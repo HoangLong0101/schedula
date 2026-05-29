@@ -1,0 +1,61 @@
+name: schedula
+description: Booking management for spa & clinic SMEs
+publish_to: none
+version: 1.0.0+1
+ 
+environment:
+  sdk: '>=3.12.0 <4.0.0'
+  flutter: '>=3.44.0'
+ 
+dependencies:
+  flutter:
+    sdk: flutter
+ 
+  # Firebase ────────────────────────────────────────────
+  firebase_core: ^4.9.0
+  firebase_auth: ^6.5.1
+  google_sign_in: ^6.3.0
+  cloud_firestore: ^6.4.1
+  firebase_messaging: ^16.2.2
+  cloud_functions: ^6.3.1
+ 
+  # State Management ──────────────────────────────────
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.8          # value equality in BLoC states
+ 
+  # Dependency Injection ──────────────────────────────
+  get_it: ^9.2.1
+  injectable: ^3.0.0         # annotation-driven DI codegen
+ 
+  # Navigation ────────────────────────────────────────
+  go_router: ^17.2.3
+ 
+  # UI / Calendar ─────────────────────────────────────
+  table_calendar: ^3.2.0
+  flutter_slidable: ^4.0.3   # swipe actions on booking cards
+  shimmer: ^3.0.0            # skeleton loading screens
+  cached_network_image: ^3.4.1
+ 
+  # Storage & Networking ───────────────────────────────
+  shared_preferences: ^2.5.5
+  flutter_secure_storage: ^10.3.1  # tokens in Keychain/Keystore
+  dio: ^5.9.2                      # HTTP client (future REST)
+ 
+  # Utilities ─────────────────────────────────────────
+  intl: ^0.20.2
+  uuid: ^4.5.3
+  logger: ^2.7.0
+  dartz: ^0.10.1             # Either<Failure, Success>
+  firebase_database: ^12.4.1
+ 
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.15.0
+  injectable_generator: ^3.0.2
+  mockito: ^5.6.4
+  bloc_test: ^10.0.0
+  flutter_flavorizr: ^2.5.0
+
+ 

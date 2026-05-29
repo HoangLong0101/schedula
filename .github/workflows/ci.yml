@@ -1,0 +1,57 @@
+name: CI
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+ 
+env:
+  FLUTTER_VERSION: '3.22.3'
+ 
+jobs:
+  analyze_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test test/unit/ --coverage
+      - uses: codecov/codecov-action@v4
+        with:
+          file: coverage/lcov.info
+ 
+  build_android:
+    runs-on: ubuntu-latest
+    needs: analyze_and_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: |
+          flutter build apk --flavor dev --dart-define=FLAVOR=dev --debug
+ 
+  build_ios:
+    runs-on: macos-latest
+    needs: analyze_and_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: |
+          flutter build ios --flavor dev --dart-define=FLAVOR=dev --debug --no-codesign

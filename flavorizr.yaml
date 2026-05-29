@@ -1,0 +1,30 @@
+# flavorizr.yaml
+app:
+  android:
+    flavorDimensions: flavor
+  ios:
+    xcodeProjectPath: ios/Runner.xcodeproj
+ 
+flavors:
+  dev:
+    app:
+      name: Schedula Dev
+    android:
+      applicationId: com.exe.schedula.dev
+    ios:
+      bundleId: com.exe.schedula.dev
+  staging:
+    app:
+      name: Schedula Staging
+    android:
+      applicationId: com.exe.schedula.staging
+    ios:
+      bundleId: com.exe.schedula.staging
+  prod:
+    app:
+      name: Schedula
+    android:
+      applicationId: com.exe.schedula
+    ios:
+      bundleId: com.exe.schedula
+

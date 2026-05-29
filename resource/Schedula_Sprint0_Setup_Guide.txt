@@ -1,0 +1,770 @@
+SCHEDULA
+Flutter Project Setup Guide
+Sprint 0 — Foundation Tasks
+Field	Detail
+Flutter	3.22+ stable (Dart 3.4+)
+Platforms	iOS 14+  ·  Android API 24+
+Architecture	Clean Architecture  ·  BLoC  ·  GetIt  ·  go_router
+Backend	Firebase — Firestore · Auth · FCM · Cloud Functions
+Environments	dev  ·  staging  ·  prod  (separate Firebase projects)
+Effort estimate	˜ 2 days total across all four tasks
+
+
+1	Initialize Flutter Project Environment
+~0.5 day  ·  Owner: Tech Lead
+
+1.1  Prerequisites
+Verify all tools are installed before creating the project.
+
+Tool	Required Version	Install
+Flutter SDK	3.22+ stable	docs.flutter.dev/get-started/install
+Dart SDK	3.4+ (bundled)	Included with Flutter
+Xcode	15.3+ (macOS)	App Store ? Xcode
+Android Studio	Hedgehog 2023.1+	developer.android.com/studio
+CocoaPods	1.15+	sudo gem install cocoapods
+Node.js	18 LTS	nodejs.org  (needed for Firebase CLI)
+Firebase CLI	13+	npm install -g firebase-tools
+FVM (optional)	latest	dart pub global activate fvm
+
+TIP	FVM (Flutter Version Manager) pins the Flutter version per-project via a .fvm/fvm_config.json file in the repo root. This prevents team members running different Flutter versions from breaking each other's builds.
+
+1.2  Create the Project
+Bootstrap
+flutter create schedula \
+  --org com.schedula \
+  --platforms ios,android \
+  --template app
+ 
+cd schedula
+ 
+# Pin Flutter version (if using FVM)
+fvm use 3.22.3
+echo ".fvm/" >> .gitignore
+
+Configure 3 Build Flavors (dev / staging / prod)
+Each flavor maps to a separate Firebase project. This keeps test data completely isolated from production.
+
+# Add flavorizr as a dev dependency
+flutter pub add dev:flutter_flavorizr
+
+Create flavorizr.yaml in the project root:
+# flavorizr.yaml
+app:
+  android:
+    flavorDimensions: flavor
+  ios:
+    xcodeProjectPath: ios/Runner.xcodeproj
+ 
+flavors:
+  dev:
+    app:
+      name: Schedula Dev
+    android:
+      applicationId: com.schedula.dev
+    ios:
+      bundleId: com.schedula.dev
+  staging:
+    app:
+      name: Schedula Staging
+    android:
+      applicationId: com.schedula.staging
+    ios:
+      bundleId: com.schedula.staging
+  prod:
+    app:
+      name: Schedula
+    android:
+      applicationId: com.schedula
+    ios:
+      bundleId: com.schedula
+
+dart run flutter_flavorizr
+
+WARN	Run flavorizr BEFORE adding Firebase. It rewrites AndroidManifest.xml and the Xcode scheme. If you run it after adding Firebase, your google-services.json placement will break and you will need to redo the FlutterFire CLI step.
+
+1.3  Folder Structure (Clean Architecture)
+lib/
++-- core/
+¦   +-- di/               # GetIt service locator
+¦   ¦   +-- injection.dart
+¦   +-- router/           # go_router routes + guards
+¦   ¦   +-- app_router.dart
+¦   +-- theme/            # AppTheme, colors, text styles
+¦   ¦   +-- app_theme.dart
+¦   +-- utils/            # DateUtils, StringUtils, etc.
+¦   +-- constants/
+¦
++-- features/
+¦   +-- auth/
+¦   ¦   +-- data/
+¦   ¦   ¦   +-- datasources/   # FirebaseAuthDataSource
+¦   ¦   ¦   +-- models/        # UserModel (Firestore DTO)
+¦   ¦   ¦   +-- repositories/  # AuthRepositoryImpl
+¦   ¦   +-- domain/
+¦   ¦   ¦   +-- entities/      # User (pure Dart, no Firebase imports)
+¦   ¦   ¦   +-- repositories/  # AuthRepository (abstract)
+¦   ¦   ¦   +-- usecases/      # SignInUseCase, SignOutUseCase
+¦   ¦   +-- presentation/
+¦   ¦       +-- bloc/          # AuthBloc, AuthEvent, AuthState
+¦   ¦       +-- pages/         # LoginPage, SplashPage
+¦   ¦
+¦   +-- booking/           # same 3-layer structure
+¦   +-- staff/
+¦   +-- customer/
+¦   +-- dashboard/
+¦
++-- main.dart
+
+1.4  main.dart
+// lib/main.dart
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'core/di/injection.dart';
+import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
+import 'firebase_options_dev.dart'     as dev;
+import 'firebase_options_staging.dart' as staging;
+import 'firebase_options_prod.dart'    as prod;
+ 
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+ 
+  const flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
+  final options = switch (flavor) {
+    'staging' => staging.DefaultFirebaseOptions.currentPlatform,
+    'prod'    => prod.DefaultFirebaseOptions.currentPlatform,
+    _         => dev.DefaultFirebaseOptions.currentPlatform,
+  };
+ 
+  await Firebase.initializeApp(options: options);
+  await configureDependencies();
+  runApp(const SchedulaApp());
+}
+ 
+class SchedulaApp extends StatelessWidget {
+  const SchedulaApp({super.key});
+  @override
+  Widget build(BuildContext context) => MaterialApp.router(
+    title: 'Schedula',
+    theme: AppTheme.light,
+    routerConfig: AppRouter.router,
+  );
+}
+ 
+// Run: flutter run --flavor dev --dart-define=FLAVOR=dev
+
+1.5  Task 1 Checklist
+Checklist Item	Done?
+flutter create ran with --org com.schedula --platforms ios,android	?
+FVM version pinned — .fvm/fvm_config.json committed	?
+flavorizr.yaml created — dart run flutter_flavorizr succeeded	?
+Three flavors exist: dev / staging / prod on both Android and iOS	?
+Clean Architecture folder structure created under lib/	?
+main.dart selects Firebase options based on FLAVOR dart-define	?
+flutter run --flavor dev --dart-define=FLAVOR=dev runs without crash	?
+.gitignore covers: build/  .dart_tool/  .fvm/  *.g.dart	?
+
+
+2	Integrate Core Dependencies & Packages
+~0.5 day  ·  Owner: Flutter Developer
+
+2.1  pubspec.yaml
+name: schedula
+description: Booking management for spa & clinic SMEs
+publish_to: none
+version: 1.0.0+1
+ 
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.22.0'
+ 
+dependencies:
+  flutter:
+    sdk: flutter
+ 
+  # Firebase --------------------------------------------
+  firebase_core: ^3.3.0
+  firebase_auth: ^5.1.3
+  cloud_firestore: ^5.2.1
+  firebase_messaging: ^15.0.4
+  cloud_functions: ^4.0.0
+ 
+  # State Management ----------------------------------
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.5          # value equality in BLoC states
+ 
+  # Dependency Injection ------------------------------
+  get_it: ^8.0.0
+  injectable: ^2.4.2         # annotation-driven DI codegen
+ 
+  # Navigation ----------------------------------------
+  go_router: ^14.2.0
+ 
+  # UI / Calendar -------------------------------------
+  table_calendar: ^3.1.2
+  flutter_slidable: ^3.1.1   # swipe actions on booking cards
+  shimmer: ^3.0.0            # skeleton loading screens
+  cached_network_image: ^3.3.1
+ 
+  # Storage & Networking -------------------------------
+  shared_preferences: ^2.3.1
+  flutter_secure_storage: ^9.0.0  # tokens in Keychain/Keystore
+  dio: ^5.5.0+1                   # HTTP client (future REST)
+ 
+  # Utilities -----------------------------------------
+  intl: ^0.19.0
+  uuid: ^4.4.0
+  logger: ^2.3.0
+  dartz: ^0.10.1             # Either<Failure, Success>
+ 
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.12
+  injectable_generator: ^2.6.1
+  mockito: ^5.4.4
+  bloc_test: ^9.1.7
+  flutter_flavorizr: ^2.3.0
+
+2.2  Why These Packages
+Package	Rationale
+flutter_bloc	Official BLoC library. Clean separation of events/states, excellent testability via bloc_test. Easier to onboard new devs compared to Riverpod.
+injectable + get_it	injectable generates DI wiring from annotations — no manual GetIt.registerFactory() for every class. Scales cleanly as codebase grows.
+go_router	Official Flutter navigation package. Supports deep links, typed routes, and auth guards. Preferred over AutoRoute for new projects.
+dartz (Either)	UseCases return Either<Failure, T>. BLoC maps Left to error state, Right to success state. Replaces try/catch exception flows in the domain layer.
+flutter_secure_storage	Stores FCM tokens and auth tokens in iOS Keychain / Android Keystore. Never use SharedPreferences for tokens.
+table_calendar	Best-maintained Flutter calendar widget. Supports multi-event day markers — exactly what the booking grid needs.
+
+2.3  GetIt + Injectable Setup
+injection.dart
+// lib/core/di/injection.dart
+import 'package:get_it/get_it.dart';
+import 'package:injectable/injectable.dart';
+import 'injection.config.dart'; // generated by build_runner
+ 
+final getIt = GetIt.instance;
+ 
+@InjectableInit()
+Future<void> configureDependencies() async => getIt.init();
+
+Annotate your classes — no manual wiring needed
+// @LazySingleton(as: X) binds the concrete class to the abstract interface X
+@LazySingleton(as: BookingRepository)
+class BookingRepositoryImpl implements BookingRepository {
+  final FirebaseFirestore _db;
+  BookingRepositoryImpl(this._db); // _db is auto-injected by GetIt
+ 
+  @override
+  Stream<List<Booking>> watchBookings(String tenantId) =>
+    _db.collection('bookings')
+       .where('tenantId', isEqualTo: tenantId)
+       .orderBy('startTime')
+       .snapshots()
+       .map((s) => s.docs
+         .map((d) => BookingModel.fromFirestore(d).toEntity())
+         .toList());
+}
+
+# After adding any @Injectable annotation, regenerate config
+dart run build_runner build --delete-conflicting-outputs
+ 
+# Watch mode during active development
+dart run build_runner watch --delete-conflicting-outputs
+
+2.4  AppTheme — Brand Colors
+// lib/core/theme/app_theme.dart
+import 'package:flutter/material.dart';
+ 
+class AppTheme {
+  static const primary   = Color(0xFF1A7F7A); // deep teal
+  static const secondary = Color(0xFFF26B5B); // soft coral
+  static const surface   = Color(0xFFE8F4F3); // teal tint
+ 
+  static ThemeData get light => ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: primary, secondary: secondary,
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: primary,
+      foregroundColor: Colors.white,
+      elevation: 0,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(52),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10)),
+      ),
+    ),
+  );
+}
+
+2.5  Task 2 Checklist
+Checklist Item	Done?
+pubspec.yaml matches the package list above	?
+flutter pub get runs with zero errors	?
+dart run build_runner build generates injection.config.dart cleanly	?
+AppTheme.primary (teal) and secondary (coral) constants defined	?
+flutter analyze returns zero issues	?
+analysis_options.yaml references flutter_lints	?
+
+
+3	Setup Firebase & Push Notification Services
+~0.5 day  ·  Owner: Lead Engineer
+
+3.1  Firebase Project Structure
+Create three Firebase projects — one per flavor. Never share a Firebase project between environments.
+
+Firebase Project	Flavor	Purpose
+schedula-dev	dev	Local dev. Seeded test data. Can use permissive Firestore rules while testing.
+schedula-staging	staging	QA and internal testing. Rules must match production exactly.
+schedula-prod	prod	Live production. Strict rules + Firebase Alerting enabled.
+
+WARN	Never point the dev Flutter flavor at the prod Firebase project. One accidental flutter run can corrupt production customer data.
+
+3.2  FlutterFire CLI — Connect Each Project
+# Install FlutterFire CLI
+dart pub global activate flutterfire_cli
+firebase login
+ 
+# DEV
+flutterfire configure \
+  --project=schedula-dev \
+  --out=lib/firebase_options_dev.dart \
+  --ios-bundle-id=com.schedula.dev \
+  --android-app-id=com.schedula.dev
+ 
+# STAGING
+flutterfire configure \
+  --project=schedula-staging \
+  --out=lib/firebase_options_staging.dart \
+  --ios-bundle-id=com.schedula.staging \
+  --android-app-id=com.schedula.staging
+ 
+# PROD
+flutterfire configure \
+  --project=schedula-prod \
+  --out=lib/firebase_options_prod.dart \
+  --ios-bundle-id=com.schedula \
+  --android-app-id=com.schedula
+
+TIP	Commit all three firebase_options_*.dart files to git. They contain only project IDs and API keys — no secrets. This is safe and recommended by the FlutterFire team.
+
+3.3  Firebase Auth — Roles as Custom Claims
+Store roles (owner / receptionist / staff) as custom claims on the Firebase Auth JWT — not in Firestore. Security Rules can then check roles without an extra database read on every request.
+
+Cloud Function — assign role (deploy to all 3 projects)
+// functions/src/auth/setUserRole.ts
+import * as admin from 'firebase-admin';
+import * as functions from 'firebase-functions';
+ 
+export const setUserRole = functions.https.onCall(async (data, context) => {
+  if (context.auth?.token?.role !== 'owner') {
+    throw new functions.https.HttpsError('permission-denied', 'Owners only');
+  }
+  const { uid, role, tenantId } = data;
+  if (!['owner','receptionist','staff'].includes(role)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Bad role');
+  }
+  await admin.auth().setCustomUserClaims(uid, { role, tenantId });
+  return { success: true };
+});
+
+Flutter — read claims after sign-in
+// Force-refresh the token so custom claims are visible immediately
+final token = await FirebaseAuth.instance.currentUser!
+    .getIdTokenResult(true); // true = bypass cache
+ 
+final role     = token.claims?['role']     as String? ?? 'staff';
+final tenantId = token.claims?['tenantId'] as String?;
+
+3.4  Firestore Security Rules
+Deploy these rules before writing any feature code. The rules enforce role access and tenant isolation simultaneously.
+
+// firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+ 
+    function isAuth()           { return request.auth != null; }
+    function role()             { return request.auth.token.get('role','staff'); }
+    function myTenant()         { return request.auth.token.get('tenantId',''); }
+    function sameTenant(docTid) { return myTenant() == docTid; }
+    function isOwner()          { return role() == 'owner'; }
+    function canBook()          { return role() == 'owner' || role() == 'receptionist'; }
+ 
+    match /bookings/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow create: if isAuth() && canBook()
+                    && sameTenant(request.resource.data.tenantId)
+                    && request.resource.data.keys().hasAll([
+                         'tenantId','staffId','customerId',
+                         'serviceId','startTime','endTime','status']);
+      allow update: if isAuth() && sameTenant(resource.data.tenantId)
+                    && (canBook() ||
+                       (role() == 'staff'
+                        && request.auth.uid == resource.data.staffId
+                        && request.resource.data.diff(resource.data)
+                             .affectedKeys().hasOnly(['status','updatedAt'])));
+      allow delete: if isOwner() && sameTenant(resource.data.tenantId);
+    }
+    match /customers/{id} {
+      allow read:  if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isAuth() && canBook()
+                   && sameTenant(request.resource.data.tenantId);
+    }
+    match /users/{userId} {
+      allow read:  if isAuth()
+                   && (request.auth.uid == userId
+                       || (isOwner() && sameTenant(resource.data.tenantId)));
+      allow write: if isOwner() && sameTenant(request.resource.data.tenantId);
+    }
+    match /services/{id} {
+      allow read:  if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isOwner() && sameTenant(request.resource.data.tenantId);
+    }
+    match /slots/{id} {
+      allow read:  if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isAuth() && canBook()
+                   && sameTenant(request.resource.data.tenantId);
+    }
+    match /notifications/{id} {
+      allow read:  if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if false; // Cloud Functions only — never from client
+    }
+  }
+}
+
+firebase use schedula-dev     && firebase deploy --only firestore:rules
+firebase use schedula-staging && firebase deploy --only firestore:rules
+firebase use schedula-prod    && firebase deploy --only firestore:rules
+
+3.5  Firestore Composite Indexes
+These queries will throw errors at runtime without composite indexes. Create them all now — each takes 5–10 minutes to build.
+
+Collection	Index Fields
+bookings	tenantId ASC  ·  startTime ASC
+bookings	tenantId ASC  ·  staffId ASC  ·  startTime ASC
+bookings	tenantId ASC  ·  status ASC  ·  startTime ASC
+customers	tenantId ASC  ·  name ASC
+slots	tenantId ASC  ·  staffId ASC  ·  date ASC
+notifications	tenantId ASC  ·  bookingId ASC  ·  scheduledAt ASC
+
+TIP	In dev, if you hit a MissingIndexException, Firestore logs a direct console link. Click it — the index is pre-filled for one-click creation.
+
+3.6  FCM — Push Notifications
+iOS: APNs setup
+1.Apple Developer Portal ? Keys ? Create key with Apple Push Notifications Service enabled
+2.Download the .p8 file — store it safely (you can only download once)
+3.Firebase Console ? schedula-dev ? Project Settings ? Cloud Messaging ? iOS app ? upload .p8 key
+4.Xcode: Runner target ? Signing & Capabilities ? + ? Push Notifications
+5.Also add Background Modes ? check Remote notifications
+
+Android: no extra certs needed
+The google-services.json placed by FlutterFire CLI is sufficient. FCM works out of the box on Android.
+
+NotificationService.dart
+// lib/core/services/notification_service.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+ 
+// Must be a top-level function (not inside a class)
+@pragma('vm:entry-point')
+Future<void> _bgHandler(RemoteMessage message) async {
+  // Keep lightweight — no UI here
+}
+ 
+class NotificationService {
+  final _fcm = FirebaseMessaging.instance;
+ 
+  Future<void> initialize() async {
+    FirebaseMessaging.onBackgroundMessage(_bgHandler);
+ 
+    await _fcm.requestPermission(alert: true, badge: true, sound: true);
+ 
+    final token = await _fcm.getToken();
+    if (token != null) await _saveToken(token);
+    _fcm.onTokenRefresh.listen(_saveToken);
+ 
+    FirebaseMessaging.onMessage.listen((msg) {
+      // TODO: show in-app snackbar or banner
+    });
+  }
+ 
+  Future<void> _saveToken(String token) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      'fcmToken': token,
+      'fcmUpdatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+}
+
+Cloud Function: scheduled reminder trigger
+// functions/src/notifications/reminders.ts
+export const sendReminders = functions.pubsub
+  .schedule('every 15 minutes').onRun(async () => {
+    const now = Date.now();
+    const h24 = now + 24 * 60 * 60 * 1000;
+    const win = 15 * 60 * 1000; // 15-min window
+    const db  = admin.firestore();
+ 
+    const snap = await db.collection('bookings')
+      .where('status',         '==',  'confirmed')
+      .where('reminder24Sent', '==',  false)
+      .where('startTime',      '>=',  Timestamp.fromMillis(h24))
+      .where('startTime',      '<',   Timestamp.fromMillis(h24 + win))
+      .get();
+ 
+    const batch = db.batch();
+    for (const doc of snap.docs) {
+      const b = doc.data();
+      const user = await db.collection('users').doc(b.customerId).get();
+      const fcmToken = user.data()?.fcmToken;
+      if (fcmToken) {
+        await admin.messaging().send({
+          token: fcmToken,
+          notification: { title: 'Nh?c l?ch', body: 'B?n có l?ch h?n vào ngày mai.' },
+        });
+      }
+      batch.update(doc.ref, { reminder24Sent: true });
+    }
+    await batch.commit();
+    // Repeat with reminder1hSent for 1-hour reminders
+  });
+
+3.7  Task 3 Checklist
+Checklist Item	Done?
+Three Firebase projects created: schedula-dev / schedula-staging / schedula-prod	?
+FlutterFire CLI run for each — three firebase_options_*.dart files committed to repo	?
+main.dart selects the correct options file based on FLAVOR dart-define	?
+Firebase Auth: Email/Password provider enabled in all three projects	?
+Firestore Security Rules deployed to all three projects	?
+Six composite indexes created and built (status: Enabled in console)	?
+APNs .p8 key uploaded to Firebase Console for iOS (all three projects)	?
+Xcode: Push Notifications + Background Modes capabilities added	?
+NotificationService.initialize() called in main() after Firebase.initializeApp()	?
+FCM token saves to Firestore users/{uid}.fcmToken on login and on token refresh	?
+Cloud Functions: functions/ folder initialized with TypeScript	?
+setUserRole callable function deployed to schedula-dev	?
+
+
+4	CI/CD Pipeline & Initial Repository Commit
+~0.5 day  ·  Owner: Lead Engineer
+
+4.1  Repo Structure
+schedula/
++-- .github/
+¦   +-- workflows/
+¦       +-- ci.yml          # PR gate: analyze + test + build
+¦       +-- deploy.yml      # on merge to main: distribute staging build
++-- android/
++-- ios/
++-- lib/
++-- test/
+¦   +-- unit/
+¦   +-- widget/
++-- functions/              # Firebase Cloud Functions (TypeScript)
++-- firestore.rules
++-- firestore.indexes.json
++-- firebase.json
++-- pubspec.yaml
++-- .fvm/fvm_config.json
++-- Makefile
++-- README.md
+
+4.2  ci.yml — Runs on Every PR
+# .github/workflows/ci.yml
+name: CI
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+ 
+env:
+  FLUTTER_VERSION: '3.22.3'
+ 
+jobs:
+  analyze_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test test/unit/ --coverage
+      - uses: codecov/codecov-action@v4
+        with:
+          file: coverage/lcov.info
+ 
+  build_android:
+    runs-on: ubuntu-latest
+    needs: analyze_and_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: |
+          flutter build apk --flavor dev --dart-define=FLAVOR=dev --debug
+ 
+  build_ios:
+    runs-on: macos-latest
+    needs: analyze_and_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: |
+          flutter build ios --flavor dev --dart-define=FLAVOR=dev --debug --no-codesign
+
+4.3  deploy.yml — Runs on Merge to Main
+# .github/workflows/deploy.yml
+name: Deploy Staging
+on:
+  push:
+    branches: [main]
+ 
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.3'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - name: Build release APK (staging)
+        run: |
+          flutter build apk \
+            --flavor staging \
+            --dart-define=FLAVOR=staging \
+            --release
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      - name: Upload to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_STAGING_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          groups: internal-testers
+          file: build/app/outputs/flutter-apk/app-staging-release.apk
+          releaseNotes: 'Build ${{ github.sha }}'
+
+4.4  GitHub Secrets
+Secret Name	How to Get It
+KEYSTORE_PASSWORD	Password you set when creating your Android .jks keystore
+KEY_ALIAS	Alias of the signing key (set during keytool key creation)
+KEY_PASSWORD	Key password (same as keystore password unless set differently)
+FIREBASE_STAGING_APP_ID	Firebase Console ? schedula-staging ? Project Settings ? Your apps ? App ID
+FIREBASE_SERVICE_ACCOUNT	Firebase Console ? Project Settings ? Service accounts ? Generate new private key ? paste entire JSON content
+
+4.5  Makefile
+# Makefile  (indent with TABS, not spaces)
+.PHONY: gen clean test run-dev run-staging analyze rules
+ 
+gen:
+	dart run build_runner build --delete-conflicting-outputs
+ 
+clean:
+	flutter clean && flutter pub get && make gen
+ 
+test:
+	flutter test --coverage
+ 
+run-dev:
+	flutter run --flavor dev --dart-define=FLAVOR=dev
+ 
+run-staging:
+	flutter run --flavor staging --dart-define=FLAVOR=staging
+ 
+analyze:
+	flutter analyze && dart format --set-exit-if-changed lib/
+ 
+rules:
+	firebase use schedula-dev && firebase deploy --only firestore:rules
+
+4.6  Branch Strategy
+Branch	Purpose	Protected?
+main	Production-ready. Triggers staging deploy on merge.	Yes — PR + all CI checks required
+develop	Integration branch. CI runs on every push.	Yes — CI required
+feature/*	Individual feature work. PR targets develop.	No
+fix/*	Bug fixes. PR into develop (or main for hotfixes).	No
+
+4.7  Initial Commit
+git init
+git checkout -b develop
+git add .
+git commit -m "chore: Sprint 0 — Flutter project foundation
+ 
+- Flutter 3.22.3, Clean Architecture, flavors: dev/staging/prod
+- Firebase connected (FlutterFire CLI), Firestore rules deployed
+- Core packages: bloc, get_it, go_router, firestore, fcm, dartz
+- GitHub Actions CI/CD: analyze + test + build on PR, deploy on merge"
+ 
+git remote add origin https://github.com/your-org/schedula.git
+git push -u origin develop
+
+4.8  Branch Protection Rules (GitHub)
+Settings ? Branches ? Add rule, branch name pattern: main
+•Require a pull request before merging — minimum 1 approval
+•Require status checks: Analyze & Test · Build Android · Build iOS
+•Require branches to be up to date before merging
+•Do not allow bypassing the above settings (applies to admins too)
+
+4.9  Task 4 Checklist
+Checklist Item	Done?
+GitHub repo created with develop and main branches	?
+.github/workflows/ci.yml committed — first CI run passes	?
+.github/workflows/deploy.yml committed	?
+All 5 GitHub Secrets configured (keystore + Firebase)	?
+Branch protection rules applied to main	?
+First staging APK distributed via Firebase App Distribution	?
+Makefile works locally: make run-dev, make test, make analyze	?
+
+
+?	Sprint 0 — Final Merge Gate
+All items below must pass before Sprint 1 begins
+
+Verification	Status
+flutter run --flavor dev boots without any error	?
+All three flavors build independently (dev / staging / prod)	?
+Firebase Auth returns a user with role + tenantId custom claims after sign-in	?
+A Firestore write with wrong tenantId is rejected by Security Rules	?
+FCM token is written to Firestore users/{uid}.fcmToken after login	?
+GitHub CI pipeline green: Analyze & Test + Build Android + Build iOS	?
+First staging APK successfully distributed via Firebase App Distribution	?
+flutter analyze returns 0 issues	?
+make gen / make test / make run-dev all work on every team machine	?
+
+
+NOTE	Sprint 0 produces zero visible features. It produces only infrastructure — and that infrastructure is what makes every subsequent sprint fast and safe. The Firestore Security Rules step is the most commonly skipped and the most expensive to retrofit later.
+
+
+— End of Document —

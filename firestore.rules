@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuth() { return request.auth != null; }
+    function role() { return isAuth() && request.auth.token.role != null ? request.auth.token.role : 'staff'; }
+    function myTenant() { return isAuth() && request.auth.token.tenantId != null ? request.auth.token.tenantId : ''; }
+    function sameTenant(docTenantId) { return myTenant() == docTenantId; }
+    function isOwner() { return role() == 'owner'; }
+    function canBook() { return role() == 'owner' || role() == 'receptionist'; }
+
+    match /bookings/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow create: if isAuth()
+        && canBook()
+        && sameTenant(request.resource.data.tenantId)
+        && request.resource.data.keys().hasAll([
+          'tenantId',
+          'staffId',
+          'customerId',
+          'serviceId',
+          'startTime',
+          'endTime',
+          'status',
+        ]);
+      allow update: if isAuth()
+        && sameTenant(resource.data.tenantId)
+        && (
+          canBook()
+          || (
+            role() == 'staff'
+            && request.auth.uid == resource.data.staffId
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status',
+              'updatedAt',
+            ])
+          )
+        );
+      allow delete: if isOwner() && sameTenant(resource.data.tenantId);
+    }
+
+    match /customers/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isAuth() && canBook() && sameTenant(request.resource.data.tenantId);
+    }
+
+    match /users/{userId} {
+      allow read: if isAuth()
+        && (
+          request.auth.uid == userId
+          || (isOwner() && sameTenant(resource.data.tenantId))
+        );
+      allow write: if isOwner() && sameTenant(request.resource.data.tenantId);
+    }
+
+    match /services/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isOwner() && sameTenant(request.resource.data.tenantId);
+    }
+
+    match /slots/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isAuth() && canBook() && sameTenant(request.resource.data.tenantId);
+    }
+
+    match /notifications/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if false;
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+	"flutter": {
+		"platforms": {
+			"android": {
+				"default": {
+					"projectId": "schedula-543b1",
+					"appId": "1:1088213596238:android:6d03e3f3e28cb1aa30ab1f",
+					"fileOutput": "android/app/google-services.json"
+				}
+			},
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "schedula-543b1",
+					"configurations": {
+						"android": "1:1088213596238:android:6d03e3f3e28cb1aa30ab1f",
+						"ios": "1:1088213596238:ios:92c229b071870c8f30ab1f"
+					}
+				}
+			}
+		}
+	},
+	"firestore": {
+		"rules": "firestore.rules",
+		"indexes": "firestore.indexes.json"
+	},
+	"functions": {
+		"source": "functions"
+	}
+}

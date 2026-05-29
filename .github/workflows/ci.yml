@@ -18,10 +18,16 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Prepare Firebase config
+        env:
+          FIREBASE_CONFIG_JSON: ${{ secrets.FIREBASE_DEV_CONFIG_JSON }}
+        run: |
+          printf '%s' "$FIREBASE_CONFIG_JSON" > .firebase-config.dev.json
+          dart run tool/bootstrap_firebase_config.dart --config-file .firebase-config.dev.json
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter analyze --no-fatal-infos
-      - run: flutter test test/unit/ --coverage
+      - run: flutter test --coverage --dart-define-from-file=.firebase-config.dev.json
       - uses: codecov/codecov-action@v4
         with:
           file: coverage/lcov.info
@@ -36,10 +42,16 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Prepare Firebase config
+        env:
+          FIREBASE_CONFIG_JSON: ${{ secrets.FIREBASE_DEV_CONFIG_JSON }}
+        run: |
+          printf '%s' "$FIREBASE_CONFIG_JSON" > .firebase-config.dev.json
+          dart run tool/bootstrap_firebase_config.dart --config-file .firebase-config.dev.json
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: |
-          flutter build apk --flavor dev --dart-define=FLAVOR=dev --debug
+          flutter build apk --flavor dev --dart-define-from-file=.firebase-config.dev.json --debug
  
   build_ios:
     runs-on: macos-latest
@@ -51,7 +63,13 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Prepare Firebase config
+        env:
+          FIREBASE_CONFIG_JSON: ${{ secrets.FIREBASE_DEV_CONFIG_JSON }}
+        run: |
+          printf '%s' "$FIREBASE_CONFIG_JSON" > .firebase-config.dev.json
+          dart run tool/bootstrap_firebase_config.dart --config-file .firebase-config.dev.json
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: |
-          flutter build ios --flavor dev --dart-define=FLAVOR=dev --debug --no-codesign
+          flutter build ios --flavor dev --dart-define-from-file=.firebase-config.dev.json --debug --no-codesign

@@ -1,17 +1,17 @@
 SCHEDULA
 Flutter Project Setup Guide
-Sprint 0 — Foundation Tasks
+Sprint 0 ï¿½ Foundation Tasks
 Field	Detail
 Flutter	3.22+ stable (Dart 3.4+)
-Platforms	iOS 14+  ·  Android API 24+
-Architecture	Clean Architecture  ·  BLoC  ·  GetIt  ·  go_router
-Backend	Firebase — Firestore · Auth · FCM · Cloud Functions
-Environments	dev  ·  staging  ·  prod  (separate Firebase projects)
-Effort estimate	˜ 2 days total across all four tasks
+Platforms	iOS 14+  ï¿½  Android API 24+
+Architecture	Clean Architecture  ï¿½  BLoC  ï¿½  GetIt  ï¿½  go_router
+Backend	Firebase ï¿½ Firestore ï¿½ Auth ï¿½ FCM ï¿½ Cloud Functions
+Environments	dev  ï¿½  staging  ï¿½  prod  (separate Firebase projects)
+Effort estimate	ï¿½ 2 days total across all four tasks
 
 
 1	Initialize Flutter Project Environment
-~0.5 day  ·  Owner: Tech Lead
+~0.5 day  ï¿½  Owner: Tech Lead
 
 1.1  Prerequisites
 Verify all tools are installed before creating the project.
@@ -85,34 +85,34 @@ WARN	Run flavorizr BEFORE adding Firebase. It rewrites AndroidManifest.xml and t
 1.3  Folder Structure (Clean Architecture)
 lib/
 +-- core/
-¦   +-- di/               # GetIt service locator
-¦   ¦   +-- injection.dart
-¦   +-- router/           # go_router routes + guards
-¦   ¦   +-- app_router.dart
-¦   +-- theme/            # AppTheme, colors, text styles
-¦   ¦   +-- app_theme.dart
-¦   +-- utils/            # DateUtils, StringUtils, etc.
-¦   +-- constants/
-¦
+ï¿½   +-- di/               # GetIt service locator
+ï¿½   ï¿½   +-- injection.dart
+ï¿½   +-- router/           # go_router routes + guards
+ï¿½   ï¿½   +-- app_router.dart
+ï¿½   +-- theme/            # AppTheme, colors, text styles
+ï¿½   ï¿½   +-- app_theme.dart
+ï¿½   +-- utils/            # DateUtils, StringUtils, etc.
+ï¿½   +-- constants/
+ï¿½
 +-- features/
-¦   +-- auth/
-¦   ¦   +-- data/
-¦   ¦   ¦   +-- datasources/   # FirebaseAuthDataSource
-¦   ¦   ¦   +-- models/        # UserModel (Firestore DTO)
-¦   ¦   ¦   +-- repositories/  # AuthRepositoryImpl
-¦   ¦   +-- domain/
-¦   ¦   ¦   +-- entities/      # User (pure Dart, no Firebase imports)
-¦   ¦   ¦   +-- repositories/  # AuthRepository (abstract)
-¦   ¦   ¦   +-- usecases/      # SignInUseCase, SignOutUseCase
-¦   ¦   +-- presentation/
-¦   ¦       +-- bloc/          # AuthBloc, AuthEvent, AuthState
-¦   ¦       +-- pages/         # LoginPage, SplashPage
-¦   ¦
-¦   +-- booking/           # same 3-layer structure
-¦   +-- staff/
-¦   +-- customer/
-¦   +-- dashboard/
-¦
+ï¿½   +-- auth/
+ï¿½   ï¿½   +-- data/
+ï¿½   ï¿½   ï¿½   +-- datasources/   # FirebaseAuthDataSource
+ï¿½   ï¿½   ï¿½   +-- models/        # UserModel (Firestore DTO)
+ï¿½   ï¿½   ï¿½   +-- repositories/  # AuthRepositoryImpl
+ï¿½   ï¿½   +-- domain/
+ï¿½   ï¿½   ï¿½   +-- entities/      # User (pure Dart, no Firebase imports)
+ï¿½   ï¿½   ï¿½   +-- repositories/  # AuthRepository (abstract)
+ï¿½   ï¿½   ï¿½   +-- usecases/      # SignInUseCase, SignOutUseCase
+ï¿½   ï¿½   +-- presentation/
+ï¿½   ï¿½       +-- bloc/          # AuthBloc, AuthEvent, AuthState
+ï¿½   ï¿½       +-- pages/         # LoginPage, SplashPage
+ï¿½   ï¿½
+ï¿½   +-- booking/           # same 3-layer structure
+ï¿½   +-- staff/
+ï¿½   +-- customer/
+ï¿½   +-- dashboard/
+ï¿½
 +-- main.dart
 
 1.4  main.dart
@@ -156,8 +156,8 @@ class SchedulaApp extends StatelessWidget {
 1.5  Task 1 Checklist
 Checklist Item	Done?
 flutter create ran with --org com.schedula --platforms ios,android	?
-FVM version pinned — .fvm/fvm_config.json committed	?
-flavorizr.yaml created — dart run flutter_flavorizr succeeded	?
+FVM version pinned ï¿½ .fvm/fvm_config.json committed	?
+flavorizr.yaml created ï¿½ dart run flutter_flavorizr succeeded	?
 Three flavors exist: dev / staging / prod on both Android and iOS	?
 Clean Architecture folder structure created under lib/	?
 main.dart selects Firebase options based on FLAVOR dart-define	?
@@ -166,7 +166,7 @@ flutter run --flavor dev --dart-define=FLAVOR=dev runs without crash	?
 
 
 2	Integrate Core Dependencies & Packages
-~0.5 day  ·  Owner: Flutter Developer
+~0.5 day  ï¿½  Owner: Flutter Developer
 
 2.1  pubspec.yaml
 name: schedula
@@ -230,11 +230,11 @@ dev_dependencies:
 2.2  Why These Packages
 Package	Rationale
 flutter_bloc	Official BLoC library. Clean separation of events/states, excellent testability via bloc_test. Easier to onboard new devs compared to Riverpod.
-injectable + get_it	injectable generates DI wiring from annotations — no manual GetIt.registerFactory() for every class. Scales cleanly as codebase grows.
+injectable + get_it	injectable generates DI wiring from annotations ï¿½ no manual GetIt.registerFactory() for every class. Scales cleanly as codebase grows.
 go_router	Official Flutter navigation package. Supports deep links, typed routes, and auth guards. Preferred over AutoRoute for new projects.
 dartz (Either)	UseCases return Either<Failure, T>. BLoC maps Left to error state, Right to success state. Replaces try/catch exception flows in the domain layer.
 flutter_secure_storage	Stores FCM tokens and auth tokens in iOS Keychain / Android Keystore. Never use SharedPreferences for tokens.
-table_calendar	Best-maintained Flutter calendar widget. Supports multi-event day markers — exactly what the booking grid needs.
+table_calendar	Best-maintained Flutter calendar widget. Supports multi-event day markers ï¿½ exactly what the booking grid needs.
 
 2.3  GetIt + Injectable Setup
 injection.dart
@@ -248,7 +248,7 @@ final getIt = GetIt.instance;
 @InjectableInit()
 Future<void> configureDependencies() async => getIt.init();
 
-Annotate your classes — no manual wiring needed
+Annotate your classes ï¿½ no manual wiring needed
 // @LazySingleton(as: X) binds the concrete class to the abstract interface X
 @LazySingleton(as: BookingRepository)
 class BookingRepositoryImpl implements BookingRepository {
@@ -272,7 +272,7 @@ dart run build_runner build --delete-conflicting-outputs
 # Watch mode during active development
 dart run build_runner watch --delete-conflicting-outputs
 
-2.4  AppTheme — Brand Colors
+2.4  AppTheme ï¿½ Brand Colors
 // lib/core/theme/app_theme.dart
 import 'package:flutter/material.dart';
  
@@ -314,10 +314,10 @@ analysis_options.yaml references flutter_lints	?
 
 
 3	Setup Firebase & Push Notification Services
-~0.5 day  ·  Owner: Lead Engineer
+~0.5 day  ï¿½  Owner: Lead Engineer
 
 3.1  Firebase Project Structure
-Create three Firebase projects — one per flavor. Never share a Firebase project between environments.
+Create three Firebase projects ï¿½ one per flavor. Never share a Firebase project between environments.
 
 Firebase Project	Flavor	Purpose
 schedula-dev	dev	Local dev. Seeded test data. Can use permissive Firestore rules while testing.
@@ -326,7 +326,7 @@ schedula-prod	prod	Live production. Strict rules + Firebase Alerting enabled.
 
 WARN	Never point the dev Flutter flavor at the prod Firebase project. One accidental flutter run can corrupt production customer data.
 
-3.2  FlutterFire CLI — Connect Each Project
+3.2  FlutterFire CLI ï¿½ Connect Each Project
 # Install FlutterFire CLI
 dart pub global activate flutterfire_cli
 firebase login
@@ -352,12 +352,12 @@ flutterfire configure \
   --ios-bundle-id=com.schedula \
   --android-app-id=com.schedula
 
-TIP	Commit all three firebase_options_*.dart files to git. They contain only project IDs and API keys — no secrets. This is safe and recommended by the FlutterFire team.
+TIP	Keep the Firebase wrapper files in git, but do not commit generated platform config or local Firebase JSON files. In this repo, real values come from ignored .firebase-config.*.json files and `--dart-define-from-file`, and `android/app/google-services.json` is generated locally when needed.
 
-3.3  Firebase Auth — Roles as Custom Claims
-Store roles (owner / receptionist / staff) as custom claims on the Firebase Auth JWT — not in Firestore. Security Rules can then check roles without an extra database read on every request.
+3.3  Firebase Auth ï¿½ Roles as Custom Claims
+Store roles (owner / receptionist / staff) as custom claims on the Firebase Auth JWT ï¿½ not in Firestore. Security Rules can then check roles without an extra database read on every request.
 
-Cloud Function — assign role (deploy to all 3 projects)
+Cloud Function ï¿½ assign role (deploy to all 3 projects)
 // functions/src/auth/setUserRole.ts
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
@@ -374,7 +374,7 @@ export const setUserRole = functions.https.onCall(async (data, context) => {
   return { success: true };
 });
 
-Flutter — read claims after sign-in
+Flutter ï¿½ read claims after sign-in
 // Force-refresh the token so custom claims are visible immediately
 final token = await FirebaseAuth.instance.currentUser!
     .getIdTokenResult(true); // true = bypass cache
@@ -434,7 +434,7 @@ service cloud.firestore {
     }
     match /notifications/{id} {
       allow read:  if isAuth() && sameTenant(resource.data.tenantId);
-      allow write: if false; // Cloud Functions only — never from client
+      allow write: if false; // Cloud Functions only ï¿½ never from client
     }
   }
 }
@@ -444,22 +444,22 @@ firebase use schedula-staging && firebase deploy --only firestore:rules
 firebase use schedula-prod    && firebase deploy --only firestore:rules
 
 3.5  Firestore Composite Indexes
-These queries will throw errors at runtime without composite indexes. Create them all now — each takes 5–10 minutes to build.
+These queries will throw errors at runtime without composite indexes. Create them all now ï¿½ each takes 5ï¿½10 minutes to build.
 
 Collection	Index Fields
-bookings	tenantId ASC  ·  startTime ASC
-bookings	tenantId ASC  ·  staffId ASC  ·  startTime ASC
-bookings	tenantId ASC  ·  status ASC  ·  startTime ASC
-customers	tenantId ASC  ·  name ASC
-slots	tenantId ASC  ·  staffId ASC  ·  date ASC
-notifications	tenantId ASC  ·  bookingId ASC  ·  scheduledAt ASC
+bookings	tenantId ASC  ï¿½  startTime ASC
+bookings	tenantId ASC  ï¿½  staffId ASC  ï¿½  startTime ASC
+bookings	tenantId ASC  ï¿½  status ASC  ï¿½  startTime ASC
+customers	tenantId ASC  ï¿½  name ASC
+slots	tenantId ASC  ï¿½  staffId ASC  ï¿½  date ASC
+notifications	tenantId ASC  ï¿½  bookingId ASC  ï¿½  scheduledAt ASC
 
-TIP	In dev, if you hit a MissingIndexException, Firestore logs a direct console link. Click it — the index is pre-filled for one-click creation.
+TIP	In dev, if you hit a MissingIndexException, Firestore logs a direct console link. Click it ï¿½ the index is pre-filled for one-click creation.
 
-3.6  FCM — Push Notifications
+3.6  FCM ï¿½ Push Notifications
 iOS: APNs setup
 1.Apple Developer Portal ? Keys ? Create key with Apple Push Notifications Service enabled
-2.Download the .p8 file — store it safely (you can only download once)
+2.Download the .p8 file ï¿½ store it safely (you can only download once)
 3.Firebase Console ? schedula-dev ? Project Settings ? Cloud Messaging ? iOS app ? upload .p8 key
 4.Xcode: Runner target ? Signing & Capabilities ? + ? Push Notifications
 5.Also add Background Modes ? check Remote notifications
@@ -476,7 +476,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 // Must be a top-level function (not inside a class)
 @pragma('vm:entry-point')
 Future<void> _bgHandler(RemoteMessage message) async {
-  // Keep lightweight — no UI here
+  // Keep lightweight ï¿½ no UI here
 }
  
 class NotificationService {
@@ -530,7 +530,7 @@ export const sendReminders = functions.pubsub
       if (fcmToken) {
         await admin.messaging().send({
           token: fcmToken,
-          notification: { title: 'Nh?c l?ch', body: 'B?n có l?ch h?n vào ngày mai.' },
+          notification: { title: 'Nh?c l?ch', body: 'B?n cï¿½ l?ch h?n vï¿½o ngï¿½y mai.' },
         });
       }
       batch.update(doc.ref, { reminder24Sent: true });
@@ -542,7 +542,7 @@ export const sendReminders = functions.pubsub
 3.7  Task 3 Checklist
 Checklist Item	Done?
 Three Firebase projects created: schedula-dev / schedula-staging / schedula-prod	?
-FlutterFire CLI run for each — three firebase_options_*.dart files committed to repo	?
+FlutterFire CLI run for each ï¿½ three firebase_options_*.dart files committed to repo	?
 main.dart selects the correct options file based on FLAVOR dart-define	?
 Firebase Auth: Email/Password provider enabled in all three projects	?
 Firestore Security Rules deployed to all three projects	?
@@ -556,20 +556,20 @@ setUserRole callable function deployed to schedula-dev	?
 
 
 4	CI/CD Pipeline & Initial Repository Commit
-~0.5 day  ·  Owner: Lead Engineer
+~0.5 day  ï¿½  Owner: Lead Engineer
 
 4.1  Repo Structure
 schedula/
 +-- .github/
-¦   +-- workflows/
-¦       +-- ci.yml          # PR gate: analyze + test + build
-¦       +-- deploy.yml      # on merge to main: distribute staging build
+ï¿½   +-- workflows/
+ï¿½       +-- ci.yml          # PR gate: analyze + test + build
+ï¿½       +-- deploy.yml      # on merge to main: distribute staging build
 +-- android/
 +-- ios/
 +-- lib/
 +-- test/
-¦   +-- unit/
-¦   +-- widget/
+ï¿½   +-- unit/
+ï¿½   +-- widget/
 +-- functions/              # Firebase Cloud Functions (TypeScript)
 +-- firestore.rules
 +-- firestore.indexes.json
@@ -579,7 +579,7 @@ schedula/
 +-- Makefile
 +-- README.md
 
-4.2  ci.yml — Runs on Every PR
+4.2  ci.yml ï¿½ Runs on Every PR
 # .github/workflows/ci.yml
 name: CI
 on:
@@ -639,7 +639,7 @@ jobs:
       - run: |
           flutter build ios --flavor dev --dart-define=FLAVOR=dev --debug --no-codesign
 
-4.3  deploy.yml — Runs on Merge to Main
+4.3  deploy.yml ï¿½ Runs on Merge to Main
 # .github/workflows/deploy.yml
 name: Deploy Staging
 on:
@@ -712,8 +712,8 @@ rules:
 
 4.6  Branch Strategy
 Branch	Purpose	Protected?
-main	Production-ready. Triggers staging deploy on merge.	Yes — PR + all CI checks required
-develop	Integration branch. CI runs on every push.	Yes — CI required
+main	Production-ready. Triggers staging deploy on merge.	Yes ï¿½ PR + all CI checks required
+develop	Integration branch. CI runs on every push.	Yes ï¿½ CI required
 feature/*	Individual feature work. PR targets develop.	No
 fix/*	Bug fixes. PR into develop (or main for hotfixes).	No
 
@@ -721,7 +721,7 @@ fix/*	Bug fixes. PR into develop (or main for hotfixes).	No
 git init
 git checkout -b develop
 git add .
-git commit -m "chore: Sprint 0 — Flutter project foundation
+git commit -m "chore: Sprint 0 ï¿½ Flutter project foundation
  
 - Flutter 3.22.3, Clean Architecture, flavors: dev/staging/prod
 - Firebase connected (FlutterFire CLI), Firestore rules deployed
@@ -733,15 +733,15 @@ git push -u origin develop
 
 4.8  Branch Protection Rules (GitHub)
 Settings ? Branches ? Add rule, branch name pattern: main
-•Require a pull request before merging — minimum 1 approval
-•Require status checks: Analyze & Test · Build Android · Build iOS
-•Require branches to be up to date before merging
-•Do not allow bypassing the above settings (applies to admins too)
+ï¿½Require a pull request before merging ï¿½ minimum 1 approval
+ï¿½Require status checks: Analyze & Test ï¿½ Build Android ï¿½ Build iOS
+ï¿½Require branches to be up to date before merging
+ï¿½Do not allow bypassing the above settings (applies to admins too)
 
 4.9  Task 4 Checklist
 Checklist Item	Done?
 GitHub repo created with develop and main branches	?
-.github/workflows/ci.yml committed — first CI run passes	?
+.github/workflows/ci.yml committed ï¿½ first CI run passes	?
 .github/workflows/deploy.yml committed	?
 All 5 GitHub Secrets configured (keystore + Firebase)	?
 Branch protection rules applied to main	?
@@ -749,7 +749,7 @@ First staging APK distributed via Firebase App Distribution	?
 Makefile works locally: make run-dev, make test, make analyze	?
 
 
-?	Sprint 0 — Final Merge Gate
+?	Sprint 0 ï¿½ Final Merge Gate
 All items below must pass before Sprint 1 begins
 
 Verification	Status
@@ -764,7 +764,7 @@ flutter analyze returns 0 issues	?
 make gen / make test / make run-dev all work on every team machine	?
 
 
-NOTE	Sprint 0 produces zero visible features. It produces only infrastructure — and that infrastructure is what makes every subsequent sprint fast and safe. The Firestore Security Rules step is the most commonly skipped and the most expensive to retrofit later.
+NOTE	Sprint 0 produces zero visible features. It produces only infrastructure ï¿½ and that infrastructure is what makes every subsequent sprint fast and safe. The Firestore Security Rules step is the most commonly skipped and the most expensive to retrofit later.
 
 
-— End of Document —
+ï¿½ End of Document ï¿½

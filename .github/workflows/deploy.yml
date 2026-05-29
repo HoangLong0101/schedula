@@ -13,13 +13,19 @@ jobs:
           flutter-version: '3.22.3'
           channel: stable
           cache: true
+      - name: Prepare Firebase config
+        env:
+          FIREBASE_CONFIG_JSON: ${{ secrets.FIREBASE_STAGING_CONFIG_JSON }}
+        run: |
+          printf '%s' "$FIREBASE_CONFIG_JSON" > .firebase-config.staging.json
+          dart run tool/bootstrap_firebase_config.dart --config-file .firebase-config.staging.json
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - name: Build release APK (staging)
         run: |
           flutter build apk \
             --flavor staging \
-            --dart-define=FLAVOR=staging \
+            --dart-define-from-file=.firebase-config.staging.json \
             --release
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

@@ -221,6 +221,18 @@ The correct Firebase project is selected at build time via `--dart-define=FLAVOR
 `main.dart` switches between `firebase_options_dev.dart`, `firebase_options_staging.dart`,
 and `firebase_options_prod.dart` accordingly.
 
+Firebase config now comes from an ignored JSON file such as `.firebase-config.dev.json`
+or `.firebase-config.staging.json`. Use `firebase-config.example.json` as the template,
+copy it to the environment-specific file you need, then run:
+
+```bash
+dart run tool/bootstrap_firebase_config.dart --config-file .firebase-config.dev.json
+flutter run --flavor dev --dart-define-from-file=.firebase-config.dev.json
+```
+
+The generator writes `android/app/google-services.json` on demand, so the Firebase API
+key and client metadata stay out of source control while Android builds still work.
+
 > ⚠️ **Never run the dev flavor against the prod Firebase project.**
 > One accidental `flutter run` can corrupt live customer data.
 

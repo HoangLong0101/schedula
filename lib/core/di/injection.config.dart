@@ -124,7 +124,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i177.GetBookingsUseCase>(
       () => _i177.GetBookingsUseCase(gh<_i262.BookingRepository>()),
     );
-    gh.factory<_i561.AuthBloc>(
+    gh.lazySingleton<_i561.AuthBloc>(
       () => _i561.AuthBloc(
         gh<_i373.SignInUseCase>(),
         gh<_i1041.SignInWithGoogleUseCase>(),

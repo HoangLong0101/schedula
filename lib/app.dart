@@ -7,7 +7,6 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_flavor.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
-import 'features/auth/presentation/bloc/auth_event.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -15,9 +14,10 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final router = getIt.isRegistered<GoRouter>() ? getIt<GoRouter>() : AppRouter.router;
+    final authBloc = getIt<AuthBloc>();
 
-    return BlocProvider(
-      create: (_) => getIt<AuthBloc>()..add(const AuthStarted()),
+    return BlocProvider.value(
+      value: authBloc,
       child: MaterialApp.router(
         title: F.title,
         theme: AppTheme.light,

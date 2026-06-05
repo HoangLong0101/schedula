@@ -7,6 +7,7 @@ import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/booking/presentation/pages/booking_page.dart';
+import '../../features/booking/presentation/pages/booking_page_wrapper.dart';
 import '../../features/customer/presentation/pages/customer_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/staff/presentation/pages/staff_page.dart';
@@ -66,7 +67,7 @@ class AppRouter {
       GoRoute(
         path: BookingPage.routePath,
         name: BookingPage.routeName,
-        builder: (_, _) => const BookingPage(),
+        builder: (context, state) => const BookingPageWrapper(),
       ),
       GoRoute(
         path: StaffPage.routePath,

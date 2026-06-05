@@ -7,7 +7,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:schedula/app.dart';
 import 'package:schedula/flavors.dart';
 import 'package:schedula/features/auth/presentation/pages/splash_page.dart';
 import 'package:flutter/material.dart';

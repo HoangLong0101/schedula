@@ -39,8 +39,20 @@ import 'package:schedula/features/booking/data/repositories/booking_repository_i
     as _i97;
 import 'package:schedula/features/booking/domain/repositories/booking_repository.dart'
     as _i262;
-import 'package:schedula/features/booking/domain/usecases/get_bookings_usecase.dart'
-    as _i177;
+import 'package:schedula/features/booking/domain/usecases/cancel_booking_usecase.dart'
+    as _i1018;
+import 'package:schedula/features/booking/domain/usecases/create_booking_usecase.dart'
+    as _i480;
+import 'package:schedula/features/booking/domain/usecases/update_booking_status_usecase.dart'
+    as _i271;
+import 'package:schedula/features/booking/domain/usecases/watch_bookings_usecase.dart'
+    as _i59;
+import 'package:schedula/features/booking/domain/usecases/watch_slots_usecase.dart'
+    as _i436;
+import 'package:schedula/features/booking/presentation/bloc/booking_bloc.dart'
+    as _i455;
+import 'package:schedula/features/booking/presentation/cubit/booking_filters_cubit.dart'
+    as _i6;
 import 'package:schedula/features/customer/data/datasources/customer_datasource.dart'
     as _i478;
 import 'package:schedula/features/customer/data/repositories/customer_repository_impl.dart'
@@ -68,6 +80,7 @@ extension GetItInjectableX on _i174.GetIt {
   }) {
     final gh = _i526.GetItHelper(this, environment, environmentFilter);
     final appModule = _$AppModule();
+    gh.factory<_i6.BookingFiltersCubit>(() => _i6.BookingFiltersCubit());
     gh.lazySingleton<_i59.FirebaseAuth>(() => appModule.firebaseAuth);
     gh.lazySingleton<_i974.FirebaseFirestore>(() => appModule.firestore);
     gh.lazySingleton<_i345.FirebaseDatabase>(() => appModule.realtimeDatabase);
@@ -100,14 +113,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i332.StaffRepository>(
       () => _i1062.StaffRepositoryImpl(gh<_i821.StaffDataSource>()),
     );
+    gh.lazySingleton<_i262.BookingRepository>(
+      () => _i97.BookingRepositoryImpl(gh<_i1019.BookingDataSource>()),
+    );
     gh.lazySingleton<_i220.DashboardRepository>(
       () => _i393.DashboardRepositoryImpl(gh<_i390.DashboardDataSource>()),
-    );
-    gh.lazySingleton<_i262.BookingRepository>(
-      () => _i97.BookingRepositoryImpl(
-        gh<_i1019.BookingDataSource>(),
-        gh<_i24.BookingRealtimeDataSource>(),
-      ),
     );
     gh.lazySingleton<_i797.AuthRepository>(
       () => _i472.AuthRepositoryImpl(gh<_i677.FirebaseAuthDataSource>()),
@@ -121,14 +131,34 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i652.SignOutUseCase>(
       () => _i652.SignOutUseCase(gh<_i797.AuthRepository>()),
     );
-    gh.factory<_i177.GetBookingsUseCase>(
-      () => _i177.GetBookingsUseCase(gh<_i262.BookingRepository>()),
+    gh.factory<_i1018.CancelBookingUseCase>(
+      () => _i1018.CancelBookingUseCase(gh<_i262.BookingRepository>()),
+    );
+    gh.factory<_i480.CreateBookingUseCase>(
+      () => _i480.CreateBookingUseCase(gh<_i262.BookingRepository>()),
+    );
+    gh.factory<_i271.UpdateBookingStatusUseCase>(
+      () => _i271.UpdateBookingStatusUseCase(gh<_i262.BookingRepository>()),
+    );
+    gh.factory<_i59.WatchBookingsUseCase>(
+      () => _i59.WatchBookingsUseCase(gh<_i262.BookingRepository>()),
+    );
+    gh.factory<_i436.WatchSlotsUseCase>(
+      () => _i436.WatchSlotsUseCase(gh<_i262.BookingRepository>()),
     );
     gh.lazySingleton<_i561.AuthBloc>(
       () => _i561.AuthBloc(
         gh<_i373.SignInUseCase>(),
         gh<_i1041.SignInWithGoogleUseCase>(),
         gh<_i652.SignOutUseCase>(),
+      ),
+    );
+    gh.lazySingleton<_i455.BookingBloc>(
+      () => _i455.BookingBloc(
+        gh<_i59.WatchBookingsUseCase>(),
+        gh<_i480.CreateBookingUseCase>(),
+        gh<_i271.UpdateBookingStatusUseCase>(),
+        gh<_i1018.CancelBookingUseCase>(),
       ),
     );
     return this;

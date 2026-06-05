@@ -24,10 +24,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignInWithGoogleUseCase _signInWithGoogleUseCase;
   final SignOutUseCase _signOutUseCase;
 
-  Future<void> _onStarted(
-    AuthStarted event,
-    Emitter<AuthState> emit,
-  ) async {
+  Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
     emit(const Unauthenticated());
   }
 
@@ -36,17 +33,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(const AuthLoading());
-    final user = await _signInUseCase(
-      email: event.email,
-      password: event.password,
-    );
+    try {
+      final user = await _signInUseCase(
+        email: event.email,
+        password: event.password,
+      );
 
-    if (user == null) {
+      if (user == null) {
+        emit(const AuthFailure('Unable to sign in'));
+        return;
+      }
+
+      emit(Authenticated(user));
+    } catch (_) {
       emit(const AuthFailure('Unable to sign in'));
-      return;
     }
-
-    emit(Authenticated(user));
   }
 
   Future<void> _onGoogleSignInRequested(
@@ -54,14 +55,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(const AuthLoading());
-    final user = await _signInWithGoogleUseCase();
+    try {
+      final user = await _signInWithGoogleUseCase();
 
-    if (user == null) {
+      if (user == null) {
+        emit(const AuthFailure('Google sign-in was cancelled or failed'));
+        return;
+      }
+
+      emit(Authenticated(user));
+    } catch (_) {
       emit(const AuthFailure('Google sign-in was cancelled or failed'));
-      return;
     }
-
-    emit(Authenticated(user));
   }
 
   Future<void> _onSignOutRequested(

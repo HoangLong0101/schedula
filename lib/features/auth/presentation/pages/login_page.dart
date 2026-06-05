@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
-import '../../../dashboard/presentation/pages/dashboard_page.dart';
+import '../../../booking/presentation/pages/booking_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -68,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          context.go(DashboardPage.routePath);
+          context.go(BookingPage.routePath);
           return;
         }
 

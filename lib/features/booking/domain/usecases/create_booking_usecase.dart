@@ -17,6 +17,9 @@ class CreateBookingParams {
     required this.status,
     this.notes,
     this.createdBy,
+    this.customerName,
+    this.staffName,
+    this.serviceName,
   });
 
   final String tenantId;
@@ -28,6 +31,9 @@ class CreateBookingParams {
   final BookingStatus status;
   final String? notes;
   final String? createdBy;
+  final String? customerName;
+  final String? staffName;
+  final String? serviceName;
 }
 
 @injectable

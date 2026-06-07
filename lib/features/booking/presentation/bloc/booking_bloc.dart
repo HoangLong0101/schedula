@@ -23,6 +23,8 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     on<BookingCreateRequested>(_onCreateRequested);
     on<BookingStatusUpdateRequested>(_onStatusUpdateRequested);
     on<BookingCancelRequested>(_onCancelRequested);
+    on<BookingWatchUpdated>(_onWatchUpdated);
+    on<BookingWatchFailed>(_onWatchFailed);
   }
 
   final WatchBookingsUseCase _watchBookingsUseCase;
@@ -41,18 +43,22 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     _bookingsSubscription = _watchBookingsUseCase(event.params).listen(
       (result) {
         result.fold(
-          (failure) {
-            if (!emit.isDone) emit(BookingFailure(failure.message));
-          },
-          (bookings) {
-            if (!emit.isDone) emit(BookingLoaded(bookings));
-          },
+          (failure) => add(BookingWatchFailed(failure.message)),
+          (bookings) => add(BookingWatchUpdated(bookings)),
         );
       },
       onError: (error) {
-        if (!emit.isDone) emit(BookingFailure(error.toString()));
+        add(BookingWatchFailed(error.toString()));
       },
     );
+  }
+
+  void _onWatchUpdated(BookingWatchUpdated event, Emitter<BookingState> emit) {
+    emit(BookingLoaded(event.bookings));
+  }
+
+  void _onWatchFailed(BookingWatchFailed event, Emitter<BookingState> emit) {
+    emit(BookingFailure(event.message, previous: _current));
   }
 
   Future<void> _onCreateRequested(

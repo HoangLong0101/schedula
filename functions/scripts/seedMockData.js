@@ -523,6 +523,12 @@ async function ensureTestUserClaims() {
   let user;
   try {
     user = await admin.auth().getUserByEmail(testUserEmail);
+    if (testUserPassword) {
+      user = await admin.auth().updateUser(user.uid, {
+        password: testUserPassword,
+      });
+      console.log(`Updated password provider for ${testUserEmail}`);
+    }
   } catch (error) {
     if (error.code !== 'auth/user-not-found' || !testUserPassword) {
       throw error;

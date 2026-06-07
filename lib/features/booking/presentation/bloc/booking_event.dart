@@ -4,6 +4,7 @@ import '../../domain/usecases/cancel_booking_usecase.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
 import '../../domain/usecases/update_booking_status_usecase.dart';
 import '../../domain/usecases/watch_bookings_usecase.dart';
+import '../../domain/entities/booking.dart';
 
 sealed class BookingEvent extends Equatable {
   const BookingEvent();
@@ -46,4 +47,22 @@ final class BookingCancelRequested extends BookingEvent {
 
   @override
   List<Object?> get props => [params];
+}
+
+final class BookingWatchUpdated extends BookingEvent {
+  const BookingWatchUpdated(this.bookings);
+
+  final List<Booking> bookings;
+
+  @override
+  List<Object?> get props => [bookings];
+}
+
+final class BookingWatchFailed extends BookingEvent {
+  const BookingWatchFailed(this.message);
+
+  final String message;
+
+  @override
+  List<Object?> get props => [message];
 }

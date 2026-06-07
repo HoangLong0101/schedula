@@ -1,10 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum BookingRangeFilter {
-  all,
-  today,
-  week,
-}
+enum BookingRangeFilter { all, today, week }
 
 class BookingFiltersState extends Equatable {
   const BookingFiltersState({
@@ -13,6 +9,8 @@ class BookingFiltersState extends Equatable {
     this.staffId,
   });
 
+  static const Object _keepStaffId = Object();
+
   final String searchQuery;
   final BookingRangeFilter range;
   final String? staffId;
@@ -20,12 +18,12 @@ class BookingFiltersState extends Equatable {
   BookingFiltersState copyWith({
     String? searchQuery,
     BookingRangeFilter? range,
-    String? staffId,
+    Object? staffId = _keepStaffId,
   }) {
     return BookingFiltersState(
       searchQuery: searchQuery ?? this.searchQuery,
       range: range ?? this.range,
-      staffId: staffId ?? this.staffId,
+      staffId: staffId == _keepStaffId ? this.staffId : staffId as String?,
     );
   }
 

@@ -2,83 +2,91 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
 class BookingFormState extends Equatable {
-  const BookingFormState({
-    this.customerId = '',
-    this.staffId = '',
-    this.serviceId = '',
-    this.date,
-    this.startTime,
-    this.endTime,
+  BookingFormState({
+    this.customerLookup = '',
+    this.customerName = '',
+    this.staffName = '',
+    this.serviceName = '',
+    DateTime? date,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
     this.notes = '',
-  });
+    this.aiMode = false,
+  }) : date = date ?? DateTime.now(),
+       startTime = startTime ?? const TimeOfDay(hour: 9, minute: 0),
+       endTime = endTime ?? const TimeOfDay(hour: 10, minute: 0);
 
-  final String customerId;
-  final String staffId;
-  final String serviceId;
-  final DateTime? date;
-  final TimeOfDay? startTime;
-  final TimeOfDay? endTime;
+  final String customerLookup;
+  final String customerName;
+  final String staffName;
+  final String serviceName;
+  final DateTime date;
+  final TimeOfDay startTime;
+  final TimeOfDay endTime;
   final String notes;
+  final bool aiMode;
 
   BookingFormState copyWith({
-    String? customerId,
-    String? staffId,
-    String? serviceId,
+    String? customerLookup,
+    String? customerName,
+    String? staffName,
+    String? serviceName,
     DateTime? date,
     TimeOfDay? startTime,
     TimeOfDay? endTime,
     String? notes,
+    bool? aiMode,
   }) {
     return BookingFormState(
-      customerId: customerId ?? this.customerId,
-      staffId: staffId ?? this.staffId,
-      serviceId: serviceId ?? this.serviceId,
+      customerLookup: customerLookup ?? this.customerLookup,
+      customerName: customerName ?? this.customerName,
+      staffName: staffName ?? this.staffName,
+      serviceName: serviceName ?? this.serviceName,
       date: date ?? this.date,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       notes: notes ?? this.notes,
+      aiMode: aiMode ?? this.aiMode,
     );
   }
 
   bool get isValid {
-    return customerId.isNotEmpty &&
-        staffId.isNotEmpty &&
-        serviceId.isNotEmpty &&
-        date != null &&
-        startTime != null &&
-        endTime != null;
+    return customerName.trim().isNotEmpty &&
+        staffName.trim().isNotEmpty &&
+        serviceName.trim().isNotEmpty &&
+        endDateTime.isAfter(startDateTime);
   }
 
-  DateTime? get startDateTime {
-    if (date == null || startTime == null) return null;
+  DateTime get startDateTime {
     return DateTime(
-      date!.year,
-      date!.month,
-      date!.day,
-      startTime!.hour,
-      startTime!.minute,
+      date.year,
+      date.month,
+      date.day,
+      startTime.hour,
+      startTime.minute,
     );
   }
 
-  DateTime? get endDateTime {
-    if (date == null || endTime == null) return null;
+  DateTime get endDateTime {
     return DateTime(
-      date!.year,
-      date!.month,
-      date!.day,
-      endTime!.hour,
-      endTime!.minute,
+      date.year,
+      date.month,
+      date.day,
+      endTime.hour,
+      endTime.minute,
     );
   }
 
   @override
   List<Object?> get props => [
-        customerId,
-        staffId,
-        serviceId,
-        date,
-        startTime,
-        endTime,
-        notes,
-      ];
+    customerLookup,
+    customerName,
+    staffName,
+    serviceName,
+    date,
+    startTime,
+    endTime,
+    notes,
+    aiMode,
+  ];
 }

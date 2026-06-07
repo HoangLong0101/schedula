@@ -36,34 +36,31 @@ class BookingDataSource {
       _firestore.collection('slots');
 
   Stream<List<BookingModel>> watchBookings(WatchBookingsParams params) {
-    Query<Map<String, dynamic>> query = _bookings
-        .where('tenantId', isEqualTo: params.tenantId)
-        .orderBy('startTime');
+    final query = _bookings.where('tenantId', isEqualTo: params.tenantId);
 
-    if (params.startDate != null) {
-      query = query.where(
-        'startTime',
-        isGreaterThanOrEqualTo: Timestamp.fromDate(params.startDate!),
-      );
-    }
-    if (params.endDate != null) {
-      query = query.where(
-        'startTime',
-        isLessThan: Timestamp.fromDate(params.endDate!),
-      );
-    }
-    if (params.staffId != null && params.staffId!.isNotEmpty) {
-      query = query.where('staffId', isEqualTo: params.staffId);
-    }
-    if (params.status != null) {
-      query = query.where('status', isEqualTo: params.status!.value);
-    }
+    return query.snapshots().map((snapshot) {
+      final bookings = snapshot.docs
+          .map(BookingModel.fromFirestore)
+          .where((booking) {
+            final matchesStart =
+                params.startDate == null ||
+                !booking.startTime.isBefore(params.startDate!);
+            final matchesEnd =
+                params.endDate == null ||
+                booking.startTime.isBefore(params.endDate!);
+            final matchesStaff =
+                params.staffId == null ||
+                params.staffId!.isEmpty ||
+                booking.staffId == params.staffId;
+            final matchesStatus =
+                params.status == null || booking.status == params.status;
 
-    return query.snapshots().map(
-          (snapshot) => snapshot.docs
-              .map(BookingModel.fromFirestore)
-              .toList(growable: false),
-        );
+            return matchesStart && matchesEnd && matchesStaff && matchesStatus;
+          })
+          .toList(growable: false);
+
+      return bookings..sort((a, b) => a.startTime.compareTo(b.startTime));
+    });
   }
 
   Stream<List<SlotModel>> watchSlots(WatchSlotsParams params) {
@@ -86,10 +83,9 @@ class BookingDataSource {
     }
 
     return query.snapshots().map(
-          (snapshot) => snapshot.docs
-              .map(SlotModel.fromFirestore)
-              .toList(growable: false),
-        );
+      (snapshot) =>
+          snapshot.docs.map(SlotModel.fromFirestore).toList(growable: false),
+    );
   }
 
   Future<BookingModel> createBooking(CreateBookingParams params) async {
@@ -138,6 +134,9 @@ class BookingDataSource {
         createdBy: params.createdBy,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        customerName: params.customerName,
+        staffName: params.staffName,
+        serviceName: params.serviceName,
       );
 
       tx.set(

@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../domain/entities/auth_exception.dart';
 import '../../domain/usecases/sign_in_usecase.dart';
 import '../../domain/usecases/sign_in_with_google_usecase.dart';
 import '../../domain/usecases/sign_out_usecase.dart';
@@ -45,6 +46,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       emit(Authenticated(user));
+    } on AuthAccessDeniedException {
+      emit(const AuthFailure('Account is not allowed'));
     } catch (_) {
       emit(const AuthFailure('Unable to sign in'));
     }
@@ -64,6 +67,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       emit(Authenticated(user));
+    } on AuthAccessDeniedException {
+      emit(const AuthFailure('Account is not allowed'));
     } catch (_) {
       emit(const AuthFailure('Google sign-in was cancelled or failed'));
     }

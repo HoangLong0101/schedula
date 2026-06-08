@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
-import '../../../dashboard/presentation/pages/dashboard_page.dart';
+import '../../../booking/presentation/pages/booking_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -49,11 +49,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     context.read<AuthBloc>().add(
-          AuthSignInRequested(
-            email: email,
-            password: password,
-          ),
-        );
+      AuthSignInRequested(email: email, password: password),
+    );
   }
 
   void _signInWithGoogle(BuildContext context) {
@@ -68,13 +65,15 @@ class _LoginPageState extends State<LoginPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          context.go(DashboardPage.routePath);
+          context.go(BookingPage.routePath);
           return;
         }
 
         if (state is AuthFailure) {
           setState(() {
-            _errorMessage = state.message == 'Google sign-in was cancelled or failed'
+            _errorMessage = state.message == 'Account is not allowed'
+                ? 'Tài khoản này chưa được cấp quyền truy cập.'
+                : state.message == 'Google sign-in was cancelled or failed'
                 ? 'Đăng nhập Google đã bị hủy hoặc thất bại.'
                 : 'Email hoặc mật khẩu không đúng.';
           });
@@ -129,7 +128,8 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: 18),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   _FormLabel(
                                     label: 'Mật khẩu',
@@ -140,12 +140,16 @@ class _LoginPageState extends State<LoginPage> {
                                     style: TextButton.styleFrom(
                                       padding: EdgeInsets.zero,
                                       minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                       foregroundColor: const Color(0xFF148A9C),
                                     ),
                                     child: const Text(
                                       'Quên mật khẩu?',
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -165,7 +169,9 @@ class _LoginPageState extends State<LoginPage> {
                                     });
                                   },
                                   icon: Icon(
-                                    _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                    _showPassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
                                     size: 18,
                                     color: const Color(0xFF9ECFDA),
                                   ),
@@ -178,7 +184,9 @@ class _LoginPageState extends State<LoginPage> {
 
                                   return _PrimaryLoginButton(
                                     loading: loading,
-                                    onPressed: loading ? null : () => _submit(context),
+                                    onPressed: loading
+                                        ? null
+                                        : () => _submit(context),
                                   );
                                 },
                               ),
@@ -196,7 +204,10 @@ class _LoginPageState extends State<LoginPage> {
                                           label: 'Google',
                                           icon: const _GoogleIcon(),
                                           loading: loading,
-                                          onPressed: loading ? null : () => _signInWithGoogle(context),
+                                          onPressed: loading
+                                              ? null
+                                              : () =>
+                                                    _signInWithGoogle(context),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
@@ -208,9 +219,13 @@ class _LoginPageState extends State<LoginPage> {
                                           onPressed: loading
                                               ? null
                                               : () {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
                                                     const SnackBar(
-                                                      content: Text('Facebook login is not implemented yet.'),
+                                                      content: Text(
+                                                        'Facebook login is not implemented yet.',
+                                                      ),
                                                     ),
                                                   );
                                                 },
@@ -227,7 +242,9 @@ class _LoginPageState extends State<LoginPage> {
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Trang đăng ký chưa được triển khai.'),
+                                      content: Text(
+                                        'Trang đăng ký chưa được triển khai.',
+                                      ),
                                     ),
                                   );
                                 },
@@ -237,7 +254,9 @@ class _LoginPageState extends State<LoginPage> {
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Đăng nhập Admin chưa được triển khai.'),
+                                      content: Text(
+                                        'Đăng nhập Admin chưa được triển khai.',
+                                      ),
                                     ),
                                   );
                                 },
@@ -407,9 +426,7 @@ class _WaveDivider extends StatelessWidget {
     return SizedBox(
       height: 26,
       width: double.infinity,
-      child: CustomPaint(
-        painter: _WaveDividerPainter(),
-      ),
+      child: CustomPaint(painter: _WaveDividerPainter()),
     );
   }
 }
@@ -466,11 +483,7 @@ class _FormLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: TextStyle(
-        fontSize: 13,
-        color: color,
-        fontWeight: FontWeight.w600,
-      ),
+      style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w600),
     );
   }
 }
@@ -517,24 +530,17 @@ class _InputField extends StatelessWidget {
         keyboardType: keyboardType,
         textInputAction: textInputAction,
         onSubmitted: onSubmitted,
-        style: const TextStyle(
-          fontSize: 16,
-          color: Color(0xFF5B6473),
-        ),
+        style: const TextStyle(fontSize: 16, color: Color(0xFF5B6473)),
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: const TextStyle(
-            fontSize: 16,
-            color: Color(0xFFB4B4B4),
-          ),
-          prefixIcon: Icon(
-            icon,
-            size: 20,
-            color: const Color(0xFF9ECFDA),
-          ),
+          hintStyle: const TextStyle(fontSize: 16, color: Color(0xFFB4B4B4)),
+          prefixIcon: Icon(icon, size: 20, color: const Color(0xFF9ECFDA)),
           suffixIcon: trailing,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 18,
+          ),
         ),
       ),
     );
@@ -554,22 +560,23 @@ class _PrimaryLoginButton extends StatelessWidget {
       height: 64,
       child: ElevatedButton(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: const Color(0xFF22AFC2),
-          disabledBackgroundColor: const Color(0xFF95DCE4),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          shadowColor: const Color(0x66148A9C),
-        ).copyWith(
-          overlayColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.pressed)) {
-              return const Color(0x22000000);
-            }
-            return null;
-          }),
-        ),
+        style:
+            ElevatedButton.styleFrom(
+              elevation: 0,
+              backgroundColor: const Color(0xFF22AFC2),
+              disabledBackgroundColor: const Color(0xFF95DCE4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              shadowColor: const Color(0x66148A9C),
+            ).copyWith(
+              overlayColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.pressed)) {
+                  return const Color(0x22000000);
+                }
+                return null;
+              }),
+            ),
         child: loading
             ? const SizedBox(
                 width: 22,
@@ -599,18 +606,19 @@ class _DividerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: const [
-        Expanded(child: Divider(height: 1, thickness: 1, color: Color(0xFFD4EEF3))),
+        Expanded(
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFD4EEF3)),
+        ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 12),
           child: Text(
             'Hoặc tiếp tục với',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFF9ECFDA),
-            ),
+            style: TextStyle(fontSize: 12, color: Color(0xFF9ECFDA)),
           ),
         ),
-        Expanded(child: Divider(height: 1, thickness: 1, color: Color(0xFFD4EEF3))),
+        Expanded(
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFD4EEF3)),
+        ),
       ],
     );
   }
@@ -732,10 +740,7 @@ class _FooterLinkRow extends StatelessWidget {
       children: [
         Text(
           prompt,
-          style: const TextStyle(
-            fontSize: 15,
-            color: Color(0xFF64A8B4),
-          ),
+          style: const TextStyle(fontSize: 15, color: Color(0xFF64A8B4)),
         ),
         TextButton(
           onPressed: onPressed,
@@ -747,10 +752,7 @@ class _FooterLinkRow extends StatelessWidget {
           ),
           child: Text(
             actionLabel,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -770,19 +772,13 @@ class _AdminLoginButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         backgroundColor: const Color(0x143AADC0),
         side: const BorderSide(color: Color(0xFFD4EEF3), width: 1.2),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.shield_outlined,
-            size: 16,
-            color: Color(0xFF148A9C),
-          ),
+          Icon(Icons.shield_outlined, size: 16, color: Color(0xFF148A9C)),
           SizedBox(width: 8),
           Text(
             'Đăng nhập Admin',

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:injectable/injectable.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../domain/entities/auth_exception.dart';
 import '../../domain/entities/user.dart';
 import '../models/user_model.dart';
 
@@ -24,6 +25,7 @@ class FirebaseAuthDataSource {
       email: email,
       password: password,
     );
+    await _ensureAuthorized(credential.user);
     return _mapUser(credential.user);
   }
 
@@ -40,14 +42,12 @@ class FirebaseAuthDataSource {
     );
 
     final userCredential = await _firebaseAuth.signInWithCredential(credential);
+    await _ensureAuthorized(userCredential.user);
     return _mapUser(userCredential.user);
   }
 
   Future<void> signOut() async {
-    await Future.wait([
-      _firebaseAuth.signOut(),
-      _googleSignIn.signOut(),
-    ]);
+    await Future.wait([_firebaseAuth.signOut(), _googleSignIn.signOut()]);
   }
 
   AppUser? _mapUser(User? user) {
@@ -55,9 +55,17 @@ class FirebaseAuthDataSource {
       return null;
     }
 
-    return UserModel(
-      id: user.uid,
-      email: user.email ?? '',
-    );
+    return UserModel(id: user.uid, email: user.email ?? '');
+  }
+
+  Future<void> _ensureAuthorized(User? user) async {
+    final token = await user?.getIdTokenResult(true);
+    final role = token?.claims?['role'] as String?;
+    final tenantId = token?.claims?['tenantId'] as String?;
+
+    if (role == null || role.isEmpty || tenantId == null || tenantId.isEmpty) {
+      await signOut();
+      throw const AuthAccessDeniedException();
+    }
   }
 }

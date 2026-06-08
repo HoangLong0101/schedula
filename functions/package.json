@@ -7,6 +7,8 @@
   "scripts": {
     "build": "tsc",
     "lint": "tsc --noEmit",
+    "seed:mock": "node scripts/seedMockData.js",
+    "seed:verify": "node scripts/verifySeedData.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

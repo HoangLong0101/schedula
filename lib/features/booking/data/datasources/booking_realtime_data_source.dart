@@ -15,10 +15,7 @@ class BookingRealtimeDataSource {
     });
   }
 
-  Future<void> setTenantLive({
-    required String tenantId,
-    required bool live,
-  }) {
+  Future<void> setTenantLive({required String tenantId, required bool live}) {
     return _root.child('tenants/$tenantId/live').set(live);
   }
 }

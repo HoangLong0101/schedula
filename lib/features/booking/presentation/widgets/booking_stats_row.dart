@@ -16,11 +16,13 @@ class BookingStatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final todayBookings = bookings.where((booking) {
-      return booking.startTime.year == today.year &&
-          booking.startTime.month == today.month &&
-          booking.startTime.day == today.day;
-    }).toList(growable: false);
+    final todayBookings = bookings
+        .where((booking) {
+          return booking.startTime.year == today.year &&
+              booking.startTime.month == today.month &&
+              booking.startTime.day == today.day;
+        })
+        .toList(growable: false);
 
     final checkedIn = bookings
         .where((booking) => booking.status == BookingStatus.inProgress)
@@ -78,16 +80,16 @@ class _StatCard extends StatelessWidget {
             Text(
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: color,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: color),
             ),
           ],
         ),

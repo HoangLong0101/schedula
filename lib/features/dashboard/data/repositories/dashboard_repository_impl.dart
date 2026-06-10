@@ -1,7 +1,10 @@
+import 'package:dartz/dartz.dart';
 import 'package:injectable/injectable.dart';
 
-import '../../domain/entities/dashboard_item.dart';
+import '../../../../core/errors/failure.dart';
+import '../../domain/entities/dashboard_stats.dart';
 import '../../domain/repositories/dashboard_repository.dart';
+import '../../domain/usecases/get_dashboard_stats_usecase.dart';
 import '../datasources/dashboard_datasource.dart';
 
 @LazySingleton(as: DashboardRepository)
@@ -11,5 +14,14 @@ class DashboardRepositoryImpl implements DashboardRepository {
   final DashboardDataSource _dataSource;
 
   @override
-  Future<List<DashboardItem>> getItems() async => await _dataSource.fetchItems();
+  Future<Either<Failure, DashboardStats>> getDashboardStats(
+    GetDashboardStatsParams params,
+  ) async {
+    try {
+      final stats = await _dataSource.fetchStats(params.tenantId);
+      return Right(stats);
+    } catch (error) {
+      return Left(ServerFailure(error.toString()));
+    }
+  }
 }

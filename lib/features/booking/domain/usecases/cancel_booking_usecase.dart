@@ -5,10 +5,7 @@ import '../../../../core/errors/failure.dart';
 import '../repositories/booking_repository.dart';
 
 class CancelBookingParams {
-  const CancelBookingParams({
-    required this.bookingId,
-    this.reason,
-  });
+  const CancelBookingParams({required this.bookingId, this.reason});
 
   final String bookingId;
   final String? reason;

@@ -2,9 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../../domain/entities/booking.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/cancel_booking_usecase.dart';
@@ -1043,22 +1045,24 @@ class _BottomActionNav extends StatelessWidget {
                           Expanded(
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: const [
-                                _NavItem(
+                              children: [
+                                const _NavItem(
                                   icon: Icons.home_outlined,
                                   label: 'Trang chủ',
                                 ),
-                                _NavItem(
+                                const _NavItem(
                                   icon: Icons.calendar_month_outlined,
                                   label: 'Lịch hẹn',
                                   active: true,
                                 ),
-                                SizedBox(width: 76),
+                                const SizedBox(width: 76),
                                 _NavItem(
                                   icon: Icons.bar_chart_outlined,
                                   label: 'Thống kê',
+                                  onTap: () =>
+                                      context.go(DashboardPage.routePath),
                                 ),
-                                _NavItem(
+                                const _NavItem(
                                   icon: Icons.person_outline,
                                   label: 'Tài khoản',
                                 ),
@@ -1456,34 +1460,40 @@ class _NavItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.active = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = Colors.white.withAlpha(active ? 255 : 178);
-    return SizedBox(
-      width: 68,
-      height: 64,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 23),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 68,
+        height: 64,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 23),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

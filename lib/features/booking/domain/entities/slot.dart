@@ -16,13 +16,7 @@ class Slot extends Equatable {
   final List<SlotInterval> intervals;
 
   @override
-  List<Object?> get props => [
-        id,
-        tenantId,
-        staffId,
-        date,
-        intervals,
-      ];
+  List<Object?> get props => [id, tenantId, staffId, date, intervals];
 }
 
 class SlotInterval extends Equatable {
@@ -37,9 +31,5 @@ class SlotInterval extends Equatable {
   final String? bookingId;
 
   @override
-  List<Object?> get props => [
-        startTime,
-        endTime,
-        bookingId,
-      ];
+  List<Object?> get props => [startTime, endTime, bookingId];
 }

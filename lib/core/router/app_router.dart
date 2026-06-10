@@ -12,6 +12,7 @@ import '../../features/booking/presentation/pages/booking_page.dart';
 import '../../features/booking/presentation/pages/booking_page_wrapper.dart';
 import '../../features/customer/presentation/pages/customer_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../../features/dashboard/presentation/pages/dashboard_page_wrapper.dart';
 import '../../features/staff/presentation/pages/staff_page.dart';
 
 class AppRouter {
@@ -68,7 +69,7 @@ class AppRouter {
       GoRoute(
         path: DashboardPage.routePath,
         name: DashboardPage.routeName,
-        builder: (_, _) => const DashboardPage(),
+        builder: (_, _) => const DashboardPageWrapper(),
       ),
       GoRoute(
         path: BookingPage.routePath,

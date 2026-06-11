@@ -14,7 +14,8 @@ class FirebaseAuthDataSource {
   final GoogleSignIn _googleSignIn;
 
   Stream<AppUser?> watchCurrentUser() {
-    return _firebaseAuth.authStateChanges().map(_mapUser);
+    // Dùng asyncMap vì việc lấy custom claims (token) là tác vụ bất đồng bộ
+    return _firebaseAuth.authStateChanges().asyncMap(_mapUserAsync);
   }
 
   Future<AppUser?> signIn({
@@ -26,7 +27,7 @@ class FirebaseAuthDataSource {
       password: password,
     );
     await _ensureAuthorized(credential.user);
-    return _mapUser(credential.user);
+    return _mapUserAsync(credential.user);
   }
 
   Future<AppUser?> signInWithGoogle() async {
@@ -43,22 +44,35 @@ class FirebaseAuthDataSource {
 
     final userCredential = await _firebaseAuth.signInWithCredential(credential);
     await _ensureAuthorized(userCredential.user);
-    return _mapUser(userCredential.user);
+    return _mapUserAsync(userCredential.user);
   }
 
   Future<void> signOut() async {
     await Future.wait([_firebaseAuth.signOut(), _googleSignIn.signOut()]);
   }
 
-  AppUser? _mapUser(User? user) {
+  // Hàm map mới xử lý việc bóc tách Custom Claims
+  Future<AppUser?> _mapUserAsync(User? user) async {
     if (user == null) {
       return null;
     }
 
-    return UserModel(id: user.uid, email: user.email ?? '');
+    // forceRefresh = false để ưu tiên cache, nhưng vì _ensureAuthorized đã forceRefresh trước đó,
+    // token ở đây luôn là mới nhất.
+    final token = await user.getIdTokenResult(false);
+    final role = token.claims?['role'] as String? ?? '';
+    final tenantId = token.claims?['tenantId'] as String? ?? '';
+
+    return UserModel(
+      id: user.uid,
+      email: user.email ?? '',
+      role: role,
+      tenantId: tenantId,
+    );
   }
 
   Future<void> _ensureAuthorized(User? user) async {
+    // forceRefresh = true để lấy quyền mới nhất từ server mỗi khi đăng nhập
     final token = await user?.getIdTokenResult(true);
     final role = token?.claims?['role'] as String?;
     final tenantId = token?.claims?['tenantId'] as String?;

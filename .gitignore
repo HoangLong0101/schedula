@@ -51,4 +51,4 @@ app.*.map.json
 /.firebase-config.prod.json
 
 # FVM Version Cache
-.fvm/.fvm/
+.fvm/

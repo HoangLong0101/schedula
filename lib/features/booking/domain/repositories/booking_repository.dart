@@ -18,15 +18,11 @@ abstract class BookingRepository {
     WatchBookingsParams params,
   );
 
-  Stream<Either<Failure, List<Slot>>> watchSlots(
-    WatchSlotsParams params,
-  );
+  Stream<Either<Failure, List<Slot>>> watchSlots(WatchSlotsParams params);
 
   Future<Either<Failure, Booking>> updateBookingStatus(
     UpdateBookingStatusParams params,
   );
 
-  Future<Either<Failure, void>> cancelBooking(
-    CancelBookingParams params,
-  );
+  Future<Either<Failure, void>> cancelBooking(CancelBookingParams params);
 }

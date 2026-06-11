@@ -95,6 +95,10 @@ import 'package:schedula/features/dashboard/data/repositories/dashboard_reposito
     as _i393;
 import 'package:schedula/features/dashboard/domain/repositories/dashboard_repository.dart'
     as _i220;
+import 'package:schedula/features/dashboard/domain/usecases/get_dashboard_stats_usecase.dart'
+    as _i184;
+import 'package:schedula/features/dashboard/presentation/cubit/dashboard_cubit.dart'
+    as _i658;
 import 'package:schedula/features/equipment/data/datasources/equipment_datasource.dart'
     as _i514;
 import 'package:schedula/features/equipment/data/repositories/equipment_repository_impl.dart'
@@ -142,6 +146,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i345.FirebaseDatabase>(() => appModule.realtimeDatabase);
     gh.lazySingleton<_i116.GoogleSignIn>(() => appModule.googleSignIn);
     gh.lazySingleton<_i583.GoRouter>(() => appModule.router);
+    gh.lazySingleton<_i478.CustomerDataSource>(
+      () => const _i478.CustomerDataSource(),
+    );
+    gh.lazySingleton<_i821.StaffDataSource>(
+      () => const _i821.StaffDataSource(),
     gh.lazySingleton<_i390.DashboardDataSource>(
       () => const _i390.DashboardDataSource(),
     );
@@ -160,6 +169,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i1019.BookingDataSource>(
       () => _i1019.BookingDataSource(gh<_i974.FirebaseFirestore>()),
     );
+    gh.lazySingleton<_i390.DashboardDataSource>(
+      () => _i390.DashboardDataSource(gh<_i974.FirebaseFirestore>()),
     gh.lazySingleton<_i955.CatalogDataSource>(
       () => _i955.CatalogDataSource(gh<_i974.FirebaseFirestore>()),
     );
@@ -187,6 +198,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i797.AuthRepository>(
       () => _i472.AuthRepositoryImpl(gh<_i677.FirebaseAuthDataSource>()),
     );
+    gh.factory<_i184.GetDashboardStatsUseCase>(
+      () => _i184.GetDashboardStatsUseCase(gh<_i220.DashboardRepository>()),
     gh.factory<_i1050.CreateStaffUseCase>(
       () => _i1050.CreateStaffUseCase(gh<_i332.StaffRepository>()),
     );
@@ -268,6 +281,8 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i1018.CancelBookingUseCase>(),
       ),
     );
+    gh.factory<_i658.DashboardCubit>(
+      () => _i658.DashboardCubit(gh<_i184.GetDashboardStatsUseCase>()),
     gh.factory<_i324.EquipmentManagementCubit>(
       () => _i324.EquipmentManagementCubit(
         gh<_i13.WatchEquipmentUseCase>(),

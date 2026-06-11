@@ -163,7 +163,7 @@ fvm use
 flutter pub get
 
 # Generate DI config (required before first run)
-dart run build_runner build --delete-conflicting-outputs
+dart run tool/bootstrap_firebase_config.dart --config-file .firebase-config.dev.json
 ```
 
 ### VS Code setup

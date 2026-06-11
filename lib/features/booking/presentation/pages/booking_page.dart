@@ -2,9 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../../domain/entities/booking.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/cancel_booking_usecase.dart';
@@ -1007,6 +1009,115 @@ class _AppointmentCard extends StatelessWidget {
   }
 }
 
+class _BottomActionNav extends StatelessWidget {
+  const _BottomActionNav({required this.onAdd});
+
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return SizedBox(
+      height: 96 + bottomInset,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 430),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: SizedBox(
+              height: 96,
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      height: 78,
+                      decoration: const BoxDecoration(color: _Tokens.nav),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                const _NavItem(
+                                  icon: Icons.home_outlined,
+                                  label: 'Trang chủ',
+                                ),
+                                const _NavItem(
+                                  icon: Icons.calendar_month_outlined,
+                                  label: 'Lịch hẹn',
+                                  active: true,
+                                ),
+                                const SizedBox(width: 76),
+                                _NavItem(
+                                  icon: Icons.bar_chart_outlined,
+                                  label: 'Thống kê',
+                                  onTap: () =>
+                                      context.go(DashboardPage.routePath),
+                                ),
+                                const _NavItem(
+                                  icon: Icons.person_outline,
+                                  label: 'Tài khoản',
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            width: 134,
+                            height: 5,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0x6622AFC2),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    child: GestureDetector(
+                      onTap: onAdd,
+                      child: Container(
+                        width: 86,
+                        height: 86,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Container(
+                          width: 66,
+                          height: 66,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _Tokens.nav, width: 8),
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            color: _Tokens.teal,
+                            size: 36,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
 
@@ -1335,6 +1446,50 @@ class _SquareAction extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(11),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    this.active = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Colors.white.withAlpha(active ? 255 : 178);
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 68,
+        height: 64,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 23),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

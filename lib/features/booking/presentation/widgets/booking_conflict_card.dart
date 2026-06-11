@@ -37,23 +37,14 @@ class BookingConflictCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
+                Text(title, style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                Text(message, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
           if (onResolve != null)
-            TextButton(
-              onPressed: onResolve,
-              child: const Text('Resolve'),
-            ),
+            TextButton(onPressed: onResolve, child: const Text('Resolve')),
         ],
       ),
     );

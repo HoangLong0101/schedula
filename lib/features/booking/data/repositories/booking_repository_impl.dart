@@ -38,7 +38,9 @@ class BookingRepositoryImpl implements BookingRepository {
   Stream<Either<Failure, List<Booking>>> watchBookings(
     WatchBookingsParams params,
   ) {
-    return _dataSource.watchBookings(params).transform(
+    return _dataSource
+        .watchBookings(params)
+        .transform(
           StreamTransformer.fromHandlers(
             handleData: (data, sink) => sink.add(Right(data)),
             handleError: (error, stackTrace, sink) {
@@ -50,7 +52,9 @@ class BookingRepositoryImpl implements BookingRepository {
 
   @override
   Stream<Either<Failure, List<Slot>>> watchSlots(WatchSlotsParams params) {
-    return _dataSource.watchSlots(params).transform(
+    return _dataSource
+        .watchSlots(params)
+        .transform(
           StreamTransformer.fromHandlers(
             handleData: (data, sink) => sink.add(Right(data)),
             handleError: (error, stackTrace, sink) {
@@ -75,7 +79,9 @@ class BookingRepositoryImpl implements BookingRepository {
   }
 
   @override
-  Future<Either<Failure, void>> cancelBooking(CancelBookingParams params) async {
+  Future<Either<Failure, void>> cancelBooking(
+    CancelBookingParams params,
+  ) async {
     try {
       await _dataSource.cancelBooking(params);
       return const Right(null);

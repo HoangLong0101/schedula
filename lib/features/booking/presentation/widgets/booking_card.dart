@@ -61,9 +61,9 @@ class BookingCard extends StatelessWidget {
                   child: Text(
                     statusStyle.label,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: statusStyle.foreground,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: statusStyle.foreground,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -71,7 +71,11 @@ class BookingCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.access_time, size: 16, color: statusStyle.foreground),
+                Icon(
+                  Icons.access_time,
+                  size: 16,
+                  color: statusStyle.foreground,
+                ),
                 const SizedBox(width: 6),
                 Text(timeRange),
               ],
@@ -97,10 +101,7 @@ class BookingCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                 ],
-                IconButton(
-                  onPressed: onEditTap,
-                  icon: const Icon(Icons.edit),
-                ),
+                IconButton(onPressed: onEditTap, icon: const Icon(Icons.edit)),
                 IconButton(
                   onPressed: onCancelTap,
                   icon: const Icon(Icons.delete_outline),

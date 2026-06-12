@@ -1,0 +1,26 @@
+services:
+  api:
+    build:
+      context: .
+    image: booking-cascade-api:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - model-cache:/root/.cache
+      - ./logs:/app/logs
+    environment:
+      PYTHONUNBUFFERED: "1"
+    # Equivalent of `docker run --gpus all`: hand every NVIDIA GPU to the
+    # container. Requires the NVIDIA container runtime on the host
+    # (Docker Desktop WSL2 has it built in; Linux: nvidia-container-toolkit).
+    # Remove this block to run CPU-only.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  model-cache:

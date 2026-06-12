@@ -1,0 +1,37 @@
+# Dữ liệu mẫu của spa, dùng cho grounding và validation.
+# (Sample spa roster used for grounding and validation.)
+
+staff:
+  - name: "Trần Thu Hương"
+    services: ["massage toàn thân", "massage đá nóng"]
+  - name: "Nguyễn Mai Lan"
+    services: ["chăm sóc da mặt", "tẩy tế bào chết"]
+  - name: "Phạm Quỳnh Anh"
+    services: ["gội đầu dưỡng sinh", "massage toàn thân"]
+  - name: "Lê Thảo Vy"
+    services: ["làm móng"]
+  - name: "Đỗ Minh Châu"
+    services: ["triệt lông", "xông hơi"]
+
+service_types:
+  - "massage toàn thân"
+  - "massage đá nóng"
+  - "chăm sóc da mặt"
+  - "tẩy tế bào chết"
+  - "gội đầu dưỡng sinh"
+  - "làm móng"
+  - "triệt lông"
+  - "xông hơi"
+
+# Giờ mở cửa theo thứ trong tuần, định dạng 24h HH:MM.
+# Thứ nào không có trong danh sách nghĩa là spa nghỉ ngày đó.
+opening_hours:
+  # monday: nghỉ (spa đóng cửa Thứ Hai)
+  tuesday:   { open: "09:00", close: "20:00" }
+  wednesday: { open: "09:00", close: "20:00" }
+  thursday:  { open: "09:00", close: "20:00" }
+  friday:    { open: "09:00", close: "20:00" }
+  saturday:  { open: "09:00", close: "20:00" }
+  sunday:    { open: "09:00", close: "18:00" }
+
+default_service_duration_minutes: 60

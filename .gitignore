@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Generated logs & extraction records (escalations, grounding, entities.json)
+logs/
+
+# Model caches (GLiNER / EasyOCR downloads live in the user cache, but just in case)
+.cache/
+*.pt
+*.pth
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local environment files
+.env
+.env.*

@@ -1,0 +1,62 @@
+# Cấu hình cho booking cascade (spa, tiếng Việt).
+# All thresholds, model names, and connection details live here -- never hardcode them.
+
+fast_path:
+  # Multilingual GLiNER -- handles Vietnamese text with Vietnamese labels.
+  gliner_model: "urchade/gliner_multi-v2.1"
+  entity_confidence_threshold: 0.45
+  # "auto" uses CUDA when available; also accepts "cuda", "cuda:0", "cpu".
+  device: "auto"
+  labels:
+    - "tên người"
+    - "ngày"
+    - "giờ"
+    - "dịch vụ spa"
+    - "thời lượng"
+
+ocr:
+  # EasyOCR settings for image input (chat screenshots, photos...).
+  languages: ["vi", "en"]
+  # true/false, or "auto" to use CUDA when available.
+  gpu: "auto"
+  min_confidence: 0.3
+
+gate:
+  # Minimum per-slot confidence to trust the fast path's assignment.
+  min_slot_confidence: 0.6
+  negation_markers:
+    - "không phải"
+    - "à không"
+    - "à mà"
+    - "thay vào đó"
+    - "thật ra"
+    - "thực ra"
+    - "đổi lại"
+    - "nhầm"
+  context_reference_markers:
+    - "như cũ"
+    - "như lần trước"
+    - "giống lần trước"
+    - "như mọi khi"
+    - "như hôm trước"
+
+slow_path:
+  ollama_host: "http://localhost:11434"
+  model: "qwen2.5:7b-instruct"
+  temperature: 0.0
+  timeout_seconds: 30
+  max_history_turns: 6
+  spa_timezone: "Asia/Ho_Chi_Minh"
+
+grounding:
+  staff_auto_correct_score: 90
+  staff_confirm_score: 70
+  service_match_score: 80
+
+logging:
+  escalation_log_path: "logs/escalations.jsonl"
+  grounding_log_path: "logs/grounding_corrections.jsonl"
+  # Every extraction made by examples/demo_conversation.py is appended here.
+  entities_log_path: "logs/entities.json"
+
+spa_data_path: "data/spa.yaml"

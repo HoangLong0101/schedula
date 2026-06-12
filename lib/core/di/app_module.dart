@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
@@ -27,4 +28,11 @@ abstract class AppModule {
 
   @lazySingleton
   GoRouter get router => AppRouter.router;
+
+  @lazySingleton
+  Dio get dio => Dio();
+
+  @Named('bookingCascadeBaseUrl')
+  String get bookingCascadeBaseUrl =>
+      const String.fromEnvironment('BOOKING_CASCADE_API_BASE_URL');
 }

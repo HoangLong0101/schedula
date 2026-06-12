@@ -10,7 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
- 
+  
+  # HTTPs
+  http: ^1.2.2
+  
   # Firebase ────────────────────────────────────────────
   firebase_core: ^4.9.0
   firebase_auth: ^6.5.1
@@ -32,6 +35,7 @@ dependencies:
  
   # UI / Calendar ─────────────────────────────────────
   table_calendar: ^3.2.0
+  image_picker: ^1.1.2   # appointment photo scan (AI booking mode)
   flutter_slidable: ^4.0.3   # swipe actions on booking cards
   shimmer: ^3.0.0            # skeleton loading screens
   cached_network_image: ^3.4.1

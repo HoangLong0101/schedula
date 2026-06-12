@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../booking/presentation/pages/booking_page.dart';
-import 'home_page.dart';
+import 'dashboard_page.dart';
 
-class DashboardPageWrapper extends StatefulWidget {
-  const DashboardPageWrapper({super.key});
+class StatisticsPageWrapper extends StatefulWidget {
+  const StatisticsPageWrapper({super.key});
 
   @override
-  State<DashboardPageWrapper> createState() => _DashboardPageWrapperState();
+  State<StatisticsPageWrapper> createState() => _StatisticsPageWrapperState();
 }
 
-class _DashboardPageWrapperState extends State<DashboardPageWrapper> {
+class _StatisticsPageWrapperState extends State<StatisticsPageWrapper> {
   String? _tenantId;
   String? _role;
   String? _error;
@@ -46,7 +46,7 @@ class _DashboardPageWrapperState extends State<DashboardPageWrapper> {
         _role = token.claims?['role'] as String?;
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _error = 'Failed to read tenant claims';
         _loading = false;
@@ -62,27 +62,27 @@ class _DashboardPageWrapperState extends State<DashboardPageWrapper> {
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Tổng quan')),
+        appBar: AppBar(title: const Text('Thống kê')),
         body: Center(child: Text(_error!)),
       );
     }
 
     if (_role != 'owner') {
-      return const _DashboardAccessDenied();
+      return const _StatisticsAccessDenied();
     }
 
-    return HomePage(tenantId: _tenantId);
+    return DashboardPage(tenantId: _tenantId);
   }
 }
 
-class _DashboardAccessDenied extends StatelessWidget {
-  const _DashboardAccessDenied();
+class _StatisticsAccessDenied extends StatelessWidget {
+  const _StatisticsAccessDenied();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Tổng quan')),
+      appBar: AppBar(title: const Text('Thống kê')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -96,7 +96,7 @@ class _DashboardAccessDenied extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Chỉ chủ cơ sở mới có thể xem trang tổng quan.',
+                'Chỉ chủ cơ sở mới có thể xem thống kê.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium,
               ),

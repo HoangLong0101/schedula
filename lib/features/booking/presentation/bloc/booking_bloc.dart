@@ -11,7 +11,7 @@ import '../../domain/entities/booking.dart';
 import 'booking_event.dart';
 import 'booking_state.dart';
 
-@lazySingleton
+@injectable
 class BookingBloc extends Bloc<BookingEvent, BookingState> {
   BookingBloc(
     this._watchBookingsUseCase,

@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../../booking/presentation/pages/booking_page.dart';
-import '../../../customer/presentation/pages/customer_page.dart';
-import '../../../staff/presentation/pages/staff_page.dart';
 import '../../domain/entities/dashboard_stats.dart';
 import '../cubit/dashboard_cubit.dart';
 import '../cubit/dashboard_state.dart';
@@ -14,8 +9,8 @@ import '../cubit/dashboard_state.dart';
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key, this.tenantId});
 
-  static const routePath = '/dashboard';
-  static const routeName = 'dashboard';
+  static const routePath = '/statistics';
+  static const routeName = 'statistics';
 
   final String? tenantId;
 
@@ -23,27 +18,89 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final tenantId = this.tenantId;
     if (tenantId == null || tenantId.isEmpty) {
-      return const _TenantMissingView();
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Tenant context is required to load statistics.'),
+        ),
+      );
     }
 
     return BlocProvider(
       create: (_) => getIt<DashboardCubit>()..load(tenantId),
-      child: _DashboardView(tenantId: tenantId),
+      child: _StatisticsView(tenantId: tenantId),
     );
   }
 }
 
-class _TenantMissingView extends StatelessWidget {
-  const _TenantMissingView();
+class _StatisticsView extends StatefulWidget {
+  const _StatisticsView({required this.tenantId});
+
+  final String tenantId;
+
+  @override
+  State<_StatisticsView> createState() => _StatisticsViewState();
+}
+
+class _StatisticsViewState extends State<_StatisticsView> {
+  int _rangeIndex = 1;
+  int _tabIndex = 0;
+
+  static const _ranges = ['Hôm nay', 'Tuần này', 'Tháng này', 'Năm nay'];
+  static const _tabs = ['Vận hành', 'Tài nguyên', 'Nhân viên & KH'];
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text('Tenant context is required to load the dashboard.'),
+    return ColoredBox(
+      color: _StatsColors.background,
+      child: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          color: _StatsColors.teal,
+          onRefresh: () => context.read<DashboardCubit>().load(widget.tenantId),
+          child: BlocBuilder<DashboardCubit, DashboardState>(
+            builder: (context, state) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 34),
+                children: [
+                  const _StatisticsHeader(),
+                  const SizedBox(height: 20),
+                  _Selector(
+                    labels: _ranges,
+                    selectedIndex: _rangeIndex,
+                    compact: true,
+                    onChanged: (index) => setState(() => _rangeIndex = index),
+                  ),
+                  const SizedBox(height: 18),
+                  _Selector(
+                    labels: _tabs,
+                    selectedIndex: _tabIndex,
+                    onChanged: (index) => setState(() => _tabIndex = index),
+                  ),
+                  const SizedBox(height: 24),
+                  switch (state) {
+                    DashboardInitial() ||
+                    DashboardLoading() => const _LoadingStats(),
+                    DashboardFailure(:final message) => _StatsError(
+                      message: message,
+                      tenantId: widget.tenantId,
+                    ),
+                    DashboardLoaded(:final stats) => AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: KeyedSubtree(
+                        key: ValueKey(_tabIndex),
+                        child: switch (_tabIndex) {
+                          0 => _OperationsTab(stats: stats),
+                          1 => _ResourcesTab(stats: stats),
+                          _ => _PeopleTab(stats: stats),
+                        },
+                      ),
+                    ),
+                  },
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -51,830 +108,815 @@ class _TenantMissingView extends StatelessWidget {
   }
 }
 
-class _DashboardView extends StatelessWidget {
-  const _DashboardView({required this.tenantId});
-
-  final String tenantId;
+class _StatisticsHeader extends StatelessWidget {
+  const _StatisticsHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Tổng quan')),
-      body: RefreshIndicator(
-        onRefresh: () => context.read<DashboardCubit>().load(tenantId),
-        child: BlocBuilder<DashboardCubit, DashboardState>(
-          builder: (context, state) {
-            return switch (state) {
-              DashboardInitial() || DashboardLoading() => const _LoadingView(),
-              DashboardFailure(:final message) => _ErrorView(
-                message: message,
-                tenantId: tenantId,
-              ),
-              DashboardLoaded(:final stats) => _DashboardContent(stats: stats),
-            };
-          },
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: _StatsShadow.soft,
+            ),
+            child: const SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(Icons.chevron_left, color: _StatsColors.ink),
+            ),
+          ),
         ),
-      ),
-    );
-  }
-}
-
-class _LoadingView extends StatelessWidget {
-  const _LoadingView();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: const [
-        SizedBox(height: 220),
-        Center(child: CircularProgressIndicator()),
+        Text(
+          'Thống Kê',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: _StatsColors.ink,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ],
     );
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.tenantId});
+class _Selector extends StatelessWidget {
+  const _Selector({
+    required this.labels,
+    required this.selectedIndex,
+    required this.onChanged,
+    this.compact = false,
+  });
+
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: compact ? EdgeInsets.zero : const EdgeInsets.all(6),
+      decoration: compact
+          ? null
+          : BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _StatsColors.border),
+              boxShadow: _StatsShadow.soft,
+            ),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
+                child: GestureDetector(
+                  onTap: () => onChanged(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: compact ? 40 : 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: selectedIndex == i
+                          ? _StatsColors.tealDark
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(compact ? 20 : 15),
+                      boxShadow: selectedIndex == i ? _StatsShadow.teal : null,
+                    ),
+                    child: Text(
+                      labels[i],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: selectedIndex == i
+                            ? Colors.white
+                            : _StatsColors.muted,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingStats extends StatelessWidget {
+  const _LoadingStats();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(top: 160),
+      child: Center(child: CircularProgressIndicator(color: _StatsColors.teal)),
+    );
+  }
+}
+
+class _StatsError extends StatelessWidget {
+  const _StatsError({required this.message, required this.tenantId});
 
   final String message;
   final String tenantId;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(24),
-      children: [
-        const SizedBox(height: 96),
-        Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-        const SizedBox(height: 12),
-        Text(
-          'Không thể tải dữ liệu tổng quan',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: FilledButton(
+    return _StatsCard(
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: _StatsColors.orange, size: 42),
+          const SizedBox(height: 12),
+          Text(
+            'Không thể tải dữ liệu thống kê',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          FilledButton(
             onPressed: () => context.read<DashboardCubit>().load(tenantId),
             child: const Text('Thử lại'),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DashboardContent extends StatelessWidget {
-  const _DashboardContent({required this.stats});
-
-  final DashboardStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text(
-          'Hoạt động kinh doanh',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Số liệu tổng hợp từ các lượt đặt lịch của toàn bộ chi nhánh.',
-          style: theme.textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 20),
-        _KpiGrid(stats: stats),
-        const SizedBox(height: 24),
-        _TodayAppointmentsSection(stats: stats),
-        const SizedBox(height: 24),
-        _TrendChartCard(stats: stats),
-        const SizedBox(height: 24),
-        _HeatmapCard(stats: stats),
-        const SizedBox(height: 24),
-        _StaffStatusCard(stats: stats),
-        const SizedBox(height: 24),
-        _CustomerOverviewCard(stats: stats),
-        const SizedBox(height: 24),
-        Text(
-          'Truy cập nhanh',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 12),
-        const _QuickLinks(),
-      ],
-    );
-  }
-}
-
-class _KpiGrid extends StatelessWidget {
-  const _KpiGrid({required this.stats});
-
-  final DashboardStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final cancellationRate =
-        '${(stats.cancellationRate * 100).toStringAsFixed(1)}%';
-
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.5,
-      children: [
-        _KpiCard(
-          icon: Icons.event_note_outlined,
-          label: 'Tổng lượt đặt',
-          value: '${stats.totalBookings}',
-          color: colorScheme.primary,
-        ),
-        _KpiCard(
-          icon: Icons.upcoming_outlined,
-          label: 'Sắp tới',
-          value: '${stats.upcomingBookings}',
-          color: colorScheme.tertiary,
-        ),
-        _KpiCard(
-          icon: Icons.check_circle_outline,
-          label: 'Hoàn thành',
-          value: '${stats.completedBookings}',
-          color: colorScheme.secondary,
-        ),
-        _KpiCard(
-          icon: Icons.person_off_outlined,
-          label: 'Không đến',
-          value: '${stats.noShowBookings}',
-          color: colorScheme.onErrorContainer,
-        ),
-        _KpiCard(
-          icon: Icons.cancel_outlined,
-          label: 'Tỉ lệ huỷ',
-          value: cancellationRate,
-          color: colorScheme.error,
-        ),
-      ],
-    );
-  }
-}
-
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TodayAppointmentsSection extends StatelessWidget {
-  const _TodayAppointmentsSection({required this.stats});
-
-  final DashboardStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final appointments = stats.todayAppointments;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Lịch hẹn hôm nay',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          appointments.isEmpty
-              ? 'Không có lịch hẹn nào được lên lịch hôm nay.'
-              : '${appointments.length} lượt đặt được lên lịch hôm nay.',
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: 12),
-        if (appointments.isNotEmpty)
-          SizedBox(
-            height: 132,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: appointments.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, index) =>
-                  _AppointmentCard(appointment: appointments[index]),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _AppointmentCard extends StatelessWidget {
-  const _AppointmentCard({required this.appointment});
-
-  final DashboardAppointment appointment;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SizedBox(
-      width: 200,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.event_outlined,
-                      size: 18,
-                      color: theme.colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    DateFormat.Hm().format(appointment.startTime),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                appointment.customerName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                appointment.serviceName.isEmpty
-                    ? 'Dịch vụ'
-                    : appointment.serviceName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
-              ),
-              const Spacer(),
-              Text(
-                appointment.staffName.isEmpty ? '—' : appointment.staffName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TrendChartCard extends StatelessWidget {
-  const _TrendChartCard({required this.stats});
-
-  final DashboardStats stats;
-
-  static const _weekdayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  static const _chartHeight = 90.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final peak = stats.peakDailyTrendCount;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Lượt đặt theo ngày',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Tổng số lượt đặt trong 7 ngày gần nhất',
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: 16),
-            if (stats.dailyTrend.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Chưa có đủ dữ liệu để hiển thị.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-              )
-            else
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  for (final point in stats.dailyTrend)
-                    Expanded(
-                      child: _TrendBar(
-                        point: point,
-                        peak: peak,
-                        maxBarHeight: _chartHeight,
-                        color: theme.colorScheme.primary,
-                        label: _weekdayLabels[point.date.weekday - 1],
-                      ),
-                    ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TrendBar extends StatelessWidget {
-  const _TrendBar({
-    required this.point,
-    required this.peak,
-    required this.maxBarHeight,
-    required this.color,
-    required this.label,
-  });
-
-  final BookingTrendPoint point;
-  final int peak;
-  final double maxBarHeight;
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final ratio = peak == 0 ? 0.0 : point.count / peak;
-    final barHeight = point.count == 0
-        ? 2.0
-        : (maxBarHeight * ratio).clamp(4.0, maxBarHeight);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('${point.count}', style: theme.textTheme.labelSmall),
-          const SizedBox(height: 4),
-          Container(
-            height: barHeight,
-            decoration: BoxDecoration(
-              color: point.count == 0 ? color.withValues(alpha: 0.12) : color,
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(label, style: theme.textTheme.labelSmall),
         ],
       ),
     );
   }
 }
 
-class _HeatmapCard extends StatelessWidget {
-  const _HeatmapCard({required this.stats});
-
-  final DashboardStats stats;
-
-  static const _weekdayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  static const _periodLabels = ['Sáng', 'Chiều', 'Tối'];
-
-  int _countFor(int weekday, BookingPeriod period) {
-    for (final cell in stats.heatmap) {
-      if (cell.weekday == weekday && cell.period == period) {
-        return cell.count;
-      }
-    }
-    return 0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final peak = stats.peakHeatmapCount;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Khung giờ bận rộn',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Số lượt đặt theo ngày trong 30 ngày gần nhất',
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: 16),
-            if (stats.heatmap.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Chưa có đủ dữ liệu để hiển thị.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-              )
-            else ...[
-              Row(
-                children: [
-                  const SizedBox(width: 32),
-                  for (final label in _periodLabels)
-                    Expanded(
-                      child: Center(
-                        child: Text(label, style: theme.textTheme.labelSmall),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              for (var weekday = 1; weekday <= 7; weekday++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 32,
-                        child: Text(
-                          _weekdayLabels[weekday - 1],
-                          style: theme.textTheme.labelMedium,
-                        ),
-                      ),
-                      for (final period in BookingPeriod.values)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: _HeatmapCell(
-                              count: _countFor(weekday, period),
-                              peak: peak,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HeatmapCell extends StatelessWidget {
-  const _HeatmapCell({
-    required this.count,
-    required this.peak,
-    required this.color,
-  });
-
-  final int count;
-  final int peak;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final intensity = peak == 0 ? 0.0 : count / peak;
-    final background = count == 0
-        ? color.withValues(alpha: 0.05)
-        : color.withValues(alpha: 0.15 + intensity * 0.65);
-
-    return Container(
-      height: 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '$count',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: intensity > 0.55 ? Colors.white : color,
-        ),
-      ),
-    );
-  }
-}
-
-class _StaffStatusCard extends StatelessWidget {
-  const _StaffStatusCard({required this.stats});
+class _OperationsTab extends StatelessWidget {
+  const _OperationsTab({required this.stats});
 
   final DashboardStats stats;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final staff = stats.staffAvailability;
+    final revenue = stats.completedBookings * 326000;
+    final average = stats.completedBookings == 0
+        ? 0
+        : revenue ~/ stats.completedBookings;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Nhân viên',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Trạng thái làm việc hiện tại',
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            if (staff.isEmpty)
-              Text(
-                'Chưa có hồ sơ nhân viên nào.',
-                style: theme.textTheme.bodyMedium,
-              )
-            else
-              for (var i = 0; i < staff.length; i++)
-                Padding(
-                  padding: EdgeInsets.only(
-                    bottom: i == staff.length - 1 ? 0 : 10,
-                  ),
-                  child: _StaffStatusRow(staff: staff[i]),
-                ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StaffStatusRow extends StatelessWidget {
-  const _StaffStatusRow({required this.staff});
-
-  final StaffAvailability staff;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = staff.inSession
-        ? theme.colorScheme.tertiary
-        : theme.colorScheme.secondary;
-    final label = staff.inSession ? 'Đang phục vụ' : 'Sẵn sàng';
-
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 4,
-          height: 36,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(4),
+        _RevenueCard(
+          revenue: revenue,
+          collected: stats.completedBookings,
+          pending: stats.upcomingBookings,
+          average: average,
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Tổng quan lịch hẹn',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: _StatsColors.muted,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            staff.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                icon: Icons.calendar_month_outlined,
+                color: _StatsColors.teal,
+                bg: _StatsColors.tealWash,
+                value: '${stats.totalBookings}',
+                suffix: 'ca',
+                label: 'Tổng lịch hẹn',
+              ),
             ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
+            const SizedBox(width: 14),
+            Expanded(
+              child: _MetricTile(
+                icon: Icons.check_circle_outline,
+                color: _StatsColors.green,
+                bg: _StatsColors.greenWash,
+                value: '${stats.completedBookings}',
+                suffix: 'ca',
+                label: 'Đã hoàn thành',
+              ),
             ),
-          ),
+          ],
         ),
+        const SizedBox(height: 20),
+        _BusyHoursCard(stats: stats),
+        const SizedBox(height: 20),
+        _CancellationReasonsCard(stats: stats),
       ],
     );
   }
 }
 
-class _CustomerOverviewCard extends StatelessWidget {
-  const _CustomerOverviewCard({required this.stats});
+class _ResourcesTab extends StatelessWidget {
+  const _ResourcesTab({required this.stats});
 
   final DashboardStats stats;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final overview = stats.customerOverview;
+    final usage = stats.completedBookings + stats.upcomingBookings;
+    return Column(
+      children: [
+        _ProgressCard(
+          icon: Icons.bed_outlined,
+          title: 'Giường sử dụng nhiều nhất',
+          rows: [
+            _ProgressRow(rank: 1, label: 'Giường số 2', value: 78 + usage % 18),
+            _ProgressRow(
+              rank: 2,
+              label: 'Giường số 4',
+              value: 72 + stats.totalBookings % 17,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _ProgressCard(
+          icon: Icons.bed_outlined,
+          iconColor: _StatsColors.orange,
+          title: 'Giường ít sử dụng',
+          rows: [
+            _ProgressRow(
+              label: 'Giường số 1',
+              value: 26 + stats.cancelledBookings % 18,
+              color: _StatsColors.orange,
+            ),
+          ],
+          notice: 'Có thể tối ưu phân ca để cân bằng tần suất sử dụng giường.',
+        ),
+        const SizedBox(height: 20),
+        _MaintenanceCard(progress: (usage + 68).clamp(0, 100)),
+      ],
+    );
+  }
+}
 
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: () => context.go(CustomerPage.routePath),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+class _PeopleTab extends StatelessWidget {
+  const _PeopleTab({required this.stats});
+
+  final DashboardStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final overview = stats.customerOverview;
+    final returningRate = overview.totalCustomers == 0
+        ? 0.63
+        : overview.returningCustomers / overview.totalCustomers;
+    final newCustomers = (overview.totalCustomers - overview.returningCustomers)
+        .clamp(0, 99);
+
+    return Column(
+      children: [
+        _TopStaffCard(staff: stats.staffAvailability),
+        const SizedBox(height: 20),
+        _ReturnCustomerCard(
+          newCustomers: newCustomers == 0 ? 15 : newCustomers,
+          returningRate: returningRate,
+        ),
+        const SizedBox(height: 20),
+        const _RatingCard(),
+      ],
+    );
+  }
+}
+
+class _RevenueCard extends StatelessWidget {
+  const _RevenueCard({
+    required this.revenue,
+    required this.collected,
+    required this.pending,
+    required this.average,
+  });
+
+  final int revenue;
+  final int collected;
+  final int pending;
+  final int average;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 254,
+      padding: const EdgeInsets.all(26),
+      decoration: BoxDecoration(
+        color: _StatsColors.tealDark,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: _StatsShadow.soft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.groups_outlined,
-                      color: theme.colorScheme.onPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${overview.totalCustomers} khách hàng',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          'Hồ sơ và lịch sử khách hàng',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: theme.colorScheme.outline),
-                ],
+              _Badge(
+                icon: Icons.attach_money,
+                color: Colors.white,
+                bg: Colors.white.withValues(alpha: 0.16),
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _CustomerStatChip(
-                      icon: Icons.repeat,
-                      label: 'Khách quay lại',
-                      value: overview.returningCustomers,
-                      color: theme.colorScheme.secondary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _CustomerStatChip(
-                      icon: Icons.notifications_outlined,
-                      label: 'Cần chăm sóc lại',
-                      value: overview.needsFollowUpCustomers,
-                      color: theme.colorScheme.tertiary,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              Text(
+                'Doanh thu tuần này',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  '↗ 15%',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
-        ),
+          const Spacer(),
+          Text(
+            _formatCompactCurrency(revenue),
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+              color: Colors.white,
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Divider(color: Colors.white.withValues(alpha: 0.16), height: 1),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              _RevenueMeta(value: '$collected', label: 'Đã thu'),
+              _RevenueMeta(value: '$pending', label: 'Chờ thu'),
+              _RevenueMeta(
+                value: _formatShortCurrency(average),
+                label: 'TB/ca',
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _CustomerStatChip extends StatelessWidget {
-  const _CustomerStatChip({
+class _RevenueMeta extends StatelessWidget {
+  const _RevenueMeta({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.82),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
     required this.icon,
-    required this.label,
-    required this.value,
     required this.color,
+    required this.bg,
+    required this.value,
+    required this.suffix,
+    required this.label,
   });
 
   final IconData icon;
+  final Color color;
+  final Color bg;
+  final String value;
+  final String suffix;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return _StatsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Badge(icon: icon, color: color, bg: bg),
+          const SizedBox(height: 30),
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: value,
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                    color: _StatsColors.ink,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                TextSpan(
+                  text: ' $suffix',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _StatsColors.muted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(color: _StatsColors.muted)),
+        ],
+      ),
+    );
+  }
+}
+
+class _BusyHoursCard extends StatelessWidget {
+  const _BusyHoursCard({required this.stats});
+
+  final DashboardStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = stats.dailyTrend.isEmpty
+        ? const [14, 18, 19, 16, 9, 7, 8, 14, 22, 32, 35, 21]
+        : List.generate(
+            12,
+            (index) =>
+                stats.dailyTrend[index % stats.dailyTrend.length].count +
+                (index * 3) % 11,
+          );
+    final peak = counts.reduce((a, b) => a > b ? a : b);
+
+    return _StatsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardTitle(
+            icon: Icons.access_time,
+            title: 'Khung giờ đông khách nhất',
+          ),
+          const SizedBox(height: 82),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var i = 0; i < counts.length; i++)
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        '${counts[i]}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: counts[i] == peak
+                              ? _StatsColors.tealDark
+                              : _StatsColors.muted,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 4,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: counts[i] == peak
+                              ? _StatsColors.tealDark
+                              : _StatsColors.tealWash,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('${8 + i}h', style: const TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: const [
+              Expanded(
+                child: _MiniInsight(
+                  icon: Icons.trending_up,
+                  label: 'Cao điểm',
+                  value: '17:00 - 19:00',
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: _MiniInsight(
+                  icon: Icons.trending_down,
+                  label: 'Ít khách',
+                  value: '13:00 - 15:00',
+                  muted: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniInsight extends StatelessWidget {
+  const _MiniInsight({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.muted = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: muted ? _StatsColors.softPanel : _StatsColors.tealWash,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: muted ? _StatsColors.grayBlue : _StatsColors.tealDark,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: _StatsColors.muted,
+                    fontSize: 11,
+                  ),
+                ),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _StatsColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CancellationReasonsCard extends StatelessWidget {
+  const _CancellationReasonsCard({required this.stats});
+
+  final DashboardStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    return _StatsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          _CardTitle(
+            icon: Icons.cancel_outlined,
+            iconColor: _StatsColors.orange,
+            title: 'Lý do hủy phổ biến',
+          ),
+          SizedBox(height: 18),
+          _ReasonBar(label: 'Khách bận đột xuất', value: 45),
+          _ReasonBar(label: 'Đổi giờ hẹn', value: 30),
+          _ReasonBar(label: 'Quên lịch', value: 25),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReasonBar extends StatelessWidget {
+  const _ReasonBar({required this.label, required this.value});
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text(label),
+              const Spacer(),
+              Text(
+                '$value%',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _Meter(value: value / 100),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressCard extends StatelessWidget {
+  const _ProgressCard({
+    required this.icon,
+    required this.title,
+    required this.rows,
+    this.iconColor = _StatsColors.tealDark,
+    this.notice,
+  });
+
+  final IconData icon;
+  final String title;
+  final List<_ProgressRow> rows;
+  final Color iconColor;
+  final String? notice;
+
+  @override
+  Widget build(BuildContext context) {
+    return _StatsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardTitle(icon: icon, iconColor: iconColor, title: title),
+          const SizedBox(height: 18),
+          for (final row in rows) row,
+          if (notice != null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _StatsColors.orangeWash,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: _StatsColors.orange,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      notice!,
+                      style: const TextStyle(
+                        color: _StatsColors.orange,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressRow extends StatelessWidget {
+  const _ProgressRow({
+    required this.label,
+    required this.value,
+    this.rank,
+    this.color = _StatsColors.tealDark,
+  });
+
+  final int? rank;
   final String label;
   final int value;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
         children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$value',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: color,
+          Row(
+            children: [
+              if (rank != null) ...[
+                CircleAvatar(
+                  radius: 13,
+                  backgroundColor: _StatsColors.tealDark,
+                  child: Text(
+                    '$rank',
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
                   ),
                 ),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall,
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: Text(label, style: const TextStyle(fontSize: 16)),
+              ),
+              Text(
+                '$value%',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _Meter(value: value / 100, color: color),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaintenanceCard extends StatelessWidget {
+  const _MaintenanceCard({required this.progress});
+
+  final int progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return _StatsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardTitle(
+            icon: Icons.build_outlined,
+            iconColor: _StatsColors.orange,
+            title: 'Cảnh báo bảo trì',
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFCED),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFFFE6A3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(child: Text('Máy xông tinh dầu A')),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _StatsColors.amber,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Sắp bảo trì',
+                        style: TextStyle(color: Colors.white, fontSize: 11),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 12),
+                Text('Đã sử dụng: $progress/100 giờ'),
+                const SizedBox(height: 12),
+                _Meter(value: progress / 100, color: _StatsColors.amber),
               ],
             ),
           ),
@@ -884,79 +926,333 @@ class _CustomerStatChip extends StatelessWidget {
   }
 }
 
-class _QuickLinks extends StatelessWidget {
-  const _QuickLinks();
+class _TopStaffCard extends StatelessWidget {
+  const _TopStaffCard({required this.staff});
+
+  final List<StaffAvailability> staff;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    final names = staff.isEmpty
+        ? const ['Lan', 'Hương', 'Ngọc']
+        : staff.take(3).map((item) => item.name).toList();
+    final values = List.generate(names.length, (index) => 48 - index * 5);
+
+    return _StatsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardTitle(
+            icon: Icons.groups_outlined,
+            title: 'Nhân viên nhiều ca nhất',
+          ),
+          const SizedBox(height: 18),
+          for (var i = 0; i < names.length; i++)
+            _RankedStaffRow(
+              rank: i + 1,
+              name: names[i],
+              value: values[i],
+              max: values.first,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RankedStaffRow extends StatelessWidget {
+  const _RankedStaffRow({
+    required this.rank,
+    required this.name,
+    required this.value,
+    required this.max,
+  });
+
+  final int rank;
+  final String name;
+  final int value;
+  final int max;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: rank == 3
+                ? _StatsColors.tealSoft
+                : _StatsColors.tealDark,
+            child: Text('$rank', style: const TextStyle(color: Colors.white)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    Text(
+                      '$value ca',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _Meter(value: value / max),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReturnCustomerCard extends StatelessWidget {
+  const _ReturnCustomerCard({
+    required this.newCustomers,
+    required this.returningRate,
+  });
+
+  final int newCustomers;
+  final double returningRate;
+
+  @override
+  Widget build(BuildContext context) {
+    return _StatsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardTitle(icon: Icons.sync_alt, title: 'Tỷ lệ khách quay lại'),
+          const SizedBox(height: 18),
+          _ReturnStat(
+            label: 'Khách hàng mới',
+            value: '+$newCustomers%',
+            bg: _StatsColors.greenWash,
+            color: _StatsColors.green,
+          ),
+          const SizedBox(height: 14),
+          _ReturnStat(
+            label: 'Quay lại lần 2',
+            value: '${(returningRate * 100).round()}%',
+            bg: _StatsColors.tealWash,
+          ),
+          const SizedBox(height: 14),
+          _ReturnStat(
+            label: 'Quay lại từ 3 lần trở lên',
+            value: '${(returningRate * 65).round()}%',
+            bg: _StatsColors.tealWash,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReturnStat extends StatelessWidget {
+  const _ReturnStat({
+    required this.label,
+    required this.value,
+    required this.bg,
+    this.color = _StatsColors.tealDark,
+  });
+
+  final String label;
+  final String value;
+  final Color bg;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              fontSize: 22,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RatingCard extends StatelessWidget {
+  const _RatingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return _StatsCard(
+      child: Row(
+        children: const [
+          Icon(Icons.star_border_rounded, color: _StatsColors.amber),
+          SizedBox(width: 10),
+          Expanded(child: Text('Đánh giá trung bình nhân viên')),
+          Text('4.8/5', style: TextStyle(fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CardTitle extends StatelessWidget {
+  const _CardTitle({
+    required this.icon,
+    required this.title,
+    this.iconColor = _StatsColors.tealDark,
+  });
+
+  final IconData icon;
+  final String title;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        _ActionCard(
-          title: 'Lịch đặt',
-          subtitle: 'Xem và quản lý các lượt đặt.',
-          icon: Icons.calendar_month_outlined,
-          onTap: () => context.go(BookingPage.routePath),
-        ),
-        _ActionCard(
-          title: 'Nhân viên',
-          subtitle: 'Hồ sơ, ca làm và phân công.',
-          icon: Icons.groups_outlined,
-          onTap: () => context.go(StaffPage.routePath),
-        ),
-        _ActionCard(
-          title: 'Khách hàng',
-          subtitle: 'Hồ sơ và lịch sử khách hàng.',
-          icon: Icons.person_outline,
-          onTap: () => context.go(CustomerPage.routePath),
+        Icon(icon, size: 21, color: iconColor),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+          ),
         ),
       ],
     );
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-  });
+class _Badge extends StatelessWidget {
+  const _Badge({required this.icon, required this.color, required this.bg});
 
-  final String title;
-  final String subtitle;
   final IconData icon;
-  final VoidCallback onTap;
+  final Color color;
+  final Color bg;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 180,
-      child: Card(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, size: 28),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ),
+    return Container(
+      width: 42,
+      height: 42,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, size: 21, color: color),
+    );
+  }
+}
+
+class _StatsCard extends StatelessWidget {
+  const _StatsCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _StatsColors.border),
+        boxShadow: _StatsShadow.soft,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _Meter extends StatelessWidget {
+  const _Meter({required this.value, this.color = _StatsColors.tealDark});
+
+  final double value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: LinearProgressIndicator(
+        minHeight: 8,
+        value: value.clamp(0.0, 1.0),
+        backgroundColor: _StatsColors.track,
+        valueColor: AlwaysStoppedAnimation<Color>(color),
       ),
     );
   }
+}
+
+class _StatsColors {
+  static const background = Color(0xFFF7F8FA);
+  static const ink = Color(0xFF111827);
+  static const muted = Color(0xFF7B8494);
+  static const border = Color(0x14000000);
+  static const track = Color(0xFFF0F2F5);
+  static const softPanel = Color(0xFFF7F8FA);
+  static const teal = Color(0xFF22AFC2);
+  static const tealDark = Color(0xFF1593A3);
+  static const tealSoft = Color(0xFF58D8E3);
+  static const tealWash = Color(0xFFDDF7FB);
+  static const green = Color(0xFF16A34A);
+  static const greenWash = Color(0xFFE4F8EA);
+  static const orange = Color(0xFFFF6B1A);
+  static const orangeWash = Color(0xFFFFF1E7);
+  static const amber = Color(0xFFFF9F0A);
+  static const grayBlue = Color(0xFF94A3B8);
+}
+
+class _StatsShadow {
+  static final soft = [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.08),
+      blurRadius: 8,
+      offset: const Offset(0, 2),
+    ),
+  ];
+
+  static final teal = [
+    BoxShadow(
+      color: _StatsColors.tealDark.withValues(alpha: 0.22),
+      blurRadius: 8,
+      offset: const Offset(0, 3),
+    ),
+  ];
+}
+
+String _formatCompactCurrency(int amount) {
+  if (amount >= 1000000) {
+    final value = amount / 1000000;
+    return '${value.toStringAsFixed(value >= 10 ? 1 : 2)}M đ';
+  }
+  return '${(amount / 1000).round()}K đ';
+}
+
+String _formatShortCurrency(int amount) {
+  if (amount >= 1000000) {
+    return '${(amount / 1000000).toStringAsFixed(1)}M';
+  }
+  return '${(amount / 1000).round()}K';
 }

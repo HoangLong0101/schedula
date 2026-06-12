@@ -38,8 +38,8 @@ class BookingPage extends StatelessWidget {
       providers: [
         BlocProvider(
           create: (_) =>
-          getIt<BookingBloc>()
-            ..add(BookingStarted(WatchBookingsParams(tenantId: tenantId!))),
+              getIt<BookingBloc>()
+                ..add(BookingStarted(WatchBookingsParams(tenantId: tenantId!))),
         ),
         BlocProvider(create: (_) => getIt<BookingFiltersCubit>()),
       ],
@@ -74,6 +74,8 @@ class _BookingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bookingBloc = context.read<BookingBloc>();
+
     return BlocListener<BookingBloc, BookingState>(
       listener: (context, state) {
         if (state is BookingFailure) {
@@ -94,7 +96,7 @@ class _BookingView extends StatelessWidget {
                   return previous.range != next.range ||
                       previous.staffId != next.staffId;
                 },
-                listener: _syncFilters,
+                listener: (_, filters) => _syncFilters(bookingBloc, filters),
                 child: BlocBuilder<BookingFiltersCubit, BookingFiltersState>(
                   builder: (context, filters) {
                     return BlocBuilder<BookingBloc, BookingState>(
@@ -162,7 +164,7 @@ class _BookingView extends StatelessWidget {
                                 child: _EmptyState(
                                   tenantId: tenantId,
                                   hasSearch:
-                                  filters.searchQuery.isNotEmpty ||
+                                      filters.searchQuery.isNotEmpty ||
                                       filters.staffId != null,
                                   failureMessage: failureMessage,
                                 ),
@@ -178,7 +180,7 @@ class _BookingView extends StatelessWidget {
                                 sliver: SliverList.separated(
                                   itemCount: filtered.length,
                                   separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 14),
+                                      const SizedBox(height: 14),
                                   itemBuilder: (context, index) {
                                     final booking = filtered[index];
                                     return _AppointmentCard(
@@ -229,7 +231,7 @@ class _BookingView extends StatelessWidget {
     );
   }
 
-  void _syncFilters(BuildContext context, BookingFiltersState filters) {
+  void _syncFilters(BookingBloc bookingBloc, BookingFiltersState filters) {
     final now = DateTime.now();
     DateTime? start;
     DateTime? end;
@@ -247,7 +249,7 @@ class _BookingView extends StatelessWidget {
       end = start.add(const Duration(days: 7));
     }
 
-    context.read<BookingBloc>().add(
+    bookingBloc.add(
       BookingStarted(
         WatchBookingsParams(
           tenantId: tenantId,
@@ -270,14 +272,14 @@ class _BookingView extends StatelessWidget {
   }
 
   List<Booking> _applyFilters(
-      List<Booking> bookings,
-      BookingFiltersState filters,
-      ) {
+    List<Booking> bookings,
+    BookingFiltersState filters,
+  ) {
     final query = filters.searchQuery.toLowerCase();
     return bookings
         .where((booking) {
-      final matchesSearch =
-          query.isEmpty ||
+          final matchesSearch =
+              query.isEmpty ||
               booking.customerName?.toLowerCase().contains(query) == true ||
               booking.staffName?.toLowerCase().contains(query) == true ||
               booking.serviceName?.toLowerCase().contains(query) == true ||
@@ -285,11 +287,11 @@ class _BookingView extends StatelessWidget {
               booking.staffId.toLowerCase().contains(query) ||
               booking.serviceId.toLowerCase().contains(query);
 
-      final matchesStaff =
-          filters.staffId == null || booking.staffId == filters.staffId;
+          final matchesStaff =
+              filters.staffId == null || booking.staffId == filters.staffId;
 
-      return matchesSearch && matchesStaff;
-    })
+          return matchesSearch && matchesStaff;
+        })
         .toList(growable: false);
   }
 
@@ -298,7 +300,7 @@ class _BookingView extends StatelessWidget {
     for (final booking in bookings) {
       byId.putIfAbsent(
         booking.staffId,
-            () => _StaffOption(
+        () => _StaffOption(
           id: booking.staffId,
           name: booking.staffName ?? booking.staffId,
         ),
@@ -313,9 +315,9 @@ class _BookingView extends StatelessWidget {
     final active = bookings
         .where(
           (booking) =>
-      booking.status != BookingStatus.cancelled &&
-          booking.status != BookingStatus.completed,
-    )
+              booking.status != BookingStatus.cancelled &&
+              booking.status != BookingStatus.completed,
+        )
         .toList(growable: false);
 
     for (var i = 0; i < active.length; i += 1) {
@@ -338,7 +340,7 @@ class _BookingView extends StatelessWidget {
               booking: later,
               label: 'Trùng nhân viên',
               reason:
-              '${later.staffName ?? later.staffId} đã có lịch với ${earlier.customerName ?? earlier.customerId}',
+                  '${later.staffName ?? later.staffId} đã có lịch với ${earlier.customerName ?? earlier.customerId}',
               suggestedTime: suggested,
               icon: Icons.groups_outlined,
               accent: _Tokens.danger,
@@ -351,10 +353,10 @@ class _BookingView extends StatelessWidget {
 
     final today = DateTime.now();
     final todayBookings =
-    active
-        .where((booking) => _sameDay(booking.startTime, today))
-        .toList(growable: false)
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+        active
+            .where((booking) => _sameDay(booking.startTime, today))
+            .toList(growable: false)
+          ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
     if (conflicts.isEmpty && todayBookings.length >= 2) {
       final target = todayBookings[1];
@@ -363,7 +365,7 @@ class _BookingView extends StatelessWidget {
           booking: target,
           label: 'Trùng thiết bị',
           reason:
-          'Giường số 2 đang được sử dụng cho ${todayBookings.first.customerName ?? todayBookings.first.customerId}',
+              'Giường số 2 đang được sử dụng cho ${todayBookings.first.customerName ?? todayBookings.first.customerId}',
           suggestedTime: target.startTime.add(const Duration(minutes: 30)),
           icon: Icons.construction_outlined,
           accent: _Tokens.orange,
@@ -590,9 +592,9 @@ class _StatsRow extends StatelessWidget {
     final waiting = bookings
         .where(
           (booking) =>
-      booking.status == BookingStatus.confirmed ||
-          booking.status == BookingStatus.pending,
-    )
+              booking.status == BookingStatus.confirmed ||
+              booking.status == BookingStatus.pending,
+        )
         .length;
 
     return Row(

@@ -18,9 +18,6 @@ class DashboardStatsModel extends DashboardStats {
 
   static const _trendWindow = Duration(days: 6);
 
-  /// Builds the stats from Firestore aggregate counts plus the raw booking
-  /// documents within the heatmap window (used to bucket by weekday/period
-  /// and by day for the bookings trend chart).
   factory DashboardStatsModel.fromAggregates({
     required int totalBookings,
     required int completedBookings,
@@ -39,7 +36,7 @@ class DashboardStatsModel extends DashboardStats {
     final counts = <(int, BookingPeriod), int>{};
     final dailyCounts = <DateTime, int>{};
     for (final doc in heatmapDocs) {
-      final startTime = (doc.data()['startTime'] as Timestamp?)?.toDate();
+      final startTime = _timestampFrom(doc.data()['startTime'])?.toDate();
       if (startTime == null) continue;
 
       final key = (startTime.weekday, _periodOf(startTime.hour));
@@ -68,20 +65,26 @@ class DashboardStatsModel extends DashboardStats {
         ),
     ];
 
-    final todayAppointments = [
-      for (final doc in todayBookingDocs)
-        if ((doc.data()['startTime'] as Timestamp?)?.toDate() != null)
-          DashboardAppointment(
-            id: doc.id,
-            customerName: doc.data()['customerName'] as String? ?? 'Khách',
-            staffName: doc.data()['staffName'] as String? ?? '',
-            serviceName: doc.data()['serviceName'] as String? ?? '',
-            startTime: (doc.data()['startTime'] as Timestamp).toDate(),
-          ),
-    ];
+    final todayAppointments = <DashboardAppointment>[];
+    for (final doc in todayBookingDocs) {
+      final data = doc.data();
+      final startTime = _timestampFrom(data['startTime']);
+      if (startTime == null) continue;
+
+      todayAppointments.add(
+        DashboardAppointment(
+          id: doc.id,
+          customerName: data['customerName'] as String? ?? 'Khach',
+          staffName: data['staffName'] as String? ?? '',
+          serviceName: data['serviceName'] as String? ?? '',
+          startTime: startTime.toDate(),
+        ),
+      );
+    }
 
     final inSessionStaffIds = {
-      for (final doc in inProgressBookingDocs) doc.data()['staffId'] as String?,
+      for (final doc in inProgressBookingDocs)
+        if (doc.data()['staffId'] is String) doc.data()['staffId'] as String,
     };
 
     final staffAvailability = [
@@ -89,16 +92,10 @@ class DashboardStatsModel extends DashboardStats {
         if (doc.data()['role'] != 'owner')
           StaffAvailability(
             id: doc.id,
-            name: doc.data()['name'] as String? ?? 'Nhân viên',
+            name: doc.data()['name'] as String? ?? 'Nhan vien',
             inSession: inSessionStaffIds.contains(doc.id),
           ),
     ];
-
-    final customerOverview = CustomerOverview(
-      totalCustomers: totalCustomers,
-      returningCustomers: returningCustomers,
-      needsFollowUpCustomers: needsFollowUpCustomers,
-    );
 
     return DashboardStatsModel(
       totalBookings: totalBookings,
@@ -110,8 +107,16 @@ class DashboardStatsModel extends DashboardStats {
       dailyTrend: dailyTrend,
       todayAppointments: todayAppointments,
       staffAvailability: staffAvailability,
-      customerOverview: customerOverview,
+      customerOverview: CustomerOverview(
+        totalCustomers: totalCustomers,
+        returningCustomers: returningCustomers,
+        needsFollowUpCustomers: needsFollowUpCustomers,
+      ),
     );
+  }
+
+  static Timestamp? _timestampFrom(Object? value) {
+    return value is Timestamp ? value : null;
   }
 
   static BookingPeriod _periodOf(int hour) {

@@ -29,6 +29,7 @@ class _BookingPageWrapperState extends State<BookingPageWrapper> {
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (!mounted) return;
       setState(() {
         _error = 'Not signed in';
         _loading = false;
@@ -39,11 +40,13 @@ class _BookingPageWrapperState extends State<BookingPageWrapper> {
     try {
       final token = await user.getIdTokenResult(true);
       final tenantId = token.claims?['tenantId'] as String?;
+      if (!mounted) return;
       setState(() {
         _tenantId = tenantId;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Failed to read tenant claims';
         _loading = false;

@@ -47,6 +47,7 @@ dependencies:
   logger: ^2.7.0
   dartz: ^0.10.1             # Either<Failure, Success>
   firebase_database: ^12.4.1
+  google_fonts: ^8.1.0
  
 dev_dependencies:
   flutter_test:
@@ -60,5 +61,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - resource/schedula_logo.png
 
  

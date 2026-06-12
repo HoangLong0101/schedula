@@ -7,10 +7,7 @@ import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/booking/presentation/widgets/booking_form_sheet.dart';
 
 class MainShellPage extends StatelessWidget {
-  const MainShellPage({
-    super.key,
-    required this.navigationShell,
-  });
+  const MainShellPage({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
@@ -89,7 +86,9 @@ class MainShellPage extends StatelessWidget {
                                   isSelected: navigationShell.currentIndex == 1,
                                   onTap: () => _onItemTapped(1, context),
                                 ),
-                                const SizedBox(width: 80), // Khoảng trống cho nút +
+                                const SizedBox(
+                                  width: 80,
+                                ), // Khoảng trống cho nút +
                                 _NavBarItem(
                                   icon: Icons.bar_chart_outlined,
                                   label: 'Thống kê',
@@ -111,7 +110,7 @@ class MainShellPage extends StatelessWidget {
                             width: 134,
                             margin: const EdgeInsets.only(bottom: 8, top: 2),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.18),
+                              color: Colors.black.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(3),
                             ),
                           ),
@@ -140,7 +139,7 @@ class MainShellPage extends StatelessWidget {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withValues(alpha: 0.1),
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 ),
@@ -181,7 +180,9 @@ class _NavBarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? Colors.white : Colors.white.withOpacity(0.65);
+    final color = isSelected
+        ? Colors.white
+        : Colors.white.withValues(alpha: 0.65);
     final fontWeight = isSelected ? FontWeight.w600 : FontWeight.w500;
 
     return GestureDetector(
@@ -198,7 +199,6 @@ class _NavBarItem extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontFamily: 'Raleway', // Theo DESIGN.md
                 fontWeight: fontWeight,
                 fontSize: 10,
                 color: color,

@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
+import '../../domain/entities/appointment_extraction.dart';
+
 class BookingFormState extends Equatable {
   BookingFormState({
     this.customerLookup = '',
@@ -12,6 +14,9 @@ class BookingFormState extends Equatable {
     TimeOfDay? endTime,
     this.notes = '',
     this.aiMode = false,
+    this.aiScanning = false,
+    this.aiError,
+    this.extraction,
   }) : date = date ?? DateTime.now(),
        startTime = startTime ?? const TimeOfDay(hour: 9, minute: 0),
        endTime = endTime ?? const TimeOfDay(hour: 10, minute: 0);
@@ -25,6 +30,9 @@ class BookingFormState extends Equatable {
   final TimeOfDay endTime;
   final String notes;
   final bool aiMode;
+  final bool aiScanning;
+  final String? aiError;
+  final AppointmentExtraction? extraction;
 
   BookingFormState copyWith({
     String? customerLookup,
@@ -36,6 +44,10 @@ class BookingFormState extends Equatable {
     TimeOfDay? endTime,
     String? notes,
     bool? aiMode,
+    bool? aiScanning,
+    String? aiError,
+    bool clearAiError = false,
+    AppointmentExtraction? extraction,
   }) {
     return BookingFormState(
       customerLookup: customerLookup ?? this.customerLookup,
@@ -47,6 +59,9 @@ class BookingFormState extends Equatable {
       endTime: endTime ?? this.endTime,
       notes: notes ?? this.notes,
       aiMode: aiMode ?? this.aiMode,
+      aiScanning: aiScanning ?? this.aiScanning,
+      aiError: clearAiError ? null : (aiError ?? this.aiError),
+      extraction: extraction ?? this.extraction,
     );
   }
 
@@ -88,5 +103,8 @@ class BookingFormState extends Equatable {
     endTime,
     notes,
     aiMode,
+    aiScanning,
+    aiError,
+    extraction,
   ];
 }

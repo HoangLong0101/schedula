@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/di/injection.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
+import '../../domain/usecases/scan_appointment_image_usecase.dart';
 import '../bloc/booking_bloc.dart';
 import '../bloc/booking_event.dart';
 import '../cubit/booking_form_cubit.dart';
@@ -17,7 +20,8 @@ class BookingFormSheet {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return BlocProvider(
-          create: (_) => BookingFormCubit(),
+          create: (_) =>
+              BookingFormCubit(getIt<ScanAppointmentImageUseCase>()),
           child: _BookingFormContent(tenantId: tenantId),
         );
       },
@@ -25,10 +29,25 @@ class BookingFormSheet {
   }
 }
 
-class _BookingFormContent extends StatelessWidget {
+class _BookingFormContent extends StatefulWidget {
   const _BookingFormContent({required this.tenantId});
 
   final String tenantId;
+
+  @override
+  State<_BookingFormContent> createState() => _BookingFormContentState();
+}
+
+class _BookingFormContentState extends State<_BookingFormContent> {
+  final _lookupController = TextEditingController();
+  final _customerNameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _lookupController.dispose();
+    _customerNameController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +58,15 @@ class _BookingFormContent extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        child: BlocBuilder<BookingFormCubit, BookingFormState>(
+        child: BlocConsumer<BookingFormCubit, BookingFormState>(
+          listenWhen: (previous, current) =>
+              previous.extraction != current.extraction &&
+              current.extraction != null,
+          listener: (context, state) {
+            // Reflect AI-extracted values in the editable text fields.
+            _lookupController.text = state.customerLookup;
+            _customerNameController.text = state.customerName;
+          },
           builder: (context, state) {
             return SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
@@ -89,10 +116,20 @@ class _BookingFormContent extends StatelessWidget {
                       aiMode: true,
                     ),
                   ),
+                  if (state.aiMode) ...[
+                    const SizedBox(height: 16),
+                    _AiScanPanel(
+                      scanning: state.aiScanning,
+                      error: state.aiError,
+                      scanned: state.extraction != null,
+                      onPick: (source) => _pickAndScan(context, source),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   const _SectionLabel('Khách hàng'),
                   const SizedBox(height: 8),
                   _InputField(
+                    controller: _lookupController,
                     hintText: 'Nhập SĐT hoặc tìm khách có sẵn...',
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
@@ -104,6 +141,7 @@ class _BookingFormContent extends StatelessWidget {
                   const _SectionLabel('Tên khách hàng'),
                   const SizedBox(height: 8),
                   _InputField(
+                    controller: _customerNameController,
                     hintText: 'Nhập tên khách hàng',
                     icon: Icons.person_outline,
                     textInputAction: TextInputAction.next,
@@ -191,6 +229,19 @@ class _BookingFormContent extends StatelessWidget {
     );
   }
 
+  Future<void> _pickAndScan(BuildContext context, ImageSource source) async {
+    final cubit = context.read<BookingFormCubit>();
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null) {
+      return;
+    }
+    await cubit.scanImage(picked.path);
+  }
+
   void _submit(BuildContext context, BookingFormState state) {
     if (!state.isValid) {
       return;
@@ -204,7 +255,7 @@ class _BookingFormContent extends StatelessWidget {
     context.read<BookingBloc>().add(
       BookingCreateRequested(
         CreateBookingParams(
-          tenantId: tenantId,
+          tenantId: widget.tenantId,
           staffId: _stableId('staff', staffName),
           customerId: lookup.isNotEmpty
               ? _stableId('customer', lookup)
@@ -234,6 +285,142 @@ class _BookingFormContent extends StatelessWidget {
       return '$prefix-${DateTime.now().millisecondsSinceEpoch}';
     }
     return '$prefix-$normalized';
+  }
+}
+
+class _AiScanPanel extends StatelessWidget {
+  const _AiScanPanel({
+    required this.scanning,
+    required this.error,
+    required this.scanned,
+    required this.onPick,
+  });
+
+  final bool scanning;
+  final String? error;
+  final bool scanned;
+  final ValueChanged<ImageSource> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FAFB),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: _Tokens.teal.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Chụp hoặc chọn ảnh lịch hẹn (tin nhắn, ghi chú...), '
+            'AI sẽ tự điền thông tin.',
+            style: TextStyle(
+              color: _Tokens.muted,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (scanning)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.6,
+                    color: _Tokens.teal,
+                  ),
+                ),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: _ScanSourceButton(
+                    icon: Icons.photo_camera_outlined,
+                    label: 'Chụp ảnh',
+                    onPressed: () => onPick(ImageSource.camera),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ScanSourceButton(
+                    icon: Icons.photo_library_outlined,
+                    label: 'Chọn ảnh',
+                    onPressed: () => onPick(ImageSource.gallery),
+                  ),
+                ),
+              ],
+            ),
+          if (error != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              error!,
+              style: const TextStyle(
+                color: Color(0xFFDC2626),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else if (scanned && !scanning) ...[
+            const SizedBox(height: 10),
+            const Row(
+              children: [
+                Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'Đã điền thông tin từ ảnh. Vui lòng kiểm tra lại.',
+                  style: TextStyle(
+                    color: Color(0xFF16A34A),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ScanSourceButton extends StatelessWidget {
+  const _ScanSourceButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+        style: TextButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: _Tokens.teal,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: _Tokens.teal.withValues(alpha: 0.45)),
+          ),
+          textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
   }
 }
 
@@ -331,6 +518,7 @@ class _InputField extends StatelessWidget {
     required this.hintText,
     required this.icon,
     required this.onChanged,
+    this.controller,
     this.keyboardType,
     this.textInputAction,
     this.minLines = 1,
@@ -340,6 +528,7 @@ class _InputField extends StatelessWidget {
   final String hintText;
   final IconData icon;
   final ValueChanged<String> onChanged;
+  final TextEditingController? controller;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final int minLines;
@@ -348,6 +537,7 @@ class _InputField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
       onChanged: onChanged,
       keyboardType: keyboardType,
       textInputAction: textInputAction,

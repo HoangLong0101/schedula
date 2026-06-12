@@ -66,5 +66,9 @@
       <string>UIInterfaceOrientationLandscapeLeft</string>
       <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
+    <key>NSCameraUsageDescription</key>
+    <string>Chụp ảnh lịch hẹn để AI tự điền thông tin đặt lịch.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Chọn ảnh lịch hẹn để AI tự điền thông tin đặt lịch.</string>
   </dict>
 </plist>

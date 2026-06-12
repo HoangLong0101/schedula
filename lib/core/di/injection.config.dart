@@ -10,6 +10,7 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:cloud_firestore/cloud_firestore.dart' as _i974;
+import 'package:dio/dio.dart' as _i361;
 import 'package:firebase_auth/firebase_auth.dart' as _i59;
 import 'package:firebase_database/firebase_database.dart' as _i345;
 import 'package:get_it/get_it.dart' as _i174;
@@ -43,18 +44,28 @@ import 'package:schedula/features/auth/domain/usecases/sign_out_usecase.dart'
     as _i652;
 import 'package:schedula/features/auth/presentation/bloc/auth_bloc.dart'
     as _i561;
+import 'package:schedula/features/booking/data/datasources/booking_cascade_api_datasource.dart'
+    as _i641;
 import 'package:schedula/features/booking/data/datasources/booking_datasource.dart'
     as _i1019;
 import 'package:schedula/features/booking/data/datasources/booking_realtime_data_source.dart'
     as _i24;
+import 'package:schedula/features/booking/data/repositories/appointment_extraction_repository_impl.dart'
+    as _i840;
 import 'package:schedula/features/booking/data/repositories/booking_repository_impl.dart'
     as _i97;
+import 'package:schedula/features/booking/domain/repositories/appointment_extraction_repository.dart'
+    as _i832;
 import 'package:schedula/features/booking/domain/repositories/booking_repository.dart'
     as _i262;
 import 'package:schedula/features/booking/domain/usecases/cancel_booking_usecase.dart'
     as _i1018;
 import 'package:schedula/features/booking/domain/usecases/create_booking_usecase.dart'
     as _i480;
+import 'package:schedula/features/booking/domain/usecases/extract_appointment_from_text_usecase.dart'
+    as _i1071;
+import 'package:schedula/features/booking/domain/usecases/scan_appointment_image_usecase.dart'
+    as _i363;
 import 'package:schedula/features/booking/domain/usecases/update_booking_status_usecase.dart'
     as _i271;
 import 'package:schedula/features/booking/domain/usecases/watch_bookings_usecase.dart'
@@ -146,8 +157,19 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i345.FirebaseDatabase>(() => appModule.realtimeDatabase);
     gh.lazySingleton<_i116.GoogleSignIn>(() => appModule.googleSignIn);
     gh.lazySingleton<_i583.GoRouter>(() => appModule.router);
+    gh.lazySingleton<_i361.Dio>(() => appModule.dio);
+    gh.factory<String>(
+      () => appModule.bookingCascadeBaseUrl,
+      instanceName: 'bookingCascadeBaseUrl',
+    );
     gh.lazySingleton<_i24.BookingRealtimeDataSource>(
       () => _i24.BookingRealtimeDataSource(gh<_i345.FirebaseDatabase>()),
+    );
+    gh.lazySingleton<_i641.BookingCascadeApiDataSource>(
+      () => _i641.BookingCascadeApiDataSource(
+        gh<_i361.Dio>(),
+        gh<String>(instanceName: 'bookingCascadeBaseUrl'),
+      ),
     );
     gh.lazySingleton<_i677.FirebaseAuthDataSource>(
       () => _i677.FirebaseAuthDataSource(
@@ -187,6 +209,11 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i625.CatalogRepository>(
       () => _i80.CatalogRepositoryImpl(gh<_i955.CatalogDataSource>()),
+    );
+    gh.lazySingleton<_i832.AppointmentExtractionRepository>(
+      () => _i840.AppointmentExtractionRepositoryImpl(
+        gh<_i641.BookingCascadeApiDataSource>(),
+      ),
     );
     gh.lazySingleton<_i797.AuthRepository>(
       () => _i472.AuthRepositoryImpl(gh<_i677.FirebaseAuthDataSource>()),
@@ -259,6 +286,16 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i13.WatchEquipmentUseCase>(
       () => _i13.WatchEquipmentUseCase(gh<_i71.EquipmentRepository>()),
+    );
+    gh.factory<_i1071.ExtractAppointmentFromTextUseCase>(
+      () => _i1071.ExtractAppointmentFromTextUseCase(
+        gh<_i832.AppointmentExtractionRepository>(),
+      ),
+    );
+    gh.factory<_i363.ScanAppointmentImageUseCase>(
+      () => _i363.ScanAppointmentImageUseCase(
+        gh<_i832.AppointmentExtractionRepository>(),
+      ),
     );
     gh.lazySingleton<_i561.AuthBloc>(
       () => _i561.AuthBloc(

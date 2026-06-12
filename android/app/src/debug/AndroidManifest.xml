@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Allow plain-HTTP calls to the local Booking Cascade API during
+         development. Debug builds only; release keeps cleartext blocked. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

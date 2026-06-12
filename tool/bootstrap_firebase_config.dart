@@ -34,6 +34,13 @@ String _configPath(List<String> args) {
 }
 
 Map<String, dynamic> _googleServicesJson(Map<String, dynamic> config) {
+  // Emit one client per flavor applicationId (see flavorizr.yaml) so the
+  // google-services Gradle plugin matches whichever flavor is being built.
+  // Runtime Firebase config comes from --dart-define-from-file, not this file.
+  final basePackage = _required(config, 'FIREBASE_ANDROID_PACKAGE_NAME')
+      .replaceFirst(RegExp(r'\.(dev|staging)$'), '');
+  final packages = <String>[basePackage, '$basePackage.dev', '$basePackage.staging'];
+
   return <String, dynamic>{
     'project_info': <String, dynamic>{
       'project_number': _required(config, 'FIREBASE_PROJECT_NUMBER'),
@@ -41,44 +48,46 @@ Map<String, dynamic> _googleServicesJson(Map<String, dynamic> config) {
       'storage_bucket': _required(config, 'FIREBASE_STORAGE_BUCKET'),
     },
     'client': <Map<String, dynamic>>[
-      <String, dynamic>{
-        'client_info': <String, dynamic>{
-          'mobilesdk_app_id': _required(config, 'FIREBASE_APP_ID'),
-          'android_client_info': <String, dynamic>{
-            'package_name': _required(config, 'FIREBASE_ANDROID_PACKAGE_NAME'),
-          },
-        },
-        'oauth_client': <Map<String, dynamic>>[
-          <String, dynamic>{
-            'client_id': _required(config, 'FIREBASE_ANDROID_CLIENT_ID'),
-            'client_type': 1,
-            'android_info': <String, dynamic>{
-              'package_name': _required(config, 'FIREBASE_ANDROID_PACKAGE_NAME'),
-              'certificate_hash':
-                  _required(config, 'FIREBASE_ANDROID_CERTIFICATE_HASH'),
+      for (final packageName in packages)
+        <String, dynamic>{
+          'client_info': <String, dynamic>{
+            'mobilesdk_app_id': _required(config, 'FIREBASE_APP_ID'),
+            'android_client_info': <String, dynamic>{
+              'package_name': packageName,
             },
           },
-          <String, dynamic>{
-            'client_id': _required(config, 'FIREBASE_ANDROID_WEB_CLIENT_ID'),
-            'client_type': 3,
-          },
-        ],
-        'api_key': <Map<String, dynamic>>[
-          <String, dynamic>{
-            'current_key': _required(config, 'FIREBASE_API_KEY'),
-          },
-        ],
-        'services': <String, dynamic>{
-          'appinvite_service': <String, dynamic>{
-            'other_platform_oauth_client': <Map<String, dynamic>>[
-              <String, dynamic>{
-                'client_id': _required(config, 'FIREBASE_ANDROID_WEB_CLIENT_ID'),
-                'client_type': 3,
+          'oauth_client': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'client_id': _required(config, 'FIREBASE_ANDROID_CLIENT_ID'),
+              'client_type': 1,
+              'android_info': <String, dynamic>{
+                'package_name': packageName,
+                'certificate_hash':
+                    _required(config, 'FIREBASE_ANDROID_CERTIFICATE_HASH'),
               },
-            ],
+            },
+            <String, dynamic>{
+              'client_id': _required(config, 'FIREBASE_ANDROID_WEB_CLIENT_ID'),
+              'client_type': 3,
+            },
+          ],
+          'api_key': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'current_key': _required(config, 'FIREBASE_API_KEY'),
+            },
+          ],
+          'services': <String, dynamic>{
+            'appinvite_service': <String, dynamic>{
+              'other_platform_oauth_client': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'client_id':
+                      _required(config, 'FIREBASE_ANDROID_WEB_CLIENT_ID'),
+                  'client_type': 3,
+                },
+              ],
+            },
           },
         },
-      },
     ],
     'configuration_version': '1',
   };

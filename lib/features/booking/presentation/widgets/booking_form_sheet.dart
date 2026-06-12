@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../catalog/domain/repositories/catalog_repository.dart';
+import '../../../staff/domain/usecases/watch_staff_usecase.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
 import '../../domain/usecases/scan_appointment_image_usecase.dart';
@@ -20,8 +22,12 @@ class BookingFormSheet {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return BlocProvider(
-          create: (_) =>
-              BookingFormCubit(getIt<ScanAppointmentImageUseCase>()),
+          create: (_) => BookingFormCubit(
+            tenantId,
+            getIt<ScanAppointmentImageUseCase>(),
+            getIt<WatchStaffUseCase>(),
+            getIt<CatalogRepository>(),
+          ),
           child: _BookingFormContent(tenantId: tenantId),
         );
       },
@@ -41,11 +47,15 @@ class _BookingFormContent extends StatefulWidget {
 class _BookingFormContentState extends State<_BookingFormContent> {
   final _lookupController = TextEditingController();
   final _customerNameController = TextEditingController();
+  final _staffNameController = TextEditingController();
+  final _serviceNameController = TextEditingController();
 
   @override
   void dispose() {
     _lookupController.dispose();
     _customerNameController.dispose();
+    _staffNameController.dispose();
+    _serviceNameController.dispose();
     super.dispose();
   }
 
@@ -66,6 +76,8 @@ class _BookingFormContentState extends State<_BookingFormContent> {
             // Reflect AI-extracted values in the editable text fields.
             _lookupController.text = state.customerLookup;
             _customerNameController.text = state.customerName;
+            _staffNameController.text = state.staffName;
+            _serviceNameController.text = state.serviceName;
           },
           builder: (context, state) {
             return SingleChildScrollView(
@@ -153,6 +165,7 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                   const _SectionLabel('Nhân viên phụ trách'),
                   const SizedBox(height: 8),
                   _InputField(
+                    controller: _staffNameController,
                     hintText: 'Chọn nhân viên',
                     icon: Icons.medical_services_outlined,
                     textInputAction: TextInputAction.next,
@@ -162,6 +175,7 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                   const _SectionLabel('Dịch vụ'),
                   const SizedBox(height: 8),
                   _InputField(
+                    controller: _serviceNameController,
                     hintText: 'Chọn dịch vụ',
                     icon: Icons.spa_outlined,
                     textInputAction: TextInputAction.next,
@@ -231,11 +245,9 @@ class _BookingFormContentState extends State<_BookingFormContent> {
 
   Future<void> _pickAndScan(BuildContext context, ImageSource source) async {
     final cubit = context.read<BookingFormCubit>();
-    final picked = await ImagePicker().pickImage(
-      source: source,
-      maxWidth: 1600,
-      imageQuality: 85,
-    );
+    // Send the original image untouched: recompression degrades OCR enough
+    // to change the extraction result (e.g. "tên em" instead of the name).
+    final picked = await ImagePicker().pickImage(source: source);
     if (picked == null) {
       return;
     }

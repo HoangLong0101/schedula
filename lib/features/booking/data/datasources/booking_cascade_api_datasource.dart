@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
+import 'package:logger/logger.dart';
 
 class BookingCascadeApiException implements Exception {
   BookingCascadeApiException(this.message);
@@ -22,19 +25,23 @@ class BookingCascadeApiDataSource {
 
   final Dio _dio;
   final String _baseUrl;
+  final Logger _logger = Logger();
 
   Future<Map<String, dynamic>> extractText(String text) async {
     _ensureConfigured();
 
     final response = await _request(
-      () => _dio.post<Map<String, dynamic>>(
+      () => _dio.post<List<int>>(
         '$_baseUrl/api/v1/extract',
         data: <String, dynamic>{'text': text, 'record': false},
-        options: Options(contentType: 'application/json; charset=utf-8'),
+        options: Options(
+          contentType: 'application/json; charset=utf-8',
+          responseType: ResponseType.bytes,
+        ),
       ),
     );
 
-    return Map<String, dynamic>.from(response.data ?? <String, dynamic>{});
+    return _decodeJson(response.data);
   }
 
   Future<Map<String, dynamic>> scanAppointmentImage(String imagePath) async {
@@ -45,14 +52,28 @@ class BookingCascadeApiDataSource {
     });
 
     final response = await _request(
-      () => _dio.post<Map<String, dynamic>>(
+      () => _dio.post<List<int>>(
         '$_baseUrl/api/v1/scan-appointment',
         queryParameters: <String, dynamic>{'record': false},
         data: formData,
+        options: Options(responseType: ResponseType.bytes),
       ),
     );
 
-    return Map<String, dynamic>.from(response.data ?? <String, dynamic>{});
+    return _decodeJson(response.data);
+  }
+
+  /// Decodes the raw body as UTF-8 explicitly: the API does not always
+  /// declare a charset, and falling back to latin-1 garbles Vietnamese
+  /// diacritics (e.g. "Ngọc" -> "Ngá»c").
+  Map<String, dynamic> _decodeJson(List<int>? bytes) {
+    if (bytes == null || bytes.isEmpty) {
+      return <String, dynamic>{};
+    }
+
+    final decoded = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+    _logger.d('Booking Cascade API response: $decoded');
+    return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
   }
 
   void _ensureConfigured() {
@@ -64,8 +85,8 @@ class BookingCascadeApiDataSource {
     }
   }
 
-  Future<Response<Map<String, dynamic>>> _request(
-    Future<Response<Map<String, dynamic>>> Function() send,
+  Future<Response<List<int>>> _request(
+    Future<Response<List<int>>> Function() send,
   ) async {
     try {
       return await send();

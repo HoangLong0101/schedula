@@ -33,6 +33,21 @@ class AppointmentExtraction extends Equatable {
 
   String? get phone => _string(_extracted['phone']);
 
+  /// Staff name when the API extracted one; usually absent.
+  String? get staffName =>
+      _string(_extracted['staff_name']) ??
+      _string(_extracted['staff']) ??
+      _entityText(const {'nhân viên', 'staff'});
+
+  /// Service name when the API extracted one; usually absent.
+  String? get serviceName =>
+      _string(_extracted['service_name']) ??
+      _string(_extracted['service']) ??
+      _entityText(const {'dịch vụ', 'service'});
+
+  /// The sentence the API ran extraction on (OCR'd booking text).
+  String? get sourceText => _string(fields['text']);
+
   /// `appointment_date` parsed from `yyyy-MM-dd`.
   DateTime? get appointmentDate {
     final raw = _string(_extracted['appointment_date']);
@@ -59,6 +74,20 @@ class AppointmentExtraction extends Equatable {
   String? get ocrFullText {
     final ocr = fields['ocr'];
     return ocr is Map<String, dynamic> ? _string(ocr['full_text']) : null;
+  }
+
+  String? _entityText(Set<String> labels) {
+    final entities = fields['entities'];
+    if (entities is! List) {
+      return null;
+    }
+    for (final entity in entities.whereType<Map<String, dynamic>>()) {
+      final label = _string(entity['label'])?.toLowerCase();
+      if (label != null && labels.contains(label)) {
+        return _string(entity['text']);
+      }
+    }
+    return null;
   }
 
   static String? _string(Object? value) {

@@ -21,6 +21,12 @@ class Booking extends Equatable {
     this.customerName,
     this.staffName,
     this.serviceName,
+    this.paymentStatus,
+    this.paymentId,
+    this.paymentAmount,
+    this.paymentOrderCode,
+    this.paymentCheckoutUrl,
+    this.paymentPaidAt,
   });
 
   final String id;
@@ -42,25 +48,37 @@ class Booking extends Equatable {
   final String? customerName;
   final String? staffName;
   final String? serviceName;
+  final String? paymentStatus;
+  final String? paymentId;
+  final int? paymentAmount;
+  final int? paymentOrderCode;
+  final String? paymentCheckoutUrl;
+  final DateTime? paymentPaidAt;
 
   @override
   List<Object?> get props => [
-        id,
-        tenantId,
-        staffId,
-        customerId,
-        serviceId,
-        startTime,
-        endTime,
-        status,
-        notes,
-        createdBy,
-        createdAt,
-        updatedAt,
-        reminder24Sent,
-        reminder1hSent,
-        customerName,
-        staffName,
-        serviceName,
-      ];
+    id,
+    tenantId,
+    staffId,
+    customerId,
+    serviceId,
+    startTime,
+    endTime,
+    status,
+    notes,
+    createdBy,
+    createdAt,
+    updatedAt,
+    reminder24Sent,
+    reminder1hSent,
+    customerName,
+    staffName,
+    serviceName,
+    paymentStatus,
+    paymentId,
+    paymentAmount,
+    paymentOrderCode,
+    paymentCheckoutUrl,
+    paymentPaidAt,
+  ];
 }

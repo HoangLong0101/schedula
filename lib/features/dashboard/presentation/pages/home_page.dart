@@ -165,7 +165,7 @@ class _HomeContent extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'Chào mừng Minh,',
+          'Chào mừng,',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: _HomeColors.muted,
             fontWeight: FontWeight.w500,
@@ -198,7 +198,7 @@ class _HomeContent extends StatelessWidget {
             Expanded(
               child: _KpiCard(
                 label: 'khách mới đặt lịch',
-                value: newCustomers == 0 ? 3 : newCustomers,
+                value: newCustomers,
                 delta: '-3.8%',
                 deltaPositive: false,
                 icon: Icons.south_east,
@@ -584,18 +584,56 @@ class _UpcomingAppointments extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = appointments.isEmpty ? _fallbackAppointments : appointments;
+    if (appointments.isEmpty) {
+      return const _EmptyUpcomingAppointments();
+    }
 
     return SizedBox(
       height: 222,
       child: ListView.separated(
         clipBehavior: Clip.none,
         scrollDirection: Axis.horizontal,
-        itemCount: items.length,
+        itemCount: appointments.length,
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
-          return _AppointmentCard(appointment: items[index]);
+          return _AppointmentCard(appointment: appointments[index]);
         },
+      ),
+    );
+  }
+}
+
+class _EmptyUpcomingAppointments extends StatelessWidget {
+  const _EmptyUpcomingAppointments();
+
+  @override
+  Widget build(BuildContext context) {
+    return _HomeCard(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.event_available_outlined,
+            size: 34,
+            color: _HomeColors.grayBlue,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Chưa có lịch hẹn sắp tới',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: _HomeColors.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Lịch hẹn mới của tenant này sẽ xuất hiện tại đây.',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: _HomeColors.muted),
+          ),
+        ],
       ),
     );
   }
@@ -741,14 +779,47 @@ class _StaffPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = staff.isEmpty ? _fallbackStaff : staff;
-
     return _HomeCard(
       padding: EdgeInsets.zero,
-      child: Column(
+      child: staff.isEmpty
+          ? const _EmptyStaffPanel()
+          : Column(
+              children: [
+                for (var i = 0; i < staff.length; i++)
+                  _StaffRow(
+                    staff: staff[i],
+                    index: i,
+                    isLast: i == staff.length - 1,
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _EmptyStaffPanel extends StatelessWidget {
+  const _EmptyStaffPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Row(
         children: [
-          for (var i = 0; i < items.length; i++)
-            _StaffRow(staff: items[i], index: i, isLast: i == items.length - 1),
+          const Icon(
+            Icons.groups_outlined,
+            color: _HomeColors.grayBlue,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Chưa có nhân viên trong tenant này.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: _HomeColors.muted),
+            ),
+          ),
         ],
       ),
     );
@@ -853,14 +924,10 @@ class _CustomerPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = overview.totalCustomers == 0 ? 5 : overview.totalCustomers;
-    final returning = overview.returningCustomers == 0
-        ? 3
-        : overview.returningCustomers;
+    final total = overview.totalCustomers;
+    final returning = overview.returningCustomers;
     final birthday = total > 2 ? 2 : total;
-    final followUp = overview.needsFollowUpCustomers == 0
-        ? 1
-        : overview.needsFollowUpCustomers;
+    final followUp = overview.needsFollowUpCustomers;
 
     return _HomeCard(
       padding: const EdgeInsets.all(20),
@@ -1215,39 +1282,3 @@ class _HomeShadow {
     ),
   ];
 }
-
-final _fallbackAppointments = [
-  DashboardAppointment(
-    id: 'fallback-1',
-    customerName: 'Trần Bình Minh',
-    staffName: 'Dr. Phạm Xuân Hoàng',
-    serviceName: 'Làm trắng da, tẩy da chết, nặn mụn',
-    startTime: DateTime(2026, 3, 11, 9, 30),
-  ),
-  DashboardAppointment(
-    id: 'fallback-2',
-    customerName: 'Lê Thị Hoa',
-    staffName: 'Hoàng Long',
-    serviceName: 'Massage toàn thân',
-    startTime: DateTime(2026, 3, 11, 10),
-  ),
-];
-
-final _fallbackStaff = [
-  const StaffAvailability(
-    id: 'staff-1',
-    name: 'Dr. Phạm Xuân Hoàng',
-    inSession: false,
-  ),
-  const StaffAvailability(id: 'staff-2', name: 'Hoàng Long', inSession: true),
-  const StaffAvailability(
-    id: 'staff-3',
-    name: 'Dr. Bảo Trâm',
-    inSession: false,
-  ),
-  const StaffAvailability(
-    id: 'staff-4',
-    name: 'Nguyễn Thị Mai',
-    inSession: false,
-  ),
-];

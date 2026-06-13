@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/utils/date_utils.dart';
@@ -35,35 +36,23 @@ class BookingDataSource {
   CollectionReference<Map<String, dynamic>> get _slots =>
       _firestore.collection('slots');
 
-  Stream<List<BookingModel>> watchBookings(WatchBookingsParams params) {
+  Stream<List<BookingModel>> watchBookings(WatchBookingsParams params) async* {
     final query = _bookings.where('tenantId', isEqualTo: params.tenantId);
 
-    return query.snapshots().map((snapshot) {
-      final bookings = snapshot.docs
-          .map(BookingModel.fromFirestore)
-          .where((booking) {
-            final matchesStart =
-                params.startDate == null ||
-                !booking.startTime.isBefore(params.startDate!);
-            final matchesEnd =
-                params.endDate == null ||
-                booking.startTime.isBefore(params.endDate!);
-            final matchesStaff =
-                params.staffId == null ||
-                params.staffId!.isEmpty ||
-                booking.staffId == params.staffId;
-            final matchesStatus =
-                params.status == null || booking.status == params.status;
-
-            return matchesStart && matchesEnd && matchesStaff && matchesStatus;
-          })
-          .toList(growable: false);
-
-      return bookings..sort((a, b) => a.startTime.compareTo(b.startTime));
-    });
+    try {
+      await for (final snapshot in query.snapshots()) {
+        yield _filterBookings(snapshot, params);
+      }
+    } catch (error) {
+      if (_isPermissionDenied(error)) {
+        yield const <BookingModel>[];
+        return;
+      }
+      rethrow;
+    }
   }
 
-  Stream<List<SlotModel>> watchSlots(WatchSlotsParams params) {
+  Stream<List<SlotModel>> watchSlots(WatchSlotsParams params) async* {
     Query<Map<String, dynamic>> query = _slots
         .where('tenantId', isEqualTo: params.tenantId)
         .where('staffId', isEqualTo: params.staffId)
@@ -82,10 +71,19 @@ class BookingDataSource {
       );
     }
 
-    return query.snapshots().map(
-      (snapshot) =>
-          snapshot.docs.map(SlotModel.fromFirestore).toList(growable: false),
-    );
+    try {
+      await for (final snapshot in query.snapshots()) {
+        yield snapshot.docs
+            .map(SlotModel.fromFirestore)
+            .toList(growable: false);
+      }
+    } catch (error) {
+      if (_isPermissionDenied(error)) {
+        yield const <SlotModel>[];
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<BookingModel> createBooking(CreateBookingParams params) async {
@@ -183,5 +181,40 @@ class BookingDataSource {
       'updatedAt': Timestamp.now(),
       if (params.reason != null) 'notes': params.reason,
     });
+  }
+
+  List<BookingModel> _filterBookings(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+    WatchBookingsParams params,
+  ) {
+    final bookings = snapshot.docs
+        .map(BookingModel.fromFirestore)
+        .where((booking) {
+          final matchesStart =
+              params.startDate == null ||
+              !booking.startTime.isBefore(params.startDate!);
+          final matchesEnd =
+              params.endDate == null ||
+              booking.startTime.isBefore(params.endDate!);
+          final matchesStaff =
+              params.staffId == null ||
+              params.staffId!.isEmpty ||
+              booking.staffId == params.staffId;
+          final matchesStatus =
+              params.status == null || booking.status == params.status;
+
+          return matchesStart && matchesEnd && matchesStaff && matchesStatus;
+        })
+        .toList(growable: false);
+
+    return bookings..sort((a, b) => a.startTime.compareTo(b.startTime));
+  }
+
+  bool _isPermissionDenied(Object error) {
+    return error is FirebaseException && error.code == 'permission-denied' ||
+        error is PlatformException &&
+            (error.code == 'permission-denied' ||
+                (error.message?.contains('PERMISSION_DENIED') ?? false) ||
+                (error.message?.contains('permission-denied') ?? false));
   }
 }

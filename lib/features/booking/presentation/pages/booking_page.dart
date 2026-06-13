@@ -2,11 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../../dashboard/presentation/pages/dashboard_page.dart';
+import '../../data/datasources/payos_payment_service.dart';
 import '../../domain/entities/booking.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/cancel_booking_usecase.dart';
@@ -213,6 +214,8 @@ class _BookingView extends StatelessWidget {
                                               ),
                                             ),
                                           ),
+                                      onPaymentTap: () =>
+                                          _startPayment(context, booking),
                                     );
                                   },
                                 ),
@@ -379,6 +382,78 @@ class _BookingView extends StatelessWidget {
 
   bool _sameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  Future<void> _startPayment(BuildContext context, Booking booking) async {
+    final amount = await _askPaymentAmount(context, booking);
+    if (amount == null || !context.mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final payment = await PayOSPaymentService().createPaymentLink(
+        bookingId: booking.id,
+        amount: amount,
+      );
+      final uri = Uri.parse(payment.checkoutUrl);
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened) {
+        await Clipboard.setData(ClipboardData(text: payment.checkoutUrl));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Da sao chep link thanh toan.')),
+        );
+      }
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Khong tao duoc link thanh toan: $error')),
+      );
+    }
+  }
+
+  Future<int?> _askPaymentAmount(BuildContext context, Booking booking) async {
+    final controller = TextEditingController(
+      text: booking.paymentAmount?.toString() ?? '',
+    );
+
+    final result = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Tao thanh toan PayOS'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: 'So tien',
+              suffixText: 'VND',
+              helperText: booking.serviceName ?? booking.serviceId,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Huy'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final amount = int.tryParse(controller.text.trim());
+                if (amount == null || amount <= 0) {
+                  return;
+                }
+                Navigator.of(dialogContext).pop(amount);
+              },
+              child: const Text('Tao link'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+    return result;
   }
 }
 
@@ -834,12 +909,14 @@ class _AppointmentCard extends StatelessWidget {
     required this.onStatusTap,
     required this.onEditTap,
     required this.onCancelTap,
+    required this.onPaymentTap,
   });
 
   final Booking booking;
   final VoidCallback onStatusTap;
   final VoidCallback onEditTap;
   final VoidCallback onCancelTap;
+  final VoidCallback onPaymentTap;
 
   @override
   Widget build(BuildContext context) {
@@ -965,6 +1042,42 @@ class _AppointmentCard extends StatelessWidget {
               ),
             ],
           ),
+          if (booking.paymentStatus != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(
+                  _paymentIcon(booking.paymentStatus),
+                  color: _paymentColor(booking.paymentStatus),
+                  size: 15,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  _paymentLabel(booking.paymentStatus),
+                  style: TextStyle(
+                    color: _paymentColor(booking.paymentStatus),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (booking.paymentAmount != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    NumberFormat.currency(
+                      locale: 'vi_VN',
+                      symbol: 'VND',
+                      decimalDigits: 0,
+                    ).format(booking.paymentAmount),
+                    style: const TextStyle(
+                      color: Color(0xFF718096),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
           if (booking.status != BookingStatus.completed &&
               booking.status != BookingStatus.cancelled) ...[
             const SizedBox(height: 13),
@@ -981,6 +1094,17 @@ class _AppointmentCard extends StatelessWidget {
                         ? const Color(0xFFE9FBFD)
                         : const Color(0xFFEFFCF4),
                   ),
+                ),
+                const SizedBox(width: 9),
+                _SquareAction(
+                  icon: Icons.payments_outlined,
+                  onPressed: onPaymentTap,
+                  foreground: booking.paymentStatus == 'paid'
+                      ? _Tokens.green
+                      : _Tokens.teal,
+                  background: booking.paymentStatus == 'paid'
+                      ? const Color(0xFFEFFCF4)
+                      : const Color(0xFFE9FBFD),
                 ),
                 const SizedBox(width: 9),
                 _SquareAction(icon: Icons.edit_outlined, onPressed: onEditTap),
@@ -1009,114 +1133,38 @@ class _AppointmentCard extends StatelessWidget {
     }
     return 'Check-in';
   }
-}
 
-class _BottomActionNav extends StatelessWidget {
-  const _BottomActionNav({required this.onAdd});
+  IconData _paymentIcon(String? status) {
+    if (status == 'paid') {
+      return Icons.verified_outlined;
+    }
+    if (status == 'failed' || status == 'cancelled') {
+      return Icons.error_outline;
+    }
+    return Icons.payments_outlined;
+  }
 
-  final VoidCallback onAdd;
+  Color _paymentColor(String? status) {
+    if (status == 'paid') {
+      return _Tokens.green;
+    }
+    if (status == 'failed' || status == 'cancelled') {
+      return _Tokens.danger;
+    }
+    return _Tokens.teal;
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    return SizedBox(
-      height: 96 + bottomInset,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 430),
-          child: Padding(
-            padding: EdgeInsets.only(bottom: bottomInset),
-            child: SizedBox(
-              height: 96,
-              child: Stack(
-                alignment: Alignment.topCenter,
-                children: [
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      height: 78,
-                      decoration: const BoxDecoration(color: _Tokens.nav),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                const _NavItem(
-                                  icon: Icons.home_outlined,
-                                  label: 'Trang chủ',
-                                ),
-                                const _NavItem(
-                                  icon: Icons.calendar_month_outlined,
-                                  label: 'Lịch hẹn',
-                                  active: true,
-                                ),
-                                const SizedBox(width: 76),
-                                _NavItem(
-                                  icon: Icons.bar_chart_outlined,
-                                  label: 'Thống kê',
-                                  onTap: () =>
-                                      context.go(DashboardPage.routePath),
-                                ),
-                                const _NavItem(
-                                  icon: Icons.person_outline,
-                                  label: 'Tài khoản',
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            width: 134,
-                            height: 5,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0x6622AFC2),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 0,
-                    child: GestureDetector(
-                      onTap: onAdd,
-                      child: Container(
-                        width: 86,
-                        height: 86,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: 66,
-                          height: 66,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: _Tokens.nav, width: 8),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            color: _Tokens.teal,
-                            size: 36,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  String _paymentLabel(String? status) {
+    if (status == 'paid') {
+      return 'Da thanh toan';
+    }
+    if (status == 'failed') {
+      return 'Thanh toan loi';
+    }
+    if (status == 'cancelled') {
+      return 'Da huy thanh toan';
+    }
+    return 'Cho thanh toan';
   }
 }
 
@@ -1454,50 +1502,6 @@ class _SquareAction extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Colors.white.withAlpha(active ? 255 : 178);
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 68,
-        height: 64,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 23),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _StaffOption {
   const _StaffOption({required this.id, required this.name});
 
@@ -1606,7 +1610,6 @@ class _Tokens {
   static const text = Color(0xFF1F2937);
   static const muted = Color(0xFF8A94A6);
   static const teal = Color(0xFF22AFC2);
-  static const nav = Color(0xFF58D8E3);
   static const green = Color(0xFF22C55E);
   static const orange = Color(0xFFF97316);
   static const danger = Color(0xFFEF4444);

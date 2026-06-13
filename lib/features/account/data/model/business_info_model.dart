@@ -11,9 +11,14 @@ class BusinessInfoModel extends BusinessInfo {
     required super.hoursWeekday,
     required super.hoursWeekend,
     required super.description,
+    super.planTier,
+    super.planStartedAt,
+    super.planExpiresAt,
   });
 
-  factory BusinessInfoModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory BusinessInfoModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data() ?? const <String, dynamic>{};
     return BusinessInfoModel(
       name: data['name'] as String? ?? 'Schedula Spa',
@@ -24,11 +29,14 @@ class BusinessInfoModel extends BusinessInfo {
       hoursWeekday: data['hoursWeekday'] as String? ?? '08:00 - 20:00',
       hoursWeekend: data['hoursWeekend'] as String? ?? '09:00 - 18:00',
       description: data['description'] as String? ?? '',
+      planTier: data['planTier'] as String? ?? 'basic',
+      planStartedAt: (data['planStartedAt'] as Timestamp?)?.toDate(),
+      planExpiresAt: (data['planExpiresAt'] as Timestamp?)?.toDate(),
     );
   }
 
   Map<String, dynamic> toFirestore() {
-    return {
+    final data = <String, dynamic>{
       'name': name,
       'type': type,
       'address': address,
@@ -37,7 +45,17 @@ class BusinessInfoModel extends BusinessInfo {
       'hoursWeekday': hoursWeekday,
       'hoursWeekend': hoursWeekend,
       'description': description,
+      'planTier': planTier,
       'updatedAt': FieldValue.serverTimestamp(),
     };
+
+    if (planStartedAt != null) {
+      data['planStartedAt'] = Timestamp.fromDate(planStartedAt!);
+    }
+    if (planExpiresAt != null) {
+      data['planExpiresAt'] = Timestamp.fromDate(planExpiresAt!);
+    }
+
+    return data;
   }
 }

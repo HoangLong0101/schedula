@@ -1,72 +1,23 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import 'booking_page.dart';
 
-class BookingPageWrapper extends StatefulWidget {
+class BookingPageWrapper extends StatelessWidget {
   const BookingPageWrapper({super.key});
 
   @override
-  State<BookingPageWrapper> createState() => _BookingPageWrapperState();
-}
-
-class _BookingPageWrapperState extends State<BookingPageWrapper> {
-  String? _tenantId;
-  String? _error;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTenantId();
-  }
-
-  Future<void> _loadTenantId() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Not signed in';
-        _loading = false;
-      });
-      return;
-    }
-
-    try {
-      final token = await user.getIdTokenResult(true);
-      final tenantId = token.claims?['tenantId'] as String?;
-      if (!mounted) return;
-      setState(() {
-        _tenantId = tenantId;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Failed to read tenant claims';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    final authState = context.watch<AuthBloc>().state;
+    if (authState is AuthLoading || authState is AuthInitial) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Bookings')),
-        body: Center(child: Text(_error!)),
-      );
-    }
-
-    return BookingPage(tenantId: _tenantId);
+    final tenantId = authState is Authenticated
+        ? authState.user.tenantId
+        : null;
+    return BookingPage(tenantId: tenantId);
   }
 }

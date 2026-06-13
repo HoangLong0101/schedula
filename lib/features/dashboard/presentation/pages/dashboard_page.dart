@@ -369,7 +369,7 @@ class _PeopleTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final overview = stats.customerOverview;
     final returningRate = overview.totalCustomers == 0
-        ? 0.63
+        ? 0.0
         : overview.returningCustomers / overview.totalCustomers;
     final newCustomers = (overview.totalCustomers - overview.returningCustomers)
         .clamp(0, 99);
@@ -379,7 +379,7 @@ class _PeopleTab extends StatelessWidget {
         _TopStaffCard(staff: stats.staffAvailability),
         const SizedBox(height: 20),
         _ReturnCustomerCard(
-          newCustomers: newCustomers == 0 ? 15 : newCustomers,
+          newCustomers: newCustomers,
           returningRate: returningRate,
         ),
         const SizedBox(height: 20),
@@ -933,9 +933,7 @@ class _TopStaffCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final names = staff.isEmpty
-        ? const ['Lan', 'Hương', 'Ngọc']
-        : staff.take(3).map((item) => item.name).toList();
+    final names = staff.take(3).map((item) => item.name).toList();
     final values = List.generate(names.length, (index) => 48 - index * 5);
 
     return _StatsCard(
@@ -947,13 +945,21 @@ class _TopStaffCard extends StatelessWidget {
             title: 'Nhân viên nhiều ca nhất',
           ),
           const SizedBox(height: 18),
-          for (var i = 0; i < names.length; i++)
-            _RankedStaffRow(
-              rank: i + 1,
-              name: names[i],
-              value: values[i],
-              max: values.first,
-            ),
+          if (names.isEmpty)
+            Text(
+              'Chưa có dữ liệu nhân viên.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: _StatsColors.muted),
+            )
+          else
+            for (var i = 0; i < names.length; i++)
+              _RankedStaffRow(
+                rank: i + 1,
+                name: names[i],
+                value: values[i],
+                max: values.first,
+              ),
         ],
       ),
     );
@@ -1105,7 +1111,7 @@ class _RatingCard extends StatelessWidget {
           Icon(Icons.star_border_rounded, color: _StatsColors.amber),
           SizedBox(width: 10),
           Expanded(child: Text('Đánh giá trung bình nhân viên')),
-          Text('4.8/5', style: TextStyle(fontWeight: FontWeight.w900)),
+          Text('Chưa có', style: TextStyle(fontWeight: FontWeight.w900)),
         ],
       ),
     );

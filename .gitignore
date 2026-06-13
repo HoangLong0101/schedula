@@ -50,6 +50,8 @@ app.*.map.json
 /.firebase-config.dev.json
 /.firebase-config.staging.json
 /.firebase-config.prod.json
+/functions/.env
+/functions/.env.*
 
 # FVM Version Cache
 .fvm/

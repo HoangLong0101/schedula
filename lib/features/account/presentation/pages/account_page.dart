@@ -6,6 +6,8 @@ import '../../../../core/di/injection.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
+import '../../../dashboard/presentation/cubit/dashboard_state.dart';
 import '../../domain/entities/business_info.dart';
 import '../cubit/account_cubit.dart';
 
@@ -32,9 +34,14 @@ class AccountPage extends StatelessWidget {
       );
     }
 
-    return BlocProvider(
-      // Dùng GetIt để tiêm UseCases và gọi hàm init(tenantId)
-      create: (_) => getIt<AccountCubit>()..init(tenantId),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          // Dùng GetIt để tiêm UseCases và gọi hàm init(tenantId)
+          create: (_) => getIt<AccountCubit>()..init(tenantId),
+        ),
+        BlocProvider(create: (_) => getIt<DashboardCubit>()..load(tenantId)),
+      ],
       child: const _AccountView(),
     );
   }
@@ -50,11 +57,30 @@ class _AccountView extends StatelessWidget {
     end: Alignment.bottomRight,
   );
 
+  static String _planLabel(String planTier) {
+    return switch (planTier.toLowerCase()) {
+      'basic' => 'Gói Cơ bản',
+      'professional' || 'pro' => 'Gói Chuyên Nghiệp',
+      'premium' => 'Gói Cao cấp',
+      _ => 'Gói ${planTier.toUpperCase()}',
+    };
+  }
+
+  static String _formatDate(DateTime? date) {
+    if (date == null) {
+      return 'Chưa có';
+    }
+
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     // Lấy thông tin User thực tế từ AuthBloc
     final authState = context.watch<AuthBloc>().state;
-    final userName = authState is Authenticated ? authState.user.email.split('@')[0] : 'Người dùng';
+    final userName = authState is Authenticated
+        ? authState.user.email.split('@')[0]
+        : 'Người dùng';
     final userEmail = authState is Authenticated ? authState.user.email : '';
     final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
 
@@ -62,7 +88,9 @@ class _AccountView extends StatelessWidget {
       backgroundColor: const Color(0xFFFCFCFD), // Nền chuẩn của app
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 120), // Tránh bị lấp bởi Global Navbar
+          padding: const EdgeInsets.only(
+            bottom: 120,
+          ), // Tránh bị lấp bởi Global Navbar
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -90,157 +118,243 @@ class _AccountView extends StatelessWidget {
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    // Profile Card
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: _tealGradient,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
+                child: BlocBuilder<AccountCubit, BusinessInfo>(
+                  builder: (context, business) {
+                    final planLabel = _planLabel(business.planTier);
+
+                    return Column(
+                      children: [
+                        // Profile Card
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: _tealGradient,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Column(
                             children: [
-                              Container(
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  initial,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      userName,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      initial,
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    Text(
-                                      userEmail,
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.8),
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        const Icon(Icons.workspace_premium, color: Color(0xFFFDE047), size: 14),
-                                        const SizedBox(width: 4),
-                                        const Text(
-                                          'Gói Chuyên Nghiệp',
-                                          style: TextStyle(color: Color(0xFFFDE047), fontSize: 12),
+                                        Text(
+                                          userName,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        Text(
+                                          userEmail,
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.8,
+                                            ),
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.workspace_premium,
+                                              color: Color(0xFFFDE047),
+                                              size: 14,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              planLabel,
+                                              style: const TextStyle(
+                                                color: Color(0xFFFDE047),
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Container(height: 1, color: Colors.white.withOpacity(0.2)),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: const [
-                              _StatItem(value: '142', label: 'Lịch hẹn'),
-                              _StatItem(value: '89', label: 'Khách hàng'),
-                              _StatItem(value: '4.8', label: 'Đánh giá'),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Subscription Status
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade100),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Gói Chuyên Nghiệp',
-                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Hết hạn: 11 Tháng 4, 2026',
-                                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 16),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                                height: 1,
+                                color: Colors.white.withValues(alpha: 0.2),
+                              ),
+                              const SizedBox(height: 16),
+                              BlocBuilder<DashboardCubit, DashboardState>(
+                                builder: (context, state) {
+                                  final totalBookings = state is DashboardLoaded
+                                      ? state.stats.totalBookings.toString()
+                                      : '...';
+                                  final totalCustomers =
+                                      state is DashboardLoaded
+                                      ? state
+                                            .stats
+                                            .customerOverview
+                                            .totalCustomers
+                                            .toString()
+                                      : '...';
+
+                                  return Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceAround,
+                                    children: [
+                                      _StatItem(
+                                        value: totalBookings,
+                                        label: 'Lịch hẹn',
+                                      ),
+                                      _StatItem(
+                                        value: totalCustomers,
+                                        label: 'Khách hàng',
+                                      ),
+                                      const _StatItem(
+                                        value: '-',
+                                        label: 'Đánh giá',
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Subscription Status
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade100),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        planLabel,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Hết hạn: ${_formatDate(business.planExpiresAt)}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Text(
-                                  'Quản lý',
-                                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF8B5CF6),
+                                          Color(0xFF7C3AED),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Text(
+                                      'Quản lý',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              BlocBuilder<DashboardCubit, DashboardState>(
+                                builder: (context, state) {
+                                  final usedBookings = state is DashboardLoaded
+                                      ? state.stats.totalBookings.toString()
+                                      : '...';
+
+                                  return Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Lịch hẹn đã dùng tháng này',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      Text(
+                                        '$usedBookings/∞',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: _tealColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(99),
+                                child: LinearProgressIndicator(
+                                  value: 0,
+                                  backgroundColor: Colors.grey.shade100,
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                        _tealColor,
+                                      ),
+                                  minHeight: 8,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Text('Lịch hẹn đã dùng tháng này', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                              Text('142/∞', style: TextStyle(fontSize: 12, color: _tealColor, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: LinearProgressIndicator(
-                              value: 0.75, // 75%
-                              backgroundColor: Colors.grey.shade100,
-                              valueColor: const AlwaysStoppedAnimation<Color>(_tealColor),
-                              minHeight: 8,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                        ),
+                        const SizedBox(height: 16),
 
-                    // Business Info Card
-                    BlocBuilder<AccountCubit, BusinessInfo>(
-                      builder: (context, business) {
-                        return Container(
+                        // Business Info Card
+                        Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
@@ -250,29 +364,61 @@ class _AccountView extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  14,
+                                  16,
+                                  14,
+                                ),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Row(
                                       children: [
                                         Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            color: _tealColor.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(12),
+                                            color: _tealColor.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
-                                          child: const Icon(Icons.domain, color: _tealColor, size: 16),
+                                          child: const Icon(
+                                            Icons.domain,
+                                            color: _tealColor,
+                                            size: 16,
+                                          ),
                                         ),
                                         const SizedBox(width: 10),
-                                        const Text('Thông tin doanh nghiệp', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                        const Text(
+                                          'Thông tin doanh nghiệp',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                     IconButton(
-                                      onPressed: () => _showEditBusinessSheet(context, business),
-                                      icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.grey),
-                                      style: IconButton.styleFrom(backgroundColor: Colors.grey.shade50),
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                      onPressed: () => _showEditBusinessSheet(
+                                        context,
+                                        business,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 18,
+                                        color: Colors.grey,
+                                      ),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: Colors.grey.shade50,
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
                                       padding: EdgeInsets.zero,
                                     ),
                                   ],
@@ -284,155 +430,199 @@ class _AccountView extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _InfoRow(icon: Icons.business, label: 'Tên doanh nghiệp', value: business.name),
+                                    _InfoRow(
+                                      icon: Icons.business,
+                                      label: 'Tên doanh nghiệp',
+                                      value: business.name,
+                                    ),
                                     const SizedBox(height: 12),
-                                    _InfoRow(icon: Icons.location_on_outlined, label: 'Địa chỉ', value: business.address),
+                                    _InfoRow(
+                                      icon: Icons.location_on_outlined,
+                                      label: 'Địa chỉ',
+                                      value: business.address,
+                                    ),
                                     const SizedBox(height: 12),
                                     Row(
                                       children: [
-                                        Expanded(child: _InfoRow(icon: Icons.phone_outlined, label: 'Điện thoại', value: business.phone)),
-                                        Expanded(child: _InfoRow(icon: Icons.language, label: 'Website', value: business.website, valueColor: _tealColor)),
+                                        Expanded(
+                                          child: _InfoRow(
+                                            icon: Icons.phone_outlined,
+                                            label: 'Điện thoại',
+                                            value: business.phone,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _InfoRow(
+                                            icon: Icons.language,
+                                            label: 'Website',
+                                            value: business.website,
+                                            valueColor: _tealColor,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                     const SizedBox(height: 12),
                                     _InfoRow(
-                                        icon: Icons.access_time,
-                                        label: 'Giờ hoạt động',
-                                        value: 'T2–T6: ${business.hoursWeekday}\nT7–CN: ${business.hoursWeekend}'
+                                      icon: Icons.access_time,
+                                      label: 'Giờ hoạt động',
+                                      value:
+                                          'T2–T6: ${business.hoursWeekday}\nT7–CN: ${business.hoursWeekend}',
                                     ),
                                     const SizedBox(height: 16),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      decoration: BoxDecoration(gradient: _tealGradient, borderRadius: BorderRadius.circular(99)),
-                                      child: Text(business.type, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: _tealGradient,
+                                        borderRadius: BorderRadius.circular(99),
+                                      ),
+                                      child: Text(
+                                        business.type,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                        ),
+                        const SizedBox(height: 24),
 
-                    _MenuSection(
-                      title: 'Cài đặt Tổng quan & Bảo mật',
-                      items: [
-                        _MenuItem(
-                          icon: Icons.person_outline,
-                          label: 'Thông tin tài khoản & Bảo mật',
-                          hint: 'Hồ sơ, mật khẩu, FaceID/Vân tay, 2FA',
-                          color: const Color(0xFF148a9c),
-                          onTap: () => context.push(AccountInfoPage.routePath),
+                        _MenuSection(
+                          title: 'Cài đặt Tổng quan & Bảo mật',
+                          items: [
+                            _MenuItem(
+                              icon: Icons.person_outline,
+                              label: 'Thông tin tài khoản & Bảo mật',
+                              hint: 'Hồ sơ, mật khẩu, FaceID/Vân tay, 2FA',
+                              color: const Color(0xFF148a9c),
+                              onTap: () =>
+                                  context.push(AccountInfoPage.routePath),
+                            ),
+                            _MenuItem(
+                              icon: Icons.keyboard_alt_outlined,
+                              label: 'Phím tắt & Trợ giúp',
+                              hint: 'Phím tắt PC/Tablet, hướng dẫn nhanh',
+                              color: const Color(0xFF8b5cf6),
+                            ),
+                          ],
                         ),
-                        _MenuItem(
-                            icon: Icons.keyboard_alt_outlined,
-                            label: 'Phím tắt & Trợ giúp',
-                            hint: 'Phím tắt PC/Tablet, hướng dẫn nhanh',
-                            color: const Color(0xFF8b5cf6)),
-                      ],
-                    ),
-                    _MenuSection(
-                      title: 'Quản lý',
-                      items: [
-                        _MenuItem(
-                          icon: Icons.people_outline,
-                          label: 'Quản lý nhân viên',
-                          color: const Color(0xFF148a9c),
-                          onTap: () => context.push(StaffPage.routePath),
+                        _MenuSection(
+                          title: 'Quản lý',
+                          items: [
+                            _MenuItem(
+                              icon: Icons.people_outline,
+                              label: 'Quản lý nhân viên',
+                              color: const Color(0xFF148a9c),
+                              onTap: () => context.push(StaffPage.routePath),
+                            ),
+                            _MenuItem(
+                              icon: Icons.account_circle_outlined,
+                              label: 'Quản lý khách hàng',
+                              color: const Color(0xFF14b8a6),
+                              onTap: () => context.push(CustomerPage.routePath),
+                            ),
+                            _MenuItem(
+                              icon: Icons.inventory_2_outlined,
+                              label: 'Quản lý thiết bị',
+                              color: const Color(0xFF22AFC2),
+                              onTap: () =>
+                                  context.push(EquipmentPage.routePath),
+                            ),
+                            _MenuItem(
+                              icon: Icons.grid_view,
+                              label: 'Danh mục SP & Dịch vụ',
+                              color: const Color(0xFF8b5cf6),
+                              onTap: () =>
+                                  context.push('/catalog'), // <-- Thêm dòng này
+                            ),
+                            _MenuItem(
+                              icon: Icons.auto_awesome,
+                              label: 'Trợ lý AI Schedula',
+                              color: const Color(0xFFf97316),
+                              isNew: true,
+                            ),
+                          ],
                         ),
-                        _MenuItem(
-                          icon: Icons.account_circle_outlined,
-                          label: 'Quản lý khách hàng',
-                          color: const Color(0xFF14b8a6),
-                          onTap: () => context.push(CustomerPage.routePath),
+                        _MenuSection(
+                          title: 'Cài đặt hệ thống',
+                          items: [
+                            _MenuItem(
+                              icon: Icons.edit_calendar_outlined,
+                              label: 'Quy tắc đặt lịch',
+                              color: const Color(0xFF22AFC2),
+                            ),
+                            _MenuItem(
+                              icon: Icons.admin_panel_settings_outlined,
+                              label: 'Phân quyền truy cập',
+                              color: const Color(0xFF148a9c),
+                            ),
+                            _MenuItem(
+                              icon: Icons.notifications_outlined,
+                              label: 'Thông báo & Âm thanh',
+                              color: const Color(0xFFf97316),
+                            ),
+                            _MenuItem(
+                              icon: Icons.message_outlined,
+                              label: 'SMS / Zalo ZNS',
+                              color: const Color(0xFF3b82f6),
+                            ),
+                          ],
                         ),
-                        _MenuItem(
-                          icon: Icons.inventory_2_outlined,
-                          label: 'Quản lý thiết bị',
-                          color: const Color(0xFF22AFC2),
-                          onTap: () => context.push(EquipmentPage.routePath),
+                        _MenuSection(
+                          title: 'Thanh toán',
+                          items: [
+                            _MenuItem(
+                              icon: Icons.credit_card_outlined,
+                              label: 'Quản lý thanh toán',
+                              color: const Color(0xFF14b8a6),
+                            ),
+                            _MenuItem(
+                              icon: Icons.workspace_premium_outlined,
+                              label: 'Nâng cấp gói dịch vụ',
+                              color: const Color(0xFFeab308),
+                            ),
+                            _MenuItem(
+                              icon: Icons.star_outline,
+                              label: 'Lịch sử giao dịch',
+                              color: const Color(0xFFec4899),
+                            ),
+                          ],
                         ),
-                        _MenuItem(
-                          icon: Icons.grid_view,
-                          label: 'Danh mục SP & Dịch vụ',
-                          color: const Color(0xFF8b5cf6),
-                          onTap: () => context.push('/catalog'), // <-- Thêm dòng này
+                        _MenuSection(
+                          title: 'Hỗ trợ',
+                          items: [
+                            _MenuItem(
+                              icon: Icons.logout,
+                              label: 'Đăng xuất',
+                              color: const Color(0xFFef4444),
+                              isDestructive: true,
+                              onTap: () {
+                                context.read<AuthBloc>().add(
+                                  const AuthSignOutRequested(),
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                        _MenuItem(
-                            icon: Icons.auto_awesome,
-                            label: 'Trợ lý AI Schedula',
-                            color: const Color(0xFFf97316),
-                            isNew: true
-                        ),
-                      ],
-                    ),
-                    _MenuSection(
-                      title: 'Cài đặt hệ thống',
-                      items: [
-                        _MenuItem(
-                          icon: Icons.edit_calendar_outlined,
-                          label: 'Quy tắc đặt lịch',
-                          color: const Color(0xFF22AFC2),
-                        ),
-                        _MenuItem(
-                          icon: Icons.admin_panel_settings_outlined,
-                          label: 'Phân quyền truy cập',
-                          color: const Color(0xFF148a9c),
-                        ),
-                        _MenuItem(
-                            icon: Icons.notifications_outlined,
-                            label: 'Thông báo & Âm thanh',
-                            color: const Color(0xFFf97316)
-                        ),
-                        _MenuItem(
-                            icon: Icons.message_outlined,
-                            label: 'SMS / Zalo ZNS',
-                            color: const Color(0xFF3b82f6)
-                        ),
-                      ],
-                    ),
-                    _MenuSection(
-                      title: 'Thanh toán',
-                      items: [
-                        _MenuItem(
-                          icon: Icons.credit_card_outlined,
-                          label: 'Quản lý thanh toán',
-                          color: const Color(0xFF14b8a6),
-                        ),
-                        _MenuItem(
-                          icon: Icons.workspace_premium_outlined,
-                          label: 'Nâng cấp gói dịch vụ',
-                          color: const Color(0xFFeab308),
-                        ),
-                        _MenuItem(
-                            icon: Icons.star_outline,
-                            label: 'Lịch sử giao dịch',
-                            color: const Color(0xFFec4899)
-                        ),
-                      ],
-                    ),
-                    _MenuSection(
-                      title: 'Hỗ trợ',
-                      items: [
-                        _MenuItem(
-                          icon: Icons.logout,
-                          label: 'Đăng xuất',
-                          color: const Color(0xFFef4444),
-                          isDestructive: true,
-                          onTap: () {
-                            context.read<AuthBloc>().add(const AuthSignOutRequested());
-                          },
-                        ),
-                      ],
-                    ),
 
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text('Schedula v1.0.0 · © 2026 Schedula Inc.', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    ),
-                  ],
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Text(
+                            'Schedula v1.0.0 · © 2026 Schedula Inc.',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -450,10 +640,13 @@ class _AccountView extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _EditBusinessSheet(initialInfo: currentInfo, onSave: (newInfo) {
-        cubit.updateBusinessInfo(newInfo);
-        Navigator.pop(context);
-      }),
+      builder: (context) => _EditBusinessSheet(
+        initialInfo: currentInfo,
+        onSave: (newInfo) {
+          cubit.updateBusinessInfo(newInfo);
+          Navigator.pop(context);
+        },
+      ),
     );
   }
 }
@@ -469,8 +662,21 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.8),
+            fontSize: 12,
+          ),
+        ),
       ],
     );
   }
@@ -482,7 +688,12 @@ class _InfoRow extends StatelessWidget {
   final String value;
   final Color? valueColor;
 
-  const _InfoRow({required this.icon, required this.label, required this.value, this.valueColor});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -495,9 +706,19 @@ class _InfoRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
               const SizedBox(height: 2),
-              Text(value, style: TextStyle(fontSize: 14, color: valueColor ?? Colors.grey.shade800, fontWeight: FontWeight.w500)),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: valueColor ?? Colors.grey.shade800,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
@@ -518,7 +739,10 @@ class _MenuSection extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 8, bottom: 8, top: 8),
-          child: Text(title, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+          child: Text(
+            title,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          ),
         ),
         Container(
           decoration: BoxDecoration(
@@ -533,7 +757,8 @@ class _MenuSection extends StatelessWidget {
               return Column(
                 children: [
                   item,
-                  if (index != items.length - 1) Divider(height: 1, indent: 56, color: Colors.grey.shade100),
+                  if (index != items.length - 1)
+                    Divider(height: 1, indent: 56, color: Colors.grey.shade100),
                 ],
               );
             }).toList(),
@@ -553,7 +778,15 @@ class _MenuItem extends StatelessWidget {
   final bool isDestructive;
   final VoidCallback? onTap;
 
-  const _MenuItem({required this.icon, required this.label, required this.color, this.hint, this.isNew = false, this.isDestructive = false, this.onTap});
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.hint,
+    this.isNew = false,
+    this.isDestructive = false,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -566,7 +799,10 @@ class _MenuItem extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Icon(icon, size: 18, color: color),
             ),
             const SizedBox(width: 14),
@@ -576,24 +812,51 @@ class _MenuItem extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(label, style: TextStyle(fontSize: 14, color: isDestructive ? Colors.red : Colors.grey.shade800, fontWeight: FontWeight.w500)),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDestructive
+                              ? Colors.red
+                              : Colors.grey.shade800,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       if (isNew) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Color(0xFF22AFC2), Color(0xFF148a9c)]),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF22AFC2), Color(0xFF148a9c)],
+                            ),
                             borderRadius: BorderRadius.circular(99),
                           ),
-                          child: const Text('MỚI', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                        )
-                      ]
+                          child: const Text(
+                            'MỚI',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   if (hint != null) ...[
                     const SizedBox(height: 2),
-                    Text(hint!, style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
-                  ]
+                    Text(
+                      hint!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -627,8 +890,14 @@ class _EditBusinessSheetState extends State<_EditBusinessSheet> {
   String selectedType = '';
 
   final List<String> businessTypes = [
-    "Spa & Làm đẹp", "Phòng khám da liễu", "Salon tóc", "Nail & Thẩm mỹ",
-    "Massage & Thư giãn", "Phòng khám đa khoa", "Yoga & Fitness", "Khác",
+    "Spa & Làm đẹp",
+    "Phòng khám da liễu",
+    "Salon tóc",
+    "Nail & Thẩm mỹ",
+    "Massage & Thư giãn",
+    "Phòng khám đa khoa",
+    "Yoga & Fitness",
+    "Khác",
   ];
 
   @override
@@ -652,8 +921,11 @@ class _EditBusinessSheetState extends State<_EditBusinessSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24, // Tránh bàn phím che
-        top: 24, left: 24, right: 24,
+        bottom:
+            MediaQuery.of(context).viewInsets.bottom + 24, // Tránh bàn phím che
+        top: 24,
+        left: 24,
+        right: 24,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -663,12 +935,17 @@ class _EditBusinessSheetState extends State<_EditBusinessSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Chỉnh sửa doanh nghiệp', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Chỉnh sửa doanh nghiệp',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  style: IconButton.styleFrom(backgroundColor: Colors.grey.shade100),
-                )
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.grey.shade100,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -704,30 +981,39 @@ class _EditBusinessSheetState extends State<_EditBusinessSheet> {
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: Colors.grey.shade100,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
-                    child: const Text('Hủy', style: TextStyle(color: Colors.black87)),
+                    child: const Text(
+                      'Hủy',
+                      style: TextStyle(color: Colors.black87),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      widget.onSave(BusinessInfo(
-                        name: nameCtrl.text,
-                        type: selectedType,
-                        address: addressCtrl.text,
-                        phone: phoneCtrl.text,
-                        website: websiteCtrl.text,
-                        hoursWeekday: hWeekdayCtrl.text,
-                        hoursWeekend: hWeekendCtrl.text,
-                        description: descCtrl.text,
-                      ));
+                      widget.onSave(
+                        widget.initialInfo.copyWith(
+                          name: nameCtrl.text,
+                          type: selectedType,
+                          address: addressCtrl.text,
+                          phone: phoneCtrl.text,
+                          website: websiteCtrl.text,
+                          hoursWeekday: hWeekdayCtrl.text,
+                          hoursWeekend: hWeekendCtrl.text,
+                          description: descCtrl.text,
+                        ),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: const Color(0xFF22AFC2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       elevation: 0,
                     ),
                     child: Row(
@@ -735,20 +1021,30 @@ class _EditBusinessSheetState extends State<_EditBusinessSheet> {
                       children: const [
                         Icon(Icons.check, size: 18, color: Colors.white),
                         SizedBox(width: 8),
-                        Text('Lưu thay đổi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        Text(
+                          'Lưu thay đổi',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ],
-            )
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, {int maxLines = 1}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController ctrl, {
+    int maxLines = 1,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -760,9 +1056,18 @@ class _EditBusinessSheetState extends State<_EditBusinessSheet> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.grey.shade50,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF22AFC2))),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF22AFC2)),
+            ),
           ),
         ),
       ],
@@ -777,12 +1082,22 @@ class _EditBusinessSheetState extends State<_EditBusinessSheet> {
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               isExpanded: true,
               value: selectedType,
-              items: businessTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 14)))).toList(),
+              items: businessTypes
+                  .map(
+                    (t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t, style: const TextStyle(fontSize: 14)),
+                    ),
+                  )
+                  .toList(),
               onChanged: (val) {
                 if (val != null) setState(() => selectedType = val);
               },

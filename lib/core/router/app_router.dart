@@ -9,6 +9,7 @@ import '../../features/account/presentation/pages/account_page.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/booking/presentation/pages/booking_page.dart';
 import '../../features/catalog/presentaion/pages/catalog_page.dart';
@@ -35,7 +36,9 @@ class AppRouter {
       final location = state.uri.toString();
 
       final isPublicRoute =
-          location == SplashPage.routePath || location == LoginPage.routePath;
+          location == SplashPage.routePath ||
+          location == LoginPage.routePath ||
+          location == RegisterPage.routePath;
 
       if (authState is AuthLoading) {
         return null;
@@ -64,6 +67,11 @@ class AppRouter {
         path: LoginPage.routePath,
         name: LoginPage.routeName,
         builder: (_, _) => const LoginPage(),
+      ),
+      GoRoute(
+        path: RegisterPage.routePath,
+        name: RegisterPage.routeName,
+        builder: (_, _) => const RegisterPage(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

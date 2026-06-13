@@ -52,6 +52,7 @@ dependencies:
   dartz: ^0.10.1             # Either<Failure, Success>
   firebase_database: ^12.4.1
   google_fonts: ^8.1.0
+  url_launcher: ^6.3.1
  
 dev_dependencies:
   flutter_test:

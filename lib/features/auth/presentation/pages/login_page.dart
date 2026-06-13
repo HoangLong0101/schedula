@@ -9,6 +9,7 @@ import '../../../dashboard/presentation/pages/home_page.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -225,15 +226,8 @@ class _LoginPageState extends State<LoginPage> {
                                 _FooterLinkRow(
                                   prompt: 'Chưa có tài khoản?',
                                   actionLabel: 'Đăng ký ngay',
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Trang đăng ký chưa được triển khai.',
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                  onPressed: () =>
+                                      context.go(RegisterPage.routePath),
                                 ),
                                 const SizedBox(height: 16),
                                 _AdminLoginButton(

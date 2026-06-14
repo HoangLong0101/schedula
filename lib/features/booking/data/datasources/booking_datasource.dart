@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 
-import '../../../../core/utils/date_utils.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/cancel_booking_usecase.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
@@ -37,11 +36,36 @@ class BookingDataSource {
       _firestore.collection('slots');
 
   Stream<List<BookingModel>> watchBookings(WatchBookingsParams params) async* {
-    final query = _bookings.where('tenantId', isEqualTo: params.tenantId);
+    Query<Map<String, dynamic>> query = _bookings.where(
+      'tenantId',
+      isEqualTo: params.tenantId,
+    );
+
+    if (params.staffId != null && params.staffId!.isNotEmpty) {
+      query = query.where('staffId', isEqualTo: params.staffId);
+    }
+    if (params.status != null) {
+      query = query.where('status', isEqualTo: params.status!.value);
+    }
+    if (params.startDate != null) {
+      query = query.where(
+        'startTime',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(params.startDate!),
+      );
+    }
+    if (params.endDate != null) {
+      query = query.where(
+        'startTime',
+        isLessThan: Timestamp.fromDate(params.endDate!),
+      );
+    }
+    query = query.orderBy('startTime');
 
     try {
       await for (final snapshot in query.snapshots()) {
-        yield _filterBookings(snapshot, params);
+        yield snapshot.docs
+            .map(BookingModel.fromFirestore)
+            .toList(growable: false);
       }
     } catch (error) {
       if (_isPermissionDenied(error)) {
@@ -88,75 +112,48 @@ class BookingDataSource {
 
   Future<BookingModel> createBooking(CreateBookingParams params) async {
     final bookingRef = _bookings.doc();
-    final slotId =
-        '${DateUtilsX.formatIsoDate(params.startTime)}_${params.staffId}';
-    final slotRef = _slots.doc(slotId);
 
-    return _firestore.runTransaction((tx) async {
-      final slotSnap = await tx.get(slotRef);
-      final slotData = slotSnap.data() ?? const <String, dynamic>{};
-      final rawIntervals = slotData['intervals'] as List<dynamic>? ?? const [];
-      final intervals = rawIntervals
-          .whereType<Map<String, dynamic>>()
-          .map(SlotIntervalModel.fromJson)
-          .toList(growable: false);
+    final conflicts = await _bookings
+        .where('tenantId', isEqualTo: params.tenantId)
+        .where('staffId', isEqualTo: params.staffId)
+        .get();
 
-      final overlaps = intervals.any((interval) {
-        return params.startTime.isBefore(interval.endTime) &&
-            params.endTime.isAfter(interval.startTime);
-      });
-
-      if (overlaps) {
-        throw BookingConflictException('Slot already taken');
+    final hasOverlap = conflicts.docs.map(BookingModel.fromFirestore).any((
+      booking,
+    ) {
+      if (booking.status == BookingStatus.cancelled ||
+          booking.status == BookingStatus.completed ||
+          booking.status == BookingStatus.noShow) {
+        return false;
       }
-
-      final updatedIntervals = [
-        ...intervals,
-        SlotIntervalModel(
-          startTime: params.startTime,
-          endTime: params.endTime,
-          bookingId: bookingRef.id,
-        ),
-      ];
-
-      final booking = BookingModel(
-        id: bookingRef.id,
-        tenantId: params.tenantId,
-        staffId: params.staffId,
-        customerId: params.customerId,
-        serviceId: params.serviceId,
-        startTime: params.startTime,
-        endTime: params.endTime,
-        status: params.status,
-        notes: params.notes,
-        createdBy: params.createdBy,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        customerName: params.customerName,
-        staffName: params.staffName,
-        serviceName: params.serviceName,
-      );
-
-      tx.set(
-        slotRef,
-        SlotModel(
-          id: slotRef.id,
-          tenantId: params.tenantId,
-          staffId: params.staffId,
-          date: DateTime(
-            params.startTime.year,
-            params.startTime.month,
-            params.startTime.day,
-          ),
-          intervals: updatedIntervals,
-        ).toFirestore(),
-        SetOptions(merge: true),
-      );
-
-      tx.set(bookingRef, booking.toFirestore());
-
-      return booking;
+      return params.startTime.isBefore(booking.endTime) &&
+          params.endTime.isAfter(booking.startTime);
     });
+
+    if (hasOverlap) {
+      throw BookingConflictException('Slot already taken');
+    }
+
+    final booking = BookingModel(
+      id: bookingRef.id,
+      tenantId: params.tenantId,
+      staffId: params.staffId,
+      customerId: params.customerId,
+      serviceId: params.serviceId,
+      startTime: params.startTime,
+      endTime: params.endTime,
+      status: params.status,
+      notes: params.notes,
+      createdBy: params.createdBy,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      customerName: params.customerName,
+      staffName: params.staffName,
+      serviceName: params.serviceName,
+    );
+
+    await bookingRef.set(booking.toFirestore());
+    return booking;
   }
 
   Future<BookingModel> updateBookingStatus(
@@ -181,33 +178,6 @@ class BookingDataSource {
       'updatedAt': Timestamp.now(),
       if (params.reason != null) 'notes': params.reason,
     });
-  }
-
-  List<BookingModel> _filterBookings(
-    QuerySnapshot<Map<String, dynamic>> snapshot,
-    WatchBookingsParams params,
-  ) {
-    final bookings = snapshot.docs
-        .map(BookingModel.fromFirestore)
-        .where((booking) {
-          final matchesStart =
-              params.startDate == null ||
-              !booking.startTime.isBefore(params.startDate!);
-          final matchesEnd =
-              params.endDate == null ||
-              booking.startTime.isBefore(params.endDate!);
-          final matchesStaff =
-              params.staffId == null ||
-              params.staffId!.isEmpty ||
-              booking.staffId == params.staffId;
-          final matchesStatus =
-              params.status == null || booking.status == params.status;
-
-          return matchesStart && matchesEnd && matchesStaff && matchesStatus;
-        })
-        .toList(growable: false);
-
-    return bookings..sort((a, b) => a.startTime.compareTo(b.startTime));
   }
 
   bool _isPermissionDenied(Object error) {

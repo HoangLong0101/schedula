@@ -33,11 +33,18 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
   final CancelBookingUseCase _cancelBookingUseCase;
 
   StreamSubscription? _bookingsSubscription;
+  WatchBookingsParams? _activeParams;
 
   Future<void> _onStarted(
     BookingStarted event,
     Emitter<BookingState> emit,
   ) async {
+    if (_hasSameParams(_activeParams, event.params) &&
+        (state is BookingLoaded || state is BookingLoading)) {
+      return;
+    }
+
+    _activeParams = event.params;
     await _bookingsSubscription?.cancel();
     emit(const BookingLoading());
     _bookingsSubscription = _watchBookingsUseCase(event.params).listen(
@@ -103,6 +110,14 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
       return state.previous;
     }
     return const [];
+  }
+
+  bool _hasSameParams(WatchBookingsParams? a, WatchBookingsParams b) {
+    return a?.tenantId == b.tenantId &&
+        a?.startDate == b.startDate &&
+        a?.endDate == b.endDate &&
+        a?.staffId == b.staffId &&
+        a?.status == b.status;
   }
 
   @override

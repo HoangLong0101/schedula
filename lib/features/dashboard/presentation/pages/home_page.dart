@@ -61,7 +61,10 @@ class _DashboardView extends StatelessWidget {
         bottom: false,
         child: RefreshIndicator(
           color: _HomeColors.teal,
-          onRefresh: () => context.read<DashboardCubit>().load(tenantId),
+          onRefresh: () => context.read<DashboardCubit>().load(
+            tenantId,
+            forceRefresh: true,
+          ),
           child: BlocBuilder<DashboardCubit, DashboardState>(
             builder: (context, state) {
               return switch (state) {
@@ -127,7 +130,10 @@ class _ErrorView extends StatelessWidget {
         const SizedBox(height: 16),
         Center(
           child: FilledButton(
-            onPressed: () => context.read<DashboardCubit>().load(tenantId),
+            onPressed: () => context.read<DashboardCubit>().load(
+              tenantId,
+              forceRefresh: true,
+            ),
             child: const Text('Thử lại'),
           ),
         ),

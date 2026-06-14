@@ -57,7 +57,10 @@ class _StatisticsViewState extends State<_StatisticsView> {
         bottom: false,
         child: RefreshIndicator(
           color: _StatsColors.teal,
-          onRefresh: () => context.read<DashboardCubit>().load(widget.tenantId),
+          onRefresh: () => context.read<DashboardCubit>().load(
+            widget.tenantId,
+            forceRefresh: true,
+          ),
           child: BlocBuilder<DashboardCubit, DashboardState>(
             builder: (context, state) {
               return ListView(
@@ -244,7 +247,10 @@ class _StatsError extends StatelessWidget {
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: () => context.read<DashboardCubit>().load(tenantId),
+            onPressed: () => context.read<DashboardCubit>().load(
+              tenantId,
+              forceRefresh: true,
+            ),
             child: const Text('Thử lại'),
           ),
         ],

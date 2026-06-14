@@ -45,43 +45,60 @@ class DashboardDataSource {
       DateTime.now().subtract(_followUpWindow),
     );
 
-    return DashboardStatsModel.fromAggregates(
-      totalBookings: await _safeCount(base.count()),
-      completedBookings: await _safeCount(
+    final results = await Future.wait<Object>([
+      _safeCount(base.count()),
+      _safeCount(
         base.where('status', isEqualTo: BookingStatus.completed.value).count(),
       ),
-      cancelledBookings: await _safeCount(
+      _safeCount(
         base.where('status', isEqualTo: BookingStatus.cancelled.value).count(),
       ),
-      noShowBookings: await _safeCount(
+      _safeCount(
         base.where('status', isEqualTo: BookingStatus.noShow.value).count(),
       ),
-      upcomingBookings: await _safeCount(
-        base.where('startTime', isGreaterThanOrEqualTo: now).count(),
-      ),
-      heatmapDocs: await _safeDocs(
+      _safeCount(base.where('startTime', isGreaterThanOrEqualTo: now).count()),
+      _safeDocs(
         base
             .where('startTime', isGreaterThanOrEqualTo: heatmapStart)
             .where('startTime', isLessThanOrEqualTo: now)
             .orderBy('startTime'),
       ),
-      todayBookingDocs: await _safeDocs(
+      _safeDocs(
         base
             .where('startTime', isGreaterThanOrEqualTo: startOfToday)
             .where('startTime', isLessThan: startOfTomorrow)
             .orderBy('startTime'),
       ),
-      inProgressBookingDocs: await _safeDocs(
+      _safeDocs(
         base.where('status', isEqualTo: BookingStatus.inProgress.value),
       ),
-      staffDocs: await _safeDocs(_users.where('tenantId', isEqualTo: tenantId)),
-      totalCustomers: await _safeCount(customersBase.count()),
-      returningCustomers: await _safeCount(
+      _safeDocs(_users.where('tenantId', isEqualTo: tenantId)),
+      _safeCount(customersBase.count()),
+      _safeCount(
         customersBase.where('visitCount', isGreaterThanOrEqualTo: 2).count(),
       ),
-      needsFollowUpCustomers: await _safeCount(
+      _safeCount(
         customersBase.where('lastVisit', isLessThan: followUpCutoff).count(),
       ),
+    ]);
+
+    return DashboardStatsModel.fromAggregates(
+      totalBookings: results[0] as int,
+      completedBookings: results[1] as int,
+      cancelledBookings: results[2] as int,
+      noShowBookings: results[3] as int,
+      upcomingBookings: results[4] as int,
+      heatmapDocs:
+          results[5] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
+      todayBookingDocs:
+          results[6] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
+      inProgressBookingDocs:
+          results[7] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
+      staffDocs:
+          results[8] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
+      totalCustomers: results[9] as int,
+      returningCustomers: results[10] as int,
+      needsFollowUpCustomers: results[11] as int,
     );
   }
 

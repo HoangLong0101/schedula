@@ -4,13 +4,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../catalog/domain/entities/service_item.dart';
 import '../../../catalog/domain/repositories/catalog_repository.dart';
+import '../../../staff/domain/entities/staff_member.dart';
 import '../../../staff/domain/usecases/watch_staff_usecase.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
 import '../../domain/usecases/scan_appointment_image_usecase.dart';
-import '../bloc/booking_bloc.dart';
-import '../bloc/booking_event.dart';
+import '../../domain/usecases/watch_bookings_usecase.dart';
 import '../cubit/booking_form_cubit.dart';
 import '../cubit/booking_form_state.dart';
 
@@ -26,6 +27,7 @@ class BookingFormSheet {
             tenantId,
             getIt<ScanAppointmentImageUseCase>(),
             getIt<WatchStaffUseCase>(),
+            getIt<WatchBookingsUseCase>(),
             getIt<CatalogRepository>(),
           ),
           child: _BookingFormContent(tenantId: tenantId),
@@ -47,15 +49,11 @@ class _BookingFormContent extends StatefulWidget {
 class _BookingFormContentState extends State<_BookingFormContent> {
   final _lookupController = TextEditingController();
   final _customerNameController = TextEditingController();
-  final _staffNameController = TextEditingController();
-  final _serviceNameController = TextEditingController();
 
   @override
   void dispose() {
     _lookupController.dispose();
     _customerNameController.dispose();
-    _staffNameController.dispose();
-    _serviceNameController.dispose();
     super.dispose();
   }
 
@@ -76,8 +74,6 @@ class _BookingFormContentState extends State<_BookingFormContent> {
             // Reflect AI-extracted values in the editable text fields.
             _lookupController.text = state.customerLookup;
             _customerNameController.text = state.customerName;
-            _staffNameController.text = state.staffName;
-            _serviceNameController.text = state.serviceName;
           },
           builder: (context, state) {
             return SingleChildScrollView(
@@ -138,48 +134,11 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  const _SectionLabel('Khách hàng'),
-                  const SizedBox(height: 8),
-                  _InputField(
-                    controller: _lookupController,
-                    hintText: 'Nhập SĐT hoặc tìm khách có sẵn...',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    onChanged: context
-                        .read<BookingFormCubit>()
-                        .updateCustomerLookup,
-                  ),
-                  const SizedBox(height: 16),
-                  const _SectionLabel('Tên khách hàng'),
-                  const SizedBox(height: 8),
-                  _InputField(
-                    controller: _customerNameController,
-                    hintText: 'Nhập tên khách hàng',
-                    icon: Icons.person_outline,
-                    textInputAction: TextInputAction.next,
-                    onChanged: context
-                        .read<BookingFormCubit>()
-                        .updateCustomerName,
-                  ),
-                  const SizedBox(height: 16),
-                  const _SectionLabel('Nhân viên phụ trách'),
-                  const SizedBox(height: 8),
-                  _InputField(
-                    controller: _staffNameController,
-                    hintText: 'Chọn nhân viên',
-                    icon: Icons.medical_services_outlined,
-                    textInputAction: TextInputAction.next,
-                    onChanged: context.read<BookingFormCubit>().updateStaffName,
-                  ),
-                  const SizedBox(height: 16),
-                  const _SectionLabel('Dịch vụ'),
-                  const SizedBox(height: 8),
-                  _InputField(
-                    controller: _serviceNameController,
-                    hintText: 'Chọn dịch vụ',
-                    icon: Icons.spa_outlined,
-                    textInputAction: TextInputAction.next,
-                    onChanged: context
+                  _ServiceSelectField(
+                    services: state.services,
+                    selectedServiceName: state.serviceName,
+                    onSelected: context.read<BookingFormCubit>().updateService,
+                    onManualChanged: context
                         .read<BookingFormCubit>()
                         .updateServiceName,
                   ),
@@ -220,6 +179,41 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  _StaffSelectField(
+                    recommendations: context
+                        .read<BookingFormCubit>()
+                        .staffRecommendations(),
+                    selectedStaffName: state.staffName,
+                    onSelected: context.read<BookingFormCubit>().updateStaff,
+                    onManualChanged: context
+                        .read<BookingFormCubit>()
+                        .updateStaffName,
+                  ),
+                  const SizedBox(height: 20),
+                  const _SectionLabel('Khách hàng'),
+                  const SizedBox(height: 8),
+                  _InputField(
+                    controller: _lookupController,
+                    hintText: 'Nhập SĐT hoặc tìm khách có sẵn...',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    onChanged: context
+                        .read<BookingFormCubit>()
+                        .updateCustomerLookup,
+                  ),
+                  const SizedBox(height: 16),
+                  const _SectionLabel('Tên khách hàng'),
+                  const SizedBox(height: 8),
+                  _InputField(
+                    controller: _customerNameController,
+                    hintText: 'Nhập tên khách hàng',
+                    icon: Icons.person_outline,
+                    textInputAction: TextInputAction.next,
+                    onChanged: context
+                        .read<BookingFormCubit>()
+                        .updateCustomerName,
+                  ),
+                  const SizedBox(height: 16),
                   const _SectionLabel('Ghi chú'),
                   const SizedBox(height: 8),
                   _InputField(
@@ -254,7 +248,7 @@ class _BookingFormContentState extends State<_BookingFormContent> {
     await cubit.scanImage(picked.path);
   }
 
-  void _submit(BuildContext context, BookingFormState state) {
+  Future<void> _submit(BuildContext context, BookingFormState state) async {
     if (!state.isValid) {
       return;
     }
@@ -263,27 +257,47 @@ class _BookingFormContentState extends State<_BookingFormContent> {
     final staffName = state.staffName.trim();
     final serviceName = state.serviceName.trim();
     final lookup = state.customerLookup.trim();
+    final staffId = state.staffId.isNotEmpty
+        ? state.staffId
+        : _stableId('staff', staffName);
+    final serviceId = state.serviceId.isNotEmpty
+        ? state.serviceId
+        : _stableId('service', serviceName);
 
-    context.read<BookingBloc>().add(
-      BookingCreateRequested(
-        CreateBookingParams(
-          tenantId: widget.tenantId,
-          staffId: _stableId('staff', staffName),
-          customerId: lookup.isNotEmpty
-              ? _stableId('customer', lookup)
-              : _stableId('customer', customerName),
-          serviceId: _stableId('service', serviceName),
-          startTime: state.startDateTime,
-          endTime: state.endDateTime,
-          status: BookingStatus.confirmed,
-          notes: state.notes.trim().isEmpty ? null : state.notes.trim(),
-          customerName: customerName,
-          staffName: staffName,
-          serviceName: serviceName,
-        ),
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final result = await getIt<CreateBookingUseCase>()(
+      CreateBookingParams(
+        tenantId: widget.tenantId,
+        staffId: staffId,
+        customerId: lookup.isNotEmpty
+            ? _stableId('customer', lookup)
+            : _stableId('customer', customerName),
+        serviceId: serviceId,
+        startTime: state.startDateTime,
+        endTime: state.endDateTime,
+        status: BookingStatus.confirmed,
+        notes: state.notes.trim().isEmpty ? null : state.notes.trim(),
+        customerName: customerName,
+        staffName: staffName,
+        serviceName: serviceName,
       ),
     );
-    Navigator.of(context).pop();
+
+    result.fold(
+      (failure) {
+        debugPrint('Create booking failed: ${failure.message}');
+        messenger.showSnackBar(
+          SnackBar(content: Text('Không lưu được lịch hẹn: ${failure.message}')),
+        );
+      },
+      (_) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Đã lưu lịch hẹn.')),
+        );
+        navigator.pop();
+      },
+    );
   }
 
   String _stableId(String prefix, String value) {
@@ -503,6 +517,316 @@ class _ModeButton extends StatelessWidget {
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
         ),
       ),
+    );
+  }
+}
+
+class _ServiceSelectField extends StatelessWidget {
+  const _ServiceSelectField({
+    required this.services,
+    required this.selectedServiceName,
+    required this.onSelected,
+    required this.onManualChanged,
+  });
+
+  final List<ServiceItem> services;
+  final String selectedServiceName;
+  final ValueChanged<ServiceItem> onSelected;
+  final ValueChanged<String> onManualChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PickerGroup(
+      label: 'Dịch vụ',
+      child: _SelectButton(
+        icon: Icons.spa_outlined,
+        label: selectedServiceName.isEmpty ? 'Chọn dịch vụ' : selectedServiceName,
+        onPressed: () => _showServicePicker(context),
+      ),
+    );
+  }
+
+  void _showServicePicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            children: [
+              const _SheetTitle('Chọn dịch vụ'),
+              if (services.isEmpty)
+                _ManualOption(
+                  hintText: 'Nhập tên dịch vụ',
+                  icon: Icons.spa_outlined,
+                  onSubmitted: (value) {
+                    onManualChanged(value);
+                    Navigator.of(sheetContext).pop();
+                  },
+                )
+              else
+                for (final service in services)
+                  _ServiceOption(
+                    service: service,
+                    onTap: () {
+                      onSelected(service);
+                      Navigator.of(sheetContext).pop();
+                    },
+                  ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StaffSelectField extends StatelessWidget {
+  const _StaffSelectField({
+    required this.recommendations,
+    required this.selectedStaffName,
+    required this.onSelected,
+    required this.onManualChanged,
+  });
+
+  final List<StaffRecommendation> recommendations;
+  final String selectedStaffName;
+  final ValueChanged<StaffMember> onSelected;
+  final ValueChanged<String> onManualChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PickerGroup(
+      label: 'Nhân viên phụ trách',
+      child: _SelectButton(
+        icon: Icons.medical_services_outlined,
+        label: selectedStaffName.isEmpty
+            ? 'Chọn nhân viên phù hợp'
+            : selectedStaffName,
+        onPressed: () => _showStaffPicker(context),
+      ),
+    );
+  }
+
+  void _showStaffPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            children: [
+              const _SheetTitle('Chọn nhân viên'),
+              if (recommendations.isEmpty)
+                _ManualOption(
+                  hintText: 'Nhập tên nhân viên',
+                  icon: Icons.medical_services_outlined,
+                  onSubmitted: (value) {
+                    onManualChanged(value);
+                    Navigator.of(sheetContext).pop();
+                  },
+                )
+              else
+                for (final recommendation in recommendations)
+                  _StaffOption(
+                    recommendation: recommendation,
+                    onTap: () {
+                      onSelected(recommendation.staff);
+                      Navigator.of(sheetContext).pop();
+                    },
+                  ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SelectButton extends StatelessWidget {
+  const _SelectButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 58,
+      width: double.infinity,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          backgroundColor: const Color(0xFFF7F8FA),
+          foregroundColor: _Tokens.text,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFF98A1B2), size: 20),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down, color: Color(0xFF98A1B2)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetTitle extends StatelessWidget {
+  const _SheetTitle(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: _Tokens.text,
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceOption extends StatelessWidget {
+  const _ServiceOption({required this.service, required this.onTap});
+
+  final ServiceItem service;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.spa_outlined, color: _Tokens.teal),
+      title: Text(
+        service.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+      subtitle: Text('${service.category} - ${service.duration} phút'),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
+    );
+  }
+}
+
+class _StaffOption extends StatelessWidget {
+  const _StaffOption({required this.recommendation, required this.onTap});
+
+  final StaffRecommendation recommendation;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final staff = recommendation.staff;
+    final statusText = recommendation.available ? 'Có thể nhận' : 'Bận khung giờ';
+    final statusColor = recommendation.available
+        ? const Color(0xFF16A34A)
+        : const Color(0xFFDC2626);
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: recommendation.available
+            ? const Color(0xFFE8F8EE)
+            : const Color(0xFFFFEFEF),
+        child: Icon(Icons.person_outline, color: statusColor),
+      ),
+      title: Text(
+        staff.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+      subtitle: Text(
+        [
+          statusText,
+          if (recommendation.serviceMatch) 'hợp dịch vụ',
+          '${staff.rating.toStringAsFixed(1)} sao',
+          '${staff.appointments} lịch',
+        ].join(' - '),
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
+    );
+  }
+}
+
+class _ManualOption extends StatefulWidget {
+  const _ManualOption({
+    required this.hintText,
+    required this.icon,
+    required this.onSubmitted,
+  });
+
+  final String hintText;
+  final IconData icon;
+  final ValueChanged<String> onSubmitted;
+
+  @override
+  State<_ManualOption> createState() => _ManualOptionState();
+}
+
+class _ManualOptionState extends State<_ManualOption> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      autofocus: true,
+      decoration: InputDecoration(
+        hintText: widget.hintText,
+        prefixIcon: Icon(widget.icon),
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.check),
+          onPressed: () => widget.onSubmitted(_controller.text.trim()),
+        ),
+      ),
+      onSubmitted: (value) => widget.onSubmitted(value.trim()),
     );
   }
 }

@@ -1,14 +1,23 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
+import '../../../catalog/domain/entities/service_item.dart';
+import '../../../staff/domain/entities/staff_member.dart';
+import '../../domain/entities/booking.dart';
 import '../../domain/entities/appointment_extraction.dart';
 
 class BookingFormState extends Equatable {
   BookingFormState({
     this.customerLookup = '',
     this.customerName = '',
+    this.staffId = '',
     this.staffName = '',
+    this.serviceId = '',
     this.serviceName = '',
+    this.serviceDuration = 60,
+    this.services = const [],
+    this.staff = const [],
+    this.bookingsForDay = const [],
     DateTime? date,
     TimeOfDay? startTime,
     TimeOfDay? endTime,
@@ -23,8 +32,14 @@ class BookingFormState extends Equatable {
 
   final String customerLookup;
   final String customerName;
+  final String staffId;
   final String staffName;
+  final String serviceId;
   final String serviceName;
+  final int serviceDuration;
+  final List<ServiceItem> services;
+  final List<StaffMember> staff;
+  final List<Booking> bookingsForDay;
   final DateTime date;
   final TimeOfDay startTime;
   final TimeOfDay endTime;
@@ -37,8 +52,14 @@ class BookingFormState extends Equatable {
   BookingFormState copyWith({
     String? customerLookup,
     String? customerName,
+    String? staffId,
     String? staffName,
+    String? serviceId,
     String? serviceName,
+    int? serviceDuration,
+    List<ServiceItem>? services,
+    List<StaffMember>? staff,
+    List<Booking>? bookingsForDay,
     DateTime? date,
     TimeOfDay? startTime,
     TimeOfDay? endTime,
@@ -52,8 +73,14 @@ class BookingFormState extends Equatable {
     return BookingFormState(
       customerLookup: customerLookup ?? this.customerLookup,
       customerName: customerName ?? this.customerName,
+      staffId: staffId ?? this.staffId,
       staffName: staffName ?? this.staffName,
+      serviceId: serviceId ?? this.serviceId,
       serviceName: serviceName ?? this.serviceName,
+      serviceDuration: serviceDuration ?? this.serviceDuration,
+      services: services ?? this.services,
+      staff: staff ?? this.staff,
+      bookingsForDay: bookingsForDay ?? this.bookingsForDay,
       date: date ?? this.date,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
@@ -96,8 +123,14 @@ class BookingFormState extends Equatable {
   List<Object?> get props => [
     customerLookup,
     customerName,
+    staffId,
     staffName,
+    serviceId,
     serviceName,
+    serviceDuration,
+    services,
+    staff,
+    bookingsForDay,
     date,
     startTime,
     endTime,

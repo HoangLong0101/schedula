@@ -10,10 +10,15 @@ class DashboardCubit extends Cubit<DashboardState> {
 
   final GetDashboardStatsUseCase _getDashboardStats;
 
-  Future<void> load(String tenantId) async {
-    emit(const DashboardLoading());
+  Future<void> load(String tenantId, {bool forceRefresh = false}) async {
+    if (state is! DashboardLoaded) {
+      emit(const DashboardLoading());
+    }
     final result = await _getDashboardStats(
-      GetDashboardStatsParams(tenantId: tenantId),
+      GetDashboardStatsParams(
+        tenantId: tenantId,
+        forceRefresh: forceRefresh,
+      ),
     );
     result.fold(
       (failure) => emit(DashboardFailure(failure.message)),

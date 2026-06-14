@@ -6,9 +6,13 @@ import '../entities/dashboard_stats.dart';
 import '../repositories/dashboard_repository.dart';
 
 class GetDashboardStatsParams {
-  const GetDashboardStatsParams({required this.tenantId});
+  const GetDashboardStatsParams({
+    required this.tenantId,
+    this.forceRefresh = false,
+  });
 
   final String tenantId;
+  final bool forceRefresh;
 }
 
 @injectable

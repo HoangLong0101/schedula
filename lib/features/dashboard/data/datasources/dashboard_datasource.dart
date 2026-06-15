@@ -23,6 +23,9 @@ class DashboardDataSource {
   CollectionReference<Map<String, dynamic>> get _customers =>
       _firestore.collection('customers');
 
+  CollectionReference<Map<String, dynamic>> get _tenantStatsDaily =>
+      _firestore.collection('tenantStatsDaily');
+
   Future<DashboardStatsModel> fetchStats(String tenantId) async {
     final base = _bookings.where('tenantId', isEqualTo: tenantId);
     final customersBase = _customers.where('tenantId', isEqualTo: tenantId);
@@ -63,6 +66,7 @@ class DashboardDataSource {
             .where('startTime', isLessThanOrEqualTo: now)
             .orderBy('startTime'),
       ),
+      _safeDocs(_tenantStatsDaily.where('tenantId', isEqualTo: tenantId)),
       _safeDocs(
         base
             .where('startTime', isGreaterThanOrEqualTo: startOfToday)
@@ -90,15 +94,17 @@ class DashboardDataSource {
       upcomingBookings: results[4] as int,
       heatmapDocs:
           results[5] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-      todayBookingDocs:
+      tenantStatsDocs:
           results[6] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-      inProgressBookingDocs:
+      todayBookingDocs:
           results[7] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-      staffDocs:
+      inProgressBookingDocs:
           results[8] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-      totalCustomers: results[9] as int,
-      returningCustomers: results[10] as int,
-      needsFollowUpCustomers: results[11] as int,
+      staffDocs:
+          results[9] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
+      totalCustomers: results[10] as int,
+      returningCustomers: results[11] as int,
+      needsFollowUpCustomers: results[12] as int,
     );
   }
 

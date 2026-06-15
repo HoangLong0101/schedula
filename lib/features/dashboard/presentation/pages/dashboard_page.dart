@@ -266,7 +266,7 @@ class _OperationsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final revenue = stats.completedBookings * 326000;
+    final revenue = stats.totalRevenue;
     final average = stats.completedBookings == 0
         ? 0
         : revenue ~/ stats.completedBookings;
@@ -331,17 +331,30 @@ class _ResourcesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final usage = stats.completedBookings + stats.upcomingBookings;
+    final activeRate = stats.totalBookings == 0
+        ? 0
+        : ((usage / stats.totalBookings) * 100).round().clamp(0, 100).toInt();
+    final completedRate = stats.totalBookings == 0
+        ? 0
+        : ((stats.completedBookings / stats.totalBookings) * 100)
+              .round()
+              .clamp(0, 100)
+              .toInt();
+    final cancelledRate = (stats.cancellationRate * 100)
+        .round()
+        .clamp(0, 100)
+        .toInt();
     return Column(
       children: [
         _ProgressCard(
           icon: Icons.bed_outlined,
           title: 'Giường sử dụng nhiều nhất',
           rows: [
-            _ProgressRow(rank: 1, label: 'Giường số 2', value: 78 + usage % 18),
+            _ProgressRow(rank: 1, label: 'Dang hoat dong', value: activeRate),
             _ProgressRow(
               rank: 2,
-              label: 'Giường số 4',
-              value: 72 + stats.totalBookings % 17,
+              label: 'Da hoan thanh',
+              value: completedRate,
             ),
           ],
         ),
@@ -352,15 +365,15 @@ class _ResourcesTab extends StatelessWidget {
           title: 'Giường ít sử dụng',
           rows: [
             _ProgressRow(
-              label: 'Giường số 1',
-              value: 26 + stats.cancelledBookings % 18,
+              label: 'Ty le huy',
+              value: cancelledRate,
               color: _StatsColors.orange,
             ),
           ],
           notice: 'Có thể tối ưu phân ca để cân bằng tần suất sử dụng giường.',
         ),
         const SizedBox(height: 20),
-        _MaintenanceCard(progress: (usage + 68).clamp(0, 100)),
+        _MaintenanceCard(progress: activeRate),
       ],
     );
   }
@@ -573,14 +586,9 @@ class _BusyHoursCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final counts = stats.dailyTrend.isEmpty
-        ? const [14, 18, 19, 16, 9, 7, 8, 14, 22, 32, 35, 21]
-        : List.generate(
-            12,
-            (index) =>
-                stats.dailyTrend[index % stats.dailyTrend.length].count +
-                (index * 3) % 11,
-          );
+    final counts = stats.hourlyBookingCounts.isEmpty
+        ? List<int>.filled(12, 0)
+        : stats.hourlyBookingCounts;
     final peak = counts.reduce((a, b) => a > b ? a : b);
 
     return _StatsCard(
@@ -939,8 +947,12 @@ class _TopStaffCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final names = staff.take(3).map((item) => item.name).toList();
-    final values = List.generate(names.length, (index) => 48 - index * 5);
+    final ranked = [...staff]..sort(
+      (a, b) => b.bookingCount.compareTo(a.bookingCount),
+    );
+    final topStaff = ranked.where((item) => item.bookingCount > 0).take(3);
+    final names = topStaff.map((item) => item.name).toList();
+    final values = topStaff.map((item) => item.bookingCount).toList();
 
     return _StatsCard(
       child: Column(
@@ -964,7 +976,7 @@ class _TopStaffCard extends StatelessWidget {
                 rank: i + 1,
                 name: names[i],
                 value: values[i],
-                max: values.first,
+                max: values.first == 0 ? 1 : values.first,
               ),
         ],
       ),

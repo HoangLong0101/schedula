@@ -9,6 +9,8 @@ class DashboardStatsModel extends DashboardStats {
     required super.cancelledBookings,
     required super.noShowBookings,
     required super.upcomingBookings,
+    required super.totalRevenue,
+    required super.hourlyBookingCounts,
     required super.heatmap,
     required super.dailyTrend,
     required super.todayAppointments,
@@ -25,6 +27,7 @@ class DashboardStatsModel extends DashboardStats {
     required int noShowBookings,
     required int upcomingBookings,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> heatmapDocs,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> tenantStatsDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> todayBookingDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>>
     inProgressBookingDocs,
@@ -35,15 +38,38 @@ class DashboardStatsModel extends DashboardStats {
   }) {
     final counts = <(int, BookingPeriod), int>{};
     final dailyCounts = <DateTime, int>{};
+    final staffBookingCounts = <String, int>{};
+    final hourlyBookingCounts = List<int>.filled(12, 0);
     for (final doc in heatmapDocs) {
       final startTime = _timestampFrom(doc.data()['startTime'])?.toDate();
       if (startTime == null) continue;
+
+      if (startTime.hour >= 8 && startTime.hour <= 19) {
+        hourlyBookingCounts[startTime.hour - 8] += 1;
+      }
+
+      final staffId = doc.data()['staffId'];
+      if (staffId is String && staffId.isNotEmpty) {
+        staffBookingCounts[staffId] = (staffBookingCounts[staffId] ?? 0) + 1;
+      }
 
       final key = (startTime.weekday, _periodOf(startTime.hour));
       counts[key] = (counts[key] ?? 0) + 1;
 
       final day = DateTime(startTime.year, startTime.month, startTime.day);
       dailyCounts[day] = (dailyCounts[day] ?? 0) + 1;
+    }
+
+    var totalRevenue = 0;
+    for (final doc in tenantStatsDocs) {
+      final data = doc.data();
+      totalRevenue += (data['revenue'] as num?)?.round() ?? 0;
+
+      final timestamp = _timestampFrom(data['date']);
+      final totalBookings = (data['totalBookings'] as num?)?.round();
+      if (timestamp == null || totalBookings == null) continue;
+      final date = timestamp.toDate();
+      dailyCounts[DateTime(date.year, date.month, date.day)] = totalBookings;
     }
 
     final heatmap = [
@@ -94,6 +120,7 @@ class DashboardStatsModel extends DashboardStats {
             id: doc.id,
             name: doc.data()['name'] as String? ?? 'Nhan vien',
             inSession: inSessionStaffIds.contains(doc.id),
+            bookingCount: staffBookingCounts[doc.id] ?? 0,
           ),
     ];
 
@@ -103,6 +130,8 @@ class DashboardStatsModel extends DashboardStats {
       cancelledBookings: cancelledBookings,
       noShowBookings: noShowBookings,
       upcomingBookings: upcomingBookings,
+      totalRevenue: totalRevenue,
+      hourlyBookingCounts: hourlyBookingCounts,
       heatmap: heatmap,
       dailyTrend: dailyTrend,
       todayAppointments: todayAppointments,

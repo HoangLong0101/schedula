@@ -67,14 +67,16 @@ class StaffAvailability extends Equatable {
     required this.id,
     required this.name,
     required this.inSession,
+    required this.bookingCount,
   });
 
   final String id;
   final String name;
   final bool inSession;
+  final int bookingCount;
 
   @override
-  List<Object?> get props => [id, name, inSession];
+  List<Object?> get props => [id, name, inSession, bookingCount];
 }
 
 /// Aggregate counts for the tenant's customer base, used by the
@@ -112,6 +114,8 @@ class DashboardStats extends Equatable {
     required this.cancelledBookings,
     required this.noShowBookings,
     required this.upcomingBookings,
+    required this.totalRevenue,
+    required this.hourlyBookingCounts,
     required this.heatmap,
     required this.dailyTrend,
     required this.todayAppointments,
@@ -125,6 +129,8 @@ class DashboardStats extends Equatable {
     cancelledBookings: 0,
     noShowBookings: 0,
     upcomingBookings: 0,
+    totalRevenue: 0,
+    hourlyBookingCounts: [],
     heatmap: [],
     dailyTrend: [],
     todayAppointments: [],
@@ -137,6 +143,8 @@ class DashboardStats extends Equatable {
   final int cancelledBookings;
   final int noShowBookings;
   final int upcomingBookings;
+  final int totalRevenue;
+  final List<int> hourlyBookingCounts;
   final List<BookingHeatmapCell> heatmap;
   final List<BookingTrendPoint> dailyTrend;
   final List<DashboardAppointment> todayAppointments;
@@ -161,6 +169,8 @@ class DashboardStats extends Equatable {
     cancelledBookings,
     noShowBookings,
     upcomingBookings,
+    totalRevenue,
+    hourlyBookingCounts,
     heatmap,
     dailyTrend,
     todayAppointments,

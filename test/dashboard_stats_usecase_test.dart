@@ -32,6 +32,8 @@ void main() {
         cancelledBookings: 2,
         noShowBookings: 1,
         upcomingBookings: 3,
+        totalRevenue: 1200000,
+        hourlyBookingCounts: const [0, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         heatmap: const [
           BookingHeatmapCell(
             weekday: DateTime.monday,
@@ -50,7 +52,12 @@ void main() {
           ),
         ],
         staffAvailability: const [
-          StaffAvailability(id: 's1', name: 'Nhân viên A', inSession: true),
+          StaffAvailability(
+            id: 's1',
+            name: 'Nhân viên A',
+            inSession: true,
+            bookingCount: 4,
+          ),
         ],
         customerOverview: const CustomerOverview(
           totalCustomers: 8,
@@ -68,6 +75,7 @@ void main() {
       expect(result.isRight(), true);
       result.fold((l) => fail('expected right'), (value) {
         expect(value.totalBookings, 10);
+        expect(value.totalRevenue, 1200000);
         expect(value.cancellationRate, 0.2);
         expect(value.peakHeatmapCount, 4);
         expect(value.peakDailyTrendCount, 5);

@@ -19,7 +19,7 @@ class ServiceModel extends ServiceItem {
       tenantId: data['tenantId'] as String? ?? '',
       name: data['name'] as String? ?? '',
       price: data['price'] as int? ?? 0,
-      duration: data['duration'] as int? ?? 30,
+      duration: data['duration'] as int? ?? data['durationMin'] as int? ?? 30,
       category: data['category'] as String? ?? 'Khác',
       resources: List<String>.from(data['resources'] ?? []),
     );
@@ -31,6 +31,7 @@ class ServiceModel extends ServiceItem {
       'name': name,
       'price': price,
       'duration': duration,
+      'durationMin': duration,
       'category': category,
       'resources': resources,
     };

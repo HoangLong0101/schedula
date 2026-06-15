@@ -21,7 +21,7 @@ class DashboardPage extends StatelessWidget {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
-          child: Text('Tenant context is required to load statistics.'),
+          child: Text('Thiếu thông tin cơ sở để tải thống kê.'),
         ),
       );
     }

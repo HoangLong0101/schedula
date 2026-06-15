@@ -18,8 +18,8 @@ class StaffRepositoryImpl implements StaffRepository {
     return _dataSource.watchStaff(tenantId).transform(
       StreamTransformer.fromHandlers(
         handleData: (data, sink) => sink.add(Right(data)),
-        handleError: (error, stackTrace, sink) {
-          sink.add(Left(ServerFailure(error.toString())));
+        handleError: (_, _, sink) {
+          sink.add(const Left(ServerFailure('Không thể tải nhân viên.')));
         },
       ),
     );
@@ -30,8 +30,8 @@ class StaffRepositoryImpl implements StaffRepository {
     try {
       final model = await _dataSource.createStaff(tenantId, staff);
       return Right(model);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể tạo nhân viên.'));
     }
   }
 
@@ -40,8 +40,8 @@ class StaffRepositoryImpl implements StaffRepository {
     try {
       await _dataSource.updateStaff(staff);
       return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể cập nhật nhân viên.'));
     }
   }
 
@@ -50,8 +50,8 @@ class StaffRepositoryImpl implements StaffRepository {
     try {
       await _dataSource.deleteStaff(id);
       return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể xóa nhân viên.'));
     }
   }
 }

@@ -91,11 +91,27 @@ class _CatalogFormCardState extends State<CatalogFormCard> {
               const SizedBox(width: 8),
               Expanded(child: ElevatedButton(
                 onPressed: () {
-                  if (_nameCtrl.text.isEmpty) return;
+                  final price = int.tryParse(_priceCtrl.text.trim()) ?? -1;
+                  final extra = int.tryParse(_extraCtrl.text.trim()) ?? 0;
+                  final invalidExtra = widget.tab == CatalogTab.service
+                      ? extra <= 0
+                      : _extraCtrl.text.trim().isEmpty;
+                  if (_nameCtrl.text.trim().isEmpty ||
+                      price < 0 ||
+                      invalidExtra) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Vui lòng nhập đầy đủ thông tin hợp lệ.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
                   widget.onSave({
-                    'id': widget.editingItem?.id, 'name': _nameCtrl.text,
-                    'price': int.tryParse(_priceCtrl.text) ?? 0, 'extra': _extraCtrl.text,
-                    'category': _catCtrl.text, 'resources': selectedResources
+                    'id': widget.editingItem?.id, 'name': _nameCtrl.text.trim(),
+                    'price': price, 'extra': _extraCtrl.text.trim(),
+                    'category': _catCtrl.text.trim(), 'resources': selectedResources
                   });
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: themeColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),

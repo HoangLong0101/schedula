@@ -41,15 +41,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
 
       if (user == null) {
-        emit(const AuthFailure('Unable to sign in'));
+        emit(const AuthFailure('Không thể đăng nhập.'));
         return;
       }
 
       emit(Authenticated(user));
     } on AuthAccessDeniedException {
-      emit(const AuthFailure('Account is not allowed'));
+      emit(const AuthFailure('Tài khoản chưa được cấp quyền truy cập.'));
     } catch (_) {
-      emit(const AuthFailure('Unable to sign in'));
+      emit(const AuthFailure('Không thể đăng nhập.'));
     }
   }
 
@@ -62,15 +62,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final user = await _signInWithGoogleUseCase();
 
       if (user == null) {
-        emit(const AuthFailure('Google sign-in was cancelled or failed'));
+        emit(const AuthFailure('Đăng nhập Google đã bị hủy hoặc thất bại.'));
         return;
       }
 
       emit(Authenticated(user));
     } on AuthAccessDeniedException {
-      emit(const AuthFailure('Account is not allowed'));
+      emit(const AuthFailure('Tài khoản chưa được cấp quyền truy cập.'));
     } catch (_) {
-      emit(const AuthFailure('Google sign-in was cancelled or failed'));
+      emit(const AuthFailure('Đăng nhập Google đã bị hủy hoặc thất bại.'));
     }
   }
 

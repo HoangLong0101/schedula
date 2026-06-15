@@ -29,8 +29,8 @@ class BookingRepositoryImpl implements BookingRepository {
       return Right(model);
     } on BookingConflictException catch (error) {
       return Left(ConflictFailure(error.message));
-    } catch (error) {
-      return Left(ServerFailure(error.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể tạo lịch hẹn.'));
     }
   }
 
@@ -43,8 +43,8 @@ class BookingRepositoryImpl implements BookingRepository {
         .transform(
           StreamTransformer.fromHandlers(
             handleData: (data, sink) => sink.add(Right(data)),
-            handleError: (error, stackTrace, sink) {
-              sink.add(Left(ServerFailure(error.toString())));
+            handleError: (_, _, sink) {
+              sink.add(const Left(ServerFailure('Không thể tải lịch hẹn.')));
             },
           ),
         );
@@ -57,8 +57,8 @@ class BookingRepositoryImpl implements BookingRepository {
         .transform(
           StreamTransformer.fromHandlers(
             handleData: (data, sink) => sink.add(Right(data)),
-            handleError: (error, stackTrace, sink) {
-              sink.add(Left(ServerFailure(error.toString())));
+            handleError: (_, _, sink) {
+              sink.add(const Left(ServerFailure('Không thể tải khung giờ.')));
             },
           ),
         );
@@ -73,8 +73,24 @@ class BookingRepositoryImpl implements BookingRepository {
       return Right(booking);
     } on BookingNotFoundException catch (error) {
       return Left(NotFoundFailure(error.message));
-    } catch (error) {
-      return Left(ServerFailure(error.toString()));
+    } on BookingPaymentRequiredException catch (error) {
+      return Left(ValidationFailure(error.message));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể cập nhật trạng thái lịch hẹn.'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Booking>> markBookingPaid(
+    MarkBookingPaidParams params,
+  ) async {
+    try {
+      final booking = await _dataSource.markBookingPaid(params);
+      return Right(booking);
+    } on BookingNotFoundException catch (error) {
+      return Left(NotFoundFailure(error.message));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể ghi nhận thanh toán.'));
     }
   }
 
@@ -85,8 +101,8 @@ class BookingRepositoryImpl implements BookingRepository {
     try {
       await _dataSource.cancelBooking(params);
       return const Right(null);
-    } catch (error) {
-      return Left(ServerFailure(error.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể hủy lịch hẹn.'));
     }
   }
 }

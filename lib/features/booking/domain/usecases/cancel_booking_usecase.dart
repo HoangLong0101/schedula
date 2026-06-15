@@ -18,6 +18,9 @@ class CancelBookingUseCase {
   final BookingRepository _repository;
 
   Future<Either<Failure, void>> call(CancelBookingParams params) {
+    if (params.bookingId.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Thiếu mã lịch hẹn.')));
+    }
     return _repository.cancelBooking(params);
   }
 }

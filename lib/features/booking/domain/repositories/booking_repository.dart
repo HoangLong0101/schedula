@@ -24,5 +24,9 @@ abstract class BookingRepository {
     UpdateBookingStatusParams params,
   );
 
+  Future<Either<Failure, Booking>> markBookingPaid(
+    MarkBookingPaidParams params,
+  );
+
   Future<Either<Failure, void>> cancelBooking(CancelBookingParams params);
 }

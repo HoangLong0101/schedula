@@ -34,8 +34,8 @@ class DashboardRepositoryImpl implements DashboardRepository {
         cachedAt: DateTime.now(),
       );
       return Right(stats);
-    } catch (error) {
-      return Left(ServerFailure(error.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể tải dữ liệu thống kê.'));
     }
   }
 }

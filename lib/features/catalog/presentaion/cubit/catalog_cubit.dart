@@ -35,19 +35,32 @@ class CatalogCubit extends Cubit<CatalogState> {
   void cancelEdit() => emit(state.copyWith(showForm: false, resetEdit: true));
 
   Future<void> saveService(String? id, String name, int price, int duration, String category, List<String> res) async {
+    if (_tenantId.trim().isEmpty || name.trim().isEmpty || price < 0 || duration <= 0) {
+      return;
+    }
     final item = ServiceItem(id: id ?? '', tenantId: _tenantId, name: name, price: price, duration: duration, category: category, resources: res);
     id == null ? await _repository.createService(item) : await _repository.updateService(item);
     cancelEdit();
   }
 
   Future<void> saveProduct(String? id, String name, int price, String unit, String category) async {
+    if (_tenantId.trim().isEmpty || name.trim().isEmpty || price < 0 || unit.trim().isEmpty) {
+      return;
+    }
     final item = ProductItem(id: id ?? '', tenantId: _tenantId, name: name, price: price, unit: unit, category: category);
     id == null ? await _repository.createProduct(item) : await _repository.updateProduct(item);
     cancelEdit();
   }
 
-  Future<void> deleteService(String id) async => await _repository.deleteService(id);
-  Future<void> deleteProduct(String id) async => await _repository.deleteProduct(id);
+  Future<void> deleteService(String id) async {
+    if (id.trim().isEmpty) return;
+    await _repository.deleteService(id);
+  }
+
+  Future<void> deleteProduct(String id) async {
+    if (id.trim().isEmpty) return;
+    await _repository.deleteProduct(id);
+  }
 
   @override
   Future<void> close() {

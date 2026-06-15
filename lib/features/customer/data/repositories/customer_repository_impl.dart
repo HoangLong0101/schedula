@@ -18,8 +18,8 @@ class CustomerRepositoryImpl implements CustomerRepository {
     return _dataSource.watchCustomers(tenantId).transform(
       StreamTransformer.fromHandlers(
         handleData: (data, sink) => sink.add(Right(data)),
-        handleError: (error, stackTrace, sink) {
-          sink.add(Left(ServerFailure(error.toString())));
+        handleError: (_, _, sink) {
+          sink.add(const Left(ServerFailure('Không thể tải khách hàng.')));
         },
       ),
     );
@@ -30,8 +30,8 @@ class CustomerRepositoryImpl implements CustomerRepository {
     try {
       final model = await _dataSource.createCustomer(tenantId, customer);
       return Right(model);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể tạo khách hàng.'));
     }
   }
 
@@ -40,8 +40,8 @@ class CustomerRepositoryImpl implements CustomerRepository {
     try {
       await _dataSource.updateCustomer(customer);
       return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể cập nhật khách hàng.'));
     }
   }
 
@@ -50,8 +50,8 @@ class CustomerRepositoryImpl implements CustomerRepository {
     try {
       await _dataSource.deleteCustomer(id);
       return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể xóa khách hàng.'));
     }
   }
 }

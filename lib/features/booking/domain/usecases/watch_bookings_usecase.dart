@@ -31,6 +31,16 @@ class WatchBookingsUseCase {
   final BookingRepository _repository;
 
   Stream<Either<Failure, List<Booking>>> call(WatchBookingsParams params) {
+    if (params.tenantId.trim().isEmpty) {
+      return Stream.value(const Left(ValidationFailure('Thiếu mã cơ sở.')));
+    }
+    if (params.startDate != null &&
+        params.endDate != null &&
+        !params.endDate!.isAfter(params.startDate!)) {
+      return Stream.value(
+        const Left(ValidationFailure('Khoảng thời gian lọc không hợp lệ.')),
+      );
+    }
     return _repository.watchBookings(params);
   }
 }

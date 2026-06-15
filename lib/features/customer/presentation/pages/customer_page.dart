@@ -22,7 +22,7 @@ class CustomerPage extends StatelessWidget {
 
     if (tenantId.isEmpty) {
       return const Scaffold(
-        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở (Tenant ID)')),
+        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở')),
       );
     }
 
@@ -439,10 +439,18 @@ class _CustomerFormSheetState extends State<_CustomerFormSheet> {
               width: double.infinity, height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  if (_nameCtrl.text.isEmpty || _phoneCtrl.text.isEmpty) return;
+                  if (_nameCtrl.text.trim().isEmpty ||
+                      _phoneCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Vui lòng nhập tên và số điện thoại.'),
+                      ),
+                    );
+                    return;
+                  }
                   widget.onSave(Customer(
                     id: widget.initialCustomer?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: _nameCtrl.text, phone: _phoneCtrl.text, email: _emailCtrl.text,
+                    name: _nameCtrl.text.trim(), phone: _phoneCtrl.text.trim(), email: _emailCtrl.text.trim(),
                     birthday: _bdCtrl.text, allergies: _allergiesCtrl.text, notes: _notesCtrl.text,
                     lastVisit: DateTime.now().toIso8601String().split('T')[0], avatar: _nameCtrl.text.isNotEmpty ? _nameCtrl.text[0].toUpperCase() : 'U', color: '#22AFC2',
                   ));

@@ -40,7 +40,7 @@ class BookingStatsRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         _StatCard(
-          label: 'Checked-in',
+          label: 'Đang thực hiện',
           value: checkedIn.toString(),
           color: colorScheme.tertiary,
         ),

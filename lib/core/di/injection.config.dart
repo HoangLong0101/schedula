@@ -254,6 +254,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i271.UpdateBookingStatusUseCase>(
       () => _i271.UpdateBookingStatusUseCase(gh<_i262.BookingRepository>()),
     );
+    gh.factory<_i271.MarkBookingPaidUseCase>(
+      () => _i271.MarkBookingPaidUseCase(gh<_i262.BookingRepository>()),
+    );
     gh.factory<_i59.WatchBookingsUseCase>(
       () => _i59.WatchBookingsUseCase(gh<_i262.BookingRepository>()),
     );
@@ -309,6 +312,7 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i59.WatchBookingsUseCase>(),
         gh<_i480.CreateBookingUseCase>(),
         gh<_i271.UpdateBookingStatusUseCase>(),
+        gh<_i271.MarkBookingPaidUseCase>(),
         gh<_i1018.CancelBookingUseCase>(),
       ),
     );

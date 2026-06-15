@@ -30,7 +30,7 @@ class AccountPage extends StatelessWidget {
 
     if (tenantId.isEmpty) {
       return const Scaffold(
-        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở (Tenant ID)')),
+        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở')),
       );
     }
 

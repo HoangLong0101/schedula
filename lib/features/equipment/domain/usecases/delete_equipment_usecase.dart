@@ -7,5 +7,11 @@ import '../repositories/equipment_repository.dart';
 class DeleteEquipmentUseCase {
   const DeleteEquipmentUseCase(this._repository);
   final EquipmentRepository _repository;
-  Future<Either<Failure, void>> call(String id) => _repository.deleteEquipment(id);
+
+  Future<Either<Failure, void>> call(String id) {
+    if (id.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Thiếu mã thiết bị.')));
+    }
+    return _repository.deleteEquipment(id);
+  }
 }

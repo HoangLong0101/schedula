@@ -96,7 +96,7 @@ class BookingCard extends StatelessWidget {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: onStatusTap,
-                      child: const Text('Update status'),
+                      child: const Text('Cập nhật trạng thái'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -132,37 +132,37 @@ _BookingStatusStyle _statusStyle(BuildContext context, BookingStatus status) {
   switch (status) {
     case BookingStatus.pending:
       return _BookingStatusStyle(
-        label: 'Pending',
+        label: 'Chờ xác nhận',
         background: colorScheme.surfaceContainerHighest,
         foreground: colorScheme.onSurface,
       );
     case BookingStatus.confirmed:
       return _BookingStatusStyle(
-        label: 'Confirmed',
+        label: 'Đã xác nhận',
         background: colorScheme.primary.withAlpha(31),
         foreground: colorScheme.primary,
       );
     case BookingStatus.inProgress:
       return _BookingStatusStyle(
-        label: 'Checked-in',
+        label: 'Đang thực hiện',
         background: colorScheme.tertiaryContainer,
         foreground: colorScheme.onTertiaryContainer,
       );
     case BookingStatus.completed:
       return _BookingStatusStyle(
-        label: 'Completed',
+        label: 'Hoàn thành',
         background: colorScheme.surfaceContainerHighest,
         foreground: colorScheme.onSurface,
       );
     case BookingStatus.cancelled:
       return _BookingStatusStyle(
-        label: 'Cancelled',
+        label: 'Đã hủy',
         background: colorScheme.errorContainer,
         foreground: colorScheme.onErrorContainer,
       );
     case BookingStatus.noShow:
       return _BookingStatusStyle(
-        label: 'No show',
+        label: 'Không đến',
         background: colorScheme.errorContainer,
         foreground: colorScheme.onErrorContainer,
       );

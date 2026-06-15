@@ -24,7 +24,7 @@ class CatalogPage extends StatelessWidget {
     final tenantId = authState is Authenticated ? authState.user.tenantId : '';
 
     if (tenantId.isEmpty) {
-      return const Scaffold(body: Center(child: Text('Lỗi: Không tìm thấy Tenant ID')));
+      return const Scaffold(body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở')));
     }
 
     return BlocProvider(

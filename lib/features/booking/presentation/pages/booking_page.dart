@@ -4,10 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../data/datasources/payos_payment_service.dart';
 import '../../domain/entities/booking.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/cancel_booking_usecase.dart';
@@ -60,7 +58,7 @@ class _TenantMissingView extends StatelessWidget {
         child: Center(
           child: Padding(
             padding: EdgeInsets.all(24),
-            child: Text('Tenant context is required to load bookings.'),
+            child: Text('Thiếu thông tin cơ sở để tải lịch hẹn.'),
           ),
         ),
       ),
@@ -193,6 +191,19 @@ class _BookingView extends StatelessWidget {
                                         if (nextStatus == booking.status) {
                                           return;
                                         }
+                                        if (nextStatus ==
+                                                BookingStatus.completed &&
+                                            booking.paymentStatus != 'paid') {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Vui long xac nhan thanh toan truoc khi hoan thanh lich hen.',
+                                              ),
+                                            ),
+                                          );
+                                          return;
+                                        }
                                         context.read<BookingBloc>().add(
                                           BookingStatusUpdateRequested(
                                             UpdateBookingStatusParams(
@@ -215,7 +226,10 @@ class _BookingView extends StatelessWidget {
                                             ),
                                           ),
                                       onPaymentTap: () =>
-                                          _startPayment(context, booking),
+                                          _markPaymentComplete(
+                                        context,
+                                        booking,
+                                      ),
                                     );
                                   },
                                 ),
@@ -384,76 +398,22 @@ class _BookingView extends StatelessWidget {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  Future<void> _startPayment(BuildContext context, Booking booking) async {
-    final amount = await _askPaymentAmount(context, booking);
-    if (amount == null || !context.mounted) {
+  void _markPaymentComplete(BuildContext context, Booking booking) {
+    if (booking.paymentStatus == 'paid') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lịch hẹn này đã thanh toán.')),
+      );
       return;
     }
 
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final payment = await PayOSPaymentService().createPaymentLink(
-        bookingId: booking.id,
-        amount: amount,
-      );
-      final uri = Uri.parse(payment.checkoutUrl);
-      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!opened) {
-        await Clipboard.setData(ClipboardData(text: payment.checkoutUrl));
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Da sao chep link thanh toan.')),
-        );
-      }
-    } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Khong tao duoc link thanh toan: $error')),
-      );
-    }
-  }
-
-  Future<int?> _askPaymentAmount(BuildContext context, Booking booking) async {
-    final controller = TextEditingController(
-      text: booking.paymentAmount?.toString() ?? '',
+    context.read<BookingBloc>().add(
+      BookingPaymentCompleteRequested(
+        MarkBookingPaidParams(bookingId: booking.id),
+      ),
     );
-
-    final result = await showDialog<int>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Tao thanh toan PayOS'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: InputDecoration(
-              labelText: 'So tien',
-              suffixText: 'VND',
-              helperText: booking.serviceName ?? booking.serviceId,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Huy'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final amount = int.tryParse(controller.text.trim());
-                if (amount == null || amount <= 0) {
-                  return;
-                }
-                Navigator.of(dialogContext).pop(amount);
-              },
-              child: const Text('Tao link'),
-            ),
-          ],
-        );
-      },
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đang ghi nhận thanh toán lịch hẹn...')),
     );
-
-    controller.dispose();
-    return result;
   }
 }
 
@@ -1078,43 +1038,49 @@ class _AppointmentCard extends StatelessWidget {
               ],
             ),
           ],
-          if (booking.status != BookingStatus.completed &&
-              booking.status != BookingStatus.cancelled) ...[
+          if (booking.status != BookingStatus.cancelled &&
+              (booking.status != BookingStatus.completed ||
+                  booking.paymentStatus != 'paid')) ...[
             const SizedBox(height: 13),
             Row(
               children: [
-                Expanded(
-                  child: _ActionButton(
-                    label: _statusActionLabel(booking.status),
-                    onPressed: onStatusTap,
-                    color: booking.status == BookingStatus.inProgress
-                        ? _Tokens.teal
-                        : _Tokens.green,
-                    background: booking.status == BookingStatus.inProgress
-                        ? const Color(0xFFE9FBFD)
-                        : const Color(0xFFEFFCF4),
+                if (booking.status != BookingStatus.completed) ...[
+                  Expanded(
+                    child: _ActionButton(
+                      label: _statusActionLabel(booking.status),
+                      onPressed: onStatusTap,
+                      color: booking.status == BookingStatus.inProgress
+                          ? _Tokens.teal
+                          : _Tokens.green,
+                      background: booking.status == BookingStatus.inProgress
+                          ? const Color(0xFFE9FBFD)
+                          : const Color(0xFFEFFCF4),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 9),
-                _SquareAction(
-                  icon: Icons.payments_outlined,
-                  onPressed: onPaymentTap,
-                  foreground: booking.paymentStatus == 'paid'
-                      ? _Tokens.green
-                      : _Tokens.teal,
-                  background: booking.paymentStatus == 'paid'
-                      ? const Color(0xFFEFFCF4)
-                      : const Color(0xFFE9FBFD),
-                ),
-                const SizedBox(width: 9),
-                _SquareAction(icon: Icons.edit_outlined, onPressed: onEditTap),
-                const SizedBox(width: 9),
-                _SquareAction(
-                  icon: Icons.delete_outline,
-                  onPressed: onCancelTap,
-                  foreground: _Tokens.danger,
-                  background: const Color(0xFFFFF0F1),
-                ),
+                  const SizedBox(width: 9),
+                ],
+                if (booking.paymentStatus != 'paid') ...[
+                  _SquareAction(
+                    icon: Icons.payments_outlined,
+                    onPressed: onPaymentTap,
+                    foreground: _Tokens.teal,
+                    background: const Color(0xFFE9FBFD),
+                  ),
+                  const SizedBox(width: 9),
+                ],
+                if (booking.status != BookingStatus.completed) ...[
+                  _SquareAction(
+                    icon: Icons.edit_outlined,
+                    onPressed: onEditTap,
+                  ),
+                  const SizedBox(width: 9),
+                  _SquareAction(
+                    icon: Icons.delete_outline,
+                    onPressed: onCancelTap,
+                    foreground: _Tokens.danger,
+                    background: const Color(0xFFFFF0F1),
+                  ),
+                ],
               ],
             ),
           ],
@@ -1191,10 +1157,10 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = failureMessage != null
-        ? 'Firestore error: $failureMessage'
+        ? 'Lỗi tải dữ liệu: $failureMessage'
         : hasSearch
-        ? 'No bookings match the current filters.'
-        : 'No bookings found for tenant "$tenantId". Run seed:verify to confirm Firestore has data for this tenant.';
+        ? 'Không có lịch hẹn phù hợp với bộ lọc hiện tại.'
+        : 'Chưa có lịch hẹn cho cơ sở "$tenantId".';
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,

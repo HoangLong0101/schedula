@@ -18,7 +18,8 @@ class AccountRepositoryImpl implements AccountRepository {
     return _dataSource.watchBusinessInfo(tenantId).transform(
       StreamTransformer.fromHandlers(
         handleData: (data, sink) => sink.add(Right(data)),
-        handleError: (error, _, sink) => sink.add(Left(ServerFailure(error.toString()))),
+        handleError: (_, _, sink) =>
+            sink.add(const Left(ServerFailure('Không thể tải thông tin cơ sở.'))),
       ),
     );
   }
@@ -28,8 +29,8 @@ class AccountRepositoryImpl implements AccountRepository {
     try {
       await _dataSource.updateBusinessInfo(tenantId, info);
       return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể cập nhật thông tin cơ sở.'));
     }
   }
 }

@@ -83,8 +83,8 @@ class BookingCascadeApiDataSource {
   void _ensureConfigured() {
     if (_baseUrl.isEmpty) {
       throw BookingCascadeApiNotConfiguredException(
-        'BOOKING_CASCADE_API_BASE_URL is not set. Add it to your '
-        '.firebase-config.<flavor>.json and run with --dart-define-from-file.',
+        'Chưa cấu hình địa chỉ AI. Vui lòng kiểm tra '
+        'BOOKING_CASCADE_API_BASE_URL trong file cấu hình Firebase.',
       );
     }
   }
@@ -96,7 +96,7 @@ class BookingCascadeApiDataSource {
       return await send();
     } on DioException catch (error) {
       throw BookingCascadeApiException(
-        'Booking Cascade API request failed: '
+        'Không thể gọi dịch vụ AI đặt lịch: '
         '${error.response?.statusCode ?? error.type.name} '
         '${error.response?.data ?? error.message}',
       );

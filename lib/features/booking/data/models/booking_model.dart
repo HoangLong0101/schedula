@@ -58,7 +58,7 @@ class BookingModel extends Booking {
       serviceName: data['serviceName'] as String?,
       paymentStatus: data['paymentStatus'] as String?,
       paymentId: data['paymentId'] as String?,
-      paymentAmount: data['paymentAmount'] as int?,
+      paymentAmount: (data['paymentAmount'] as num?)?.round(),
       paymentOrderCode: data['paymentOrderCode'] as int?,
       paymentCheckoutUrl: data['paymentCheckoutUrl'] as String?,
       paymentPaidAt: (data['paymentPaidAt'] as Timestamp?)?.toDate(),

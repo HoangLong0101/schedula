@@ -40,6 +40,15 @@ final class BookingStatusUpdateRequested extends BookingEvent {
   List<Object?> get props => [params];
 }
 
+final class BookingPaymentCompleteRequested extends BookingEvent {
+  const BookingPaymentCompleteRequested(this.params);
+
+  final MarkBookingPaidParams params;
+
+  @override
+  List<Object?> get props => [params];
+}
+
 final class BookingCancelRequested extends BookingEvent {
   const BookingCancelRequested(this.params);
 

@@ -36,8 +36,8 @@ class AppointmentExtractionRepositoryImpl
       return Left(ValidationFailure(error.message));
     } on BookingCascadeApiException catch (error) {
       return Left(ServerFailure(error.message));
-    } catch (error) {
-      return Left(ServerFailure(error.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể trích xuất thông tin lịch hẹn.'));
     }
   }
 }

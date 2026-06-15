@@ -257,6 +257,13 @@ class _BookingFormContentState extends State<_BookingFormContent> {
 
   Future<void> _submit(BuildContext context, BookingFormState state) async {
     if (!state.isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vui lòng chọn dịch vụ, thời gian, nhân viên và khách hàng.',
+          ),
+        ),
+      );
       return;
     }
 

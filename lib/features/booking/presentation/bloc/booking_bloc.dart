@@ -17,11 +17,13 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     this._watchBookingsUseCase,
     this._createBookingUseCase,
     this._updateBookingStatusUseCase,
+    this._markBookingPaidUseCase,
     this._cancelBookingUseCase,
   ) : super(const BookingInitial()) {
     on<BookingStarted>(_onStarted);
     on<BookingCreateRequested>(_onCreateRequested);
     on<BookingStatusUpdateRequested>(_onStatusUpdateRequested);
+    on<BookingPaymentCompleteRequested>(_onPaymentCompleteRequested);
     on<BookingCancelRequested>(_onCancelRequested);
     on<BookingWatchUpdated>(_onWatchUpdated);
     on<BookingWatchFailed>(_onWatchFailed);
@@ -30,6 +32,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
   final WatchBookingsUseCase _watchBookingsUseCase;
   final CreateBookingUseCase _createBookingUseCase;
   final UpdateBookingStatusUseCase _updateBookingStatusUseCase;
+  final MarkBookingPaidUseCase _markBookingPaidUseCase;
   final CancelBookingUseCase _cancelBookingUseCase;
 
   StreamSubscription? _bookingsSubscription;
@@ -84,6 +87,17 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     Emitter<BookingState> emit,
   ) async {
     final result = await _updateBookingStatusUseCase(event.params);
+    result.fold(
+      (failure) => emit(BookingFailure(failure.message, previous: _current)),
+      (_) {},
+    );
+  }
+
+  Future<void> _onPaymentCompleteRequested(
+    BookingPaymentCompleteRequested event,
+    Emitter<BookingState> emit,
+  ) async {
+    final result = await _markBookingPaidUseCase(event.params);
     result.fold(
       (failure) => emit(BookingFailure(failure.message, previous: _current)),
       (_) {},

@@ -23,7 +23,7 @@ class StaffPage extends StatelessWidget {
 
     if (tenantId.isEmpty) {
       return const Scaffold(
-        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở (Tenant ID)')),
+        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở')),
       );
     }
 
@@ -529,13 +529,20 @@ class _StaffFormSheetState extends State<_StaffFormSheet> {
               width: double.infinity, height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  if (_nameCtrl.text.isEmpty || _role.isEmpty) return;
+                  if (_nameCtrl.text.trim().isEmpty || _role.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Vui lòng nhập tên và vai trò nhân viên.'),
+                      ),
+                    );
+                    return;
+                  }
                   widget.onSave(StaffMember(
                     id: widget.initialStaff?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: _nameCtrl.text,
+                    name: _nameCtrl.text.trim(),
                     role: _role,
-                    phone: _phoneCtrl.text,
-                    email: _emailCtrl.text,
+                    phone: _phoneCtrl.text.trim(),
+                    email: _emailCtrl.text.trim(),
                     status: _status,
                     color: _color,
                     specialties: _specialties,

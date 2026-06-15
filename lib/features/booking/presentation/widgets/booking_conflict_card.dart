@@ -44,7 +44,7 @@ class BookingConflictCard extends StatelessWidget {
             ),
           ),
           if (onResolve != null)
-            TextButton(onPressed: onResolve, child: const Text('Resolve')),
+            TextButton(onPressed: onResolve, child: const Text('Xử lý')),
         ],
       ),
     );

@@ -21,7 +21,7 @@ class EquipmentPage extends StatelessWidget {
 
     if (tenantId.isEmpty) {
       return const Scaffold(
-        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở (Tenant ID)')),
+        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở')),
       );
     }
 
@@ -330,12 +330,22 @@ class _EquipmentFormSheetState extends State<_EquipmentFormSheet> {
               width: double.infinity, height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  if (_nameCtrl.text.isEmpty) return;
+                  final quantity = int.tryParse(_qtyCtrl.text.trim()) ?? 0;
+                  if (_nameCtrl.text.trim().isEmpty || quantity <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Vui lòng nhập tên thiết bị và số lượng hợp lệ.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
                   widget.onSave(Equipment(
                     id: widget.initialEquipment?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: _nameCtrl.text,
-                    location: _locationCtrl.text,
-                    quantity: int.tryParse(_qtyCtrl.text) ?? 1,
+                    name: _nameCtrl.text.trim(),
+                    location: _locationCtrl.text.trim(),
+                    quantity: quantity,
                     status: widget.initialEquipment?.status ?? EquipmentStatus.available,
                     lastMaintenance: widget.initialEquipment?.lastMaintenance ?? DateTime.now().toIso8601String().split('T')[0],
                   ));

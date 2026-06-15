@@ -22,6 +22,15 @@ class CreateStaffUseCase {
   final StaffRepository _repository;
 
   Future<Either<Failure, StaffMember>> call(CreateStaffParams params) {
+    if (params.tenantId.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Thiếu mã cơ sở.')));
+    }
+    if (params.staff.name.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Vui lòng nhập tên nhân viên.')));
+    }
+    if (params.staff.role.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Vui lòng chọn vai trò nhân viên.')));
+    }
     return _repository.createStaff(params.tenantId, params.staff);
   }
 }

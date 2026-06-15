@@ -16,6 +16,12 @@ class UpdateBookingStatusParams {
   final BookingStatus status;
 }
 
+class MarkBookingPaidParams {
+  const MarkBookingPaidParams({required this.bookingId});
+
+  final String bookingId;
+}
+
 @injectable
 class UpdateBookingStatusUseCase {
   const UpdateBookingStatusUseCase(this._repository);
@@ -23,6 +29,23 @@ class UpdateBookingStatusUseCase {
   final BookingRepository _repository;
 
   Future<Either<Failure, Booking>> call(UpdateBookingStatusParams params) {
+    if (params.bookingId.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Thiếu mã lịch hẹn.')));
+    }
     return _repository.updateBookingStatus(params);
+  }
+}
+
+@injectable
+class MarkBookingPaidUseCase {
+  const MarkBookingPaidUseCase(this._repository);
+
+  final BookingRepository _repository;
+
+  Future<Either<Failure, Booking>> call(MarkBookingPaidParams params) {
+    if (params.bookingId.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Thiếu mã lịch hẹn.')));
+    }
+    return _repository.markBookingPaid(params);
   }
 }

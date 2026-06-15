@@ -11,6 +11,11 @@ import '../../domain/usecases/watch_slots_usecase.dart';
 import '../models/booking_model.dart';
 import '../models/slot_model.dart';
 
+typedef _AggregateEntry = ({
+  DocumentReference<Map<String, dynamic>> ref,
+  Map<String, Object> metadata,
+});
+
 class BookingConflictException implements Exception {
   BookingConflictException(this.message);
 
@@ -19,6 +24,12 @@ class BookingConflictException implements Exception {
 
 class BookingNotFoundException implements Exception {
   BookingNotFoundException(this.message);
+
+  final String message;
+}
+
+class BookingPaymentRequiredException implements Exception {
+  BookingPaymentRequiredException(this.message);
 
   final String message;
 }
@@ -34,6 +45,18 @@ class BookingDataSource {
 
   CollectionReference<Map<String, dynamic>> get _slots =>
       _firestore.collection('slots');
+
+  CollectionReference<Map<String, dynamic>> get _services =>
+      _firestore.collection('services');
+
+  CollectionReference<Map<String, dynamic>> get _tenantStatsDaily =>
+      _firestore.collection('tenantStatsDaily');
+
+  CollectionReference<Map<String, dynamic>> get _staffStatsDaily =>
+      _firestore.collection('staffStatsDaily');
+
+  CollectionReference<Map<String, dynamic>> get _serviceStatsDaily =>
+      _firestore.collection('serviceStatsDaily');
 
   Stream<List<BookingModel>> watchBookings(WatchBookingsParams params) async* {
     Query<Map<String, dynamic>> query = _bookings.where(
@@ -131,7 +154,7 @@ class BookingDataSource {
     });
 
     if (hasOverlap) {
-      throw BookingConflictException('Slot already taken');
+      throw BookingConflictException('Khung giờ này đã có lịch hẹn.');
     }
 
     final booking = BookingModel(
@@ -160,15 +183,70 @@ class BookingDataSource {
     UpdateBookingStatusParams params,
   ) async {
     final ref = _bookings.doc(params.bookingId);
-    await ref.update({
-      'status': params.status.value,
-      'updatedAt': Timestamp.now(),
+
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(ref);
+      if (!snapshot.exists) {
+        throw BookingNotFoundException('Không tìm thấy lịch hẹn.');
+      }
+
+      final booking = BookingModel.fromFirestore(snapshot);
+      if (params.status == BookingStatus.completed &&
+          booking.paymentStatus != 'paid') {
+        throw BookingPaymentRequiredException(
+          'Vui lòng hoàn tất thanh toán trước khi hoàn thành lịch hẹn.',
+        );
+      }
+
+      final paymentAmount =
+          params.status == BookingStatus.completed && booking.paymentAmount == null
+          ? await _servicePrice(transaction, booking.serviceId)
+          : booking.paymentAmount;
+
+      transaction.update(ref, {
+        'status': params.status.value,
+        if (paymentAmount != null && booking.paymentAmount == null)
+          'paymentAmount': paymentAmount,
+        'updatedAt': Timestamp.now(),
+      });
+
+      if (params.status == BookingStatus.completed &&
+          booking.status != BookingStatus.completed) {
+        _incrementCompletedAggregates(transaction, booking, paymentAmount ?? 0);
+      }
     });
-    final snapshot = await ref.get();
-    if (!snapshot.exists) {
-      throw BookingNotFoundException('Booking not found');
-    }
-    return BookingModel.fromFirestore(snapshot);
+
+    final updatedSnapshot = await ref.get();
+    return BookingModel.fromFirestore(updatedSnapshot);
+  }
+
+  Future<BookingModel> markBookingPaid(MarkBookingPaidParams params) async {
+    final ref = _bookings.doc(params.bookingId);
+
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(ref);
+      if (!snapshot.exists) {
+        throw BookingNotFoundException('Không tìm thấy lịch hẹn.');
+      }
+
+      final booking = BookingModel.fromFirestore(snapshot);
+      final amount = await _servicePrice(transaction, booking.serviceId);
+      final wasPaid = booking.paymentStatus == 'paid';
+
+      transaction.update(ref, {
+        'paymentStatus': 'paid',
+        'paymentAmount': amount,
+        'paymentPaidAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      });
+
+      if (!wasPaid && booking.status == BookingStatus.completed) {
+        _incrementRevenueAggregates(transaction, booking, amount);
+      }
+    });
+
+    final updatedSnapshot = await ref.get();
+    return BookingModel.fromFirestore(updatedSnapshot);
   }
 
   Future<void> cancelBooking(CancelBookingParams params) async {
@@ -186,5 +264,106 @@ class BookingDataSource {
             (error.code == 'permission-denied' ||
                 (error.message?.contains('PERMISSION_DENIED') ?? false) ||
                 (error.message?.contains('permission-denied') ?? false));
+  }
+
+  Future<int> _servicePrice(
+    Transaction transaction,
+    String serviceId,
+  ) async {
+    if (serviceId.isEmpty) {
+      return 0;
+    }
+
+    final snapshot = await transaction.get(_services.doc(serviceId));
+    final price = snapshot.data()?['price'];
+    return price is num ? price.round() : 0;
+  }
+
+  void _incrementCompletedAggregates(
+    Transaction transaction,
+    BookingModel booking,
+    int amount,
+  ) {
+    _incrementRevenueAggregates(transaction, booking, amount);
+    _incrementAggregateFields(transaction, _aggregateEntries(booking), {
+      'completedBookings': FieldValue.increment(1),
+    });
+  }
+
+  void _incrementRevenueAggregates(
+    Transaction transaction,
+    BookingModel booking,
+    int amount,
+  ) {
+    _incrementAggregateFields(transaction, _aggregateEntries(booking), {
+      'revenue': FieldValue.increment(amount),
+      'updatedAt': Timestamp.now(),
+    });
+  }
+
+  void _incrementAggregateFields(
+    Transaction transaction,
+    List<_AggregateEntry> entries,
+    Map<String, Object> fields,
+  ) {
+    for (final entry in entries) {
+      transaction.set(
+        entry.ref,
+        {
+          ...entry.metadata,
+          ...fields,
+        },
+        SetOptions(merge: true),
+      );
+    }
+  }
+
+  List<_AggregateEntry> _aggregateEntries(BookingModel booking) {
+    final dateKey = _dateKey(booking.startTime);
+    final date = Timestamp.fromDate(
+      DateTime(
+        booking.startTime.year,
+        booking.startTime.month,
+        booking.startTime.day,
+      ),
+    );
+    return [
+      (
+        ref: _tenantStatsDaily.doc('${booking.tenantId}_$dateKey'),
+        metadata: {
+          'tenantId': booking.tenantId,
+          'date': date,
+          'dateKey': dateKey,
+        },
+      ),
+      (
+        ref: _staffStatsDaily.doc('${booking.tenantId}_${booking.staffId}_$dateKey'),
+        metadata: {
+          'tenantId': booking.tenantId,
+          'staffId': booking.staffId,
+          if (booking.staffName != null) 'staffName': booking.staffName!,
+          'date': date,
+          'dateKey': dateKey,
+        },
+      ),
+      (
+        ref: _serviceStatsDaily.doc(
+          '${booking.tenantId}_${booking.serviceId}_$dateKey',
+        ),
+        metadata: {
+          'tenantId': booking.tenantId,
+          'serviceId': booking.serviceId,
+          if (booking.serviceName != null) 'serviceName': booking.serviceName!,
+          'date': date,
+          'dateKey': dateKey,
+        },
+      ),
+    ];
+  }
+
+  String _dateKey(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
   }
 }

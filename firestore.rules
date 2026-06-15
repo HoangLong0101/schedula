@@ -36,6 +36,18 @@ service cloud.firestore {
         'paymentPaidAt',
       ];
     }
+    function bookingPaymentUpdateFields() {
+      return [
+        'status',
+        'updatedAt',
+        'paymentStatus',
+        'paymentId',
+        'paymentAmount',
+        'paymentOrderCode',
+        'paymentCheckoutUrl',
+        'paymentPaidAt',
+      ];
+    }
 
     match /tenants/{tenantId} {
       allow read: if isAuth() && myTenant() == tenantId;
@@ -63,9 +75,14 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(paymentFields());
       allow update: if isAuth()
         && sameTenant(resource.data.tenantId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(paymentFields())
         && (
-          canBook()
+          (
+            canBook()
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(paymentFields())
+              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(bookingPaymentUpdateFields())
+            )
+          )
           || (
             role() == 'staff'
             && request.auth.uid == resource.data.staffId
@@ -122,6 +139,21 @@ service cloud.firestore {
     match /payments/{id} {
       allow read: if isAuth() && sameTenant(resource.data.tenantId);
       allow write: if false;
+    }
+
+    match /tenantStatsDaily/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isAuth() && sameTenant(request.resource.data.tenantId);
+    }
+
+    match /staffStatsDaily/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isAuth() && sameTenant(request.resource.data.tenantId);
+    }
+
+    match /serviceStatsDaily/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if isAuth() && sameTenant(request.resource.data.tenantId);
     }
   }
 }

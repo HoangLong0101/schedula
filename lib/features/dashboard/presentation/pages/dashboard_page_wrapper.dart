@@ -21,7 +21,7 @@ class DashboardPageWrapper extends StatelessWidget {
     if (authState is! Authenticated) {
       return Scaffold(
         appBar: AppBar(title: const Text('Tổng quan')),
-        body: const Center(child: Text('Not signed in')),
+        body: const Center(child: Text('Vui lòng đăng nhập.')),
       );
     }
 

@@ -28,6 +28,19 @@ class WatchSlotsUseCase {
   final BookingRepository _repository;
 
   Stream<Either<Failure, List<Slot>>> call(WatchSlotsParams params) {
+    if (params.tenantId.trim().isEmpty) {
+      return Stream.value(const Left(ValidationFailure('Thiếu mã cơ sở.')));
+    }
+    if (params.staffId.trim().isEmpty) {
+      return Stream.value(const Left(ValidationFailure('Thiếu mã nhân viên.')));
+    }
+    if (params.startDate != null &&
+        params.endDate != null &&
+        !params.endDate!.isAfter(params.startDate!)) {
+      return Stream.value(
+        const Left(ValidationFailure('Khoảng thời gian lọc không hợp lệ.')),
+      );
+    }
     return _repository.watchSlots(params);
   }
 }

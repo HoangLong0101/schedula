@@ -12,6 +12,11 @@ class ExtractAppointmentFromTextUseCase {
   final AppointmentExtractionRepository _repository;
 
   Future<Either<Failure, AppointmentExtraction>> call(String text) {
+    if (text.trim().isEmpty) {
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng nhập nội dung lịch hẹn.')),
+      );
+    }
     return _repository.extractFromText(text);
   }
 }

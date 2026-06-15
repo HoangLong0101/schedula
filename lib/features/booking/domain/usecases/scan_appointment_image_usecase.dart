@@ -15,6 +15,16 @@ class ScanAppointmentImageUseCase {
   Future<Either<Failure, AppointmentExtraction>> call(
     AppointmentImageUpload image,
   ) {
+    if (image.bytes.isEmpty) {
+      return Future.value(
+        const Left(ValidationFailure('Ảnh lịch hẹn không hợp lệ.')),
+      );
+    }
+    if (image.filename.trim().isEmpty) {
+      return Future.value(
+        const Left(ValidationFailure('Thiếu tên tệp ảnh lịch hẹn.')),
+      );
+    }
     return _repository.extractFromImage(image);
   }
 }

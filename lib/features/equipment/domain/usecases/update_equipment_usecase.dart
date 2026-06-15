@@ -8,5 +8,17 @@ import '../repositories/equipment_repository.dart';
 class UpdateEquipmentUseCase {
   const UpdateEquipmentUseCase(this._repository);
   final EquipmentRepository _repository;
-  Future<Either<Failure, void>> call(Equipment equip) => _repository.updateEquipment(equip);
+
+  Future<Either<Failure, void>> call(Equipment equip) {
+    if (equip.id.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Thiếu mã thiết bị.')));
+    }
+    if (equip.name.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Vui lòng nhập tên thiết bị.')));
+    }
+    if (equip.quantity <= 0) {
+      return Future.value(const Left(ValidationFailure('Số lượng thiết bị phải lớn hơn 0.')));
+    }
+    return _repository.updateEquipment(equip);
+  }
 }

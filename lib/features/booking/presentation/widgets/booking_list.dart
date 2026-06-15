@@ -57,7 +57,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'No bookings found',
+            'Chưa có lịch hẹn',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],

@@ -68,11 +68,7 @@ class _LoginPageState extends State<LoginPage> {
 
         if (state is AuthFailure) {
           setState(() {
-            _errorMessage = state.message == 'Account is not allowed'
-                ? 'Tài khoản này chưa được cấp quyền truy cập.'
-                : state.message == 'Google sign-in was cancelled or failed'
-                ? 'Đăng nhập Google đã bị hủy hoặc thất bại.'
-                : 'Email hoặc mật khẩu không đúng.';
+            _errorMessage = state.message;
           });
           return;
         }
@@ -211,7 +207,7 @@ class _LoginPageState extends State<LoginPage> {
                                                     ).showSnackBar(
                                                       const SnackBar(
                                                         content: Text(
-                                                          'Facebook login is not implemented yet.',
+                                                          'Đăng nhập Facebook chưa được hỗ trợ.',
                                                         ),
                                                       ),
                                                     );

@@ -19,7 +19,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
     return _dataSource.watchServices(tenantId).transform(
       StreamTransformer.fromHandlers(
         handleData: (data, sink) => sink.add(Right(data)),
-        handleError: (err, _, sink) => sink.add(Left(ServerFailure(err.toString()))),
+        handleError: (_, _, sink) =>
+            sink.add(const Left(ServerFailure('Không thể tải dịch vụ.'))),
       ),
     );
   }
@@ -29,7 +30,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
     return _dataSource.watchProducts(tenantId).transform(
       StreamTransformer.fromHandlers(
         handleData: (data, sink) => sink.add(Right(data)),
-        handleError: (err, _, sink) => sink.add(Left(ServerFailure(err.toString()))),
+        handleError: (_, _, sink) =>
+            sink.add(const Left(ServerFailure('Không thể tải sản phẩm.'))),
       ),
     );
   }
@@ -39,7 +41,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
     try {
       await _dataSource.createService(ServiceModel(id: '', tenantId: s.tenantId, name: s.name, price: s.price, duration: s.duration, category: s.category, resources: s.resources));
       return const Right(null);
-    } catch (e) { return Left(ServerFailure(e.toString())); }
+    } catch (_) { return const Left(ServerFailure('Không thể tạo dịch vụ.')); }
   }
 
   @override
@@ -47,12 +49,12 @@ class CatalogRepositoryImpl implements CatalogRepository {
     try {
       await _dataSource.updateService(ServiceModel(id: s.id, tenantId: s.tenantId, name: s.name, price: s.price, duration: s.duration, category: s.category, resources: s.resources));
       return const Right(null);
-    } catch (e) { return Left(ServerFailure(e.toString())); }
+    } catch (_) { return const Left(ServerFailure('Không thể cập nhật dịch vụ.')); }
   }
 
   @override
   Future<Either<Failure, void>> deleteService(String id) async {
-    try { await _dataSource.deleteService(id); return const Right(null); } catch (e) { return Left(ServerFailure(e.toString())); }
+    try { await _dataSource.deleteService(id); return const Right(null); } catch (_) { return const Left(ServerFailure('Không thể xóa dịch vụ.')); }
   }
 
   @override
@@ -60,7 +62,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
     try {
       await _dataSource.createProduct(ProductModel(id: '', tenantId: p.tenantId, name: p.name, price: p.price, unit: p.unit, category: p.category));
       return const Right(null);
-    } catch (e) { return Left(ServerFailure(e.toString())); }
+    } catch (_) { return const Left(ServerFailure('Không thể tạo sản phẩm.')); }
   }
 
   @override
@@ -68,11 +70,11 @@ class CatalogRepositoryImpl implements CatalogRepository {
     try {
       await _dataSource.updateProduct(ProductModel(id: p.id, tenantId: p.tenantId, name: p.name, price: p.price, unit: p.unit, category: p.category));
       return const Right(null);
-    } catch (e) { return Left(ServerFailure(e.toString())); }
+    } catch (_) { return const Left(ServerFailure('Không thể cập nhật sản phẩm.')); }
   }
 
   @override
   Future<Either<Failure, void>> deleteProduct(String id) async {
-    try { await _dataSource.deleteProduct(id); return const Right(null); } catch (e) { return Left(ServerFailure(e.toString())); }
+    try { await _dataSource.deleteProduct(id); return const Right(null); } catch (_) { return const Left(ServerFailure('Không thể xóa sản phẩm.')); }
   }
 }

@@ -16,7 +16,7 @@ class BookingSearchField extends StatelessWidget {
       initialValue: value,
       onChanged: onChanged,
       decoration: const InputDecoration(
-        hintText: 'Search bookings',
+        hintText: 'Tìm kiếm lịch hẹn',
         prefixIcon: Icon(Icons.search),
       ),
       textInputAction: TextInputAction.search,

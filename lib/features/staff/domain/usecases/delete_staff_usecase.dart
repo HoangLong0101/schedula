@@ -16,6 +16,9 @@ class DeleteStaffUseCase {
   final StaffRepository _repository;
 
   Future<Either<Failure, void>> call(DeleteStaffParams params) {
+    if (params.staffId.trim().isEmpty) {
+      return Future.value(const Left(ValidationFailure('Thiếu mã nhân viên.')));
+    }
     return _repository.deleteStaff(params.staffId);
   }
 }

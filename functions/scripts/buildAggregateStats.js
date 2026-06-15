@@ -69,9 +69,11 @@ function emptyDaily(key) {
 }
 
 function bookingRevenue(booking, servicesById) {
-  if (typeof booking.paymentAmount === 'number' && booking.paymentStatus === 'paid') {
-    return booking.paymentAmount;
+  if (booking.paymentStatus !== 'paid') {
+    return 0;
   }
+  if (typeof booking.paymentAmount === 'number') return booking.paymentAmount;
+
   const service = servicesById.get(booking.serviceId);
   if (typeof service?.price === 'number') {
     return service.price;

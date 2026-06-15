@@ -42,7 +42,7 @@ class _TenantMissingView extends StatelessWidget {
     return const Center(
       child: Padding(
         padding: EdgeInsets.all(24),
-        child: Text('Tenant context is required to load the dashboard.'),
+        child: Text('Thiếu thông tin cơ sở để tải trang tổng quan.'),
       ),
     );
   }

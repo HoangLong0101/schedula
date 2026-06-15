@@ -18,7 +18,8 @@ class EquipmentRepositoryImpl implements EquipmentRepository {
     return _dataSource.watchEquipment(tenantId).transform(
       StreamTransformer.fromHandlers(
         handleData: (data, sink) => sink.add(Right(data)),
-        handleError: (error, _, sink) => sink.add(Left(ServerFailure(error.toString()))),
+        handleError: (_, _, sink) =>
+            sink.add(const Left(ServerFailure('Không thể tải thiết bị.'))),
       ),
     );
   }
@@ -28,8 +29,8 @@ class EquipmentRepositoryImpl implements EquipmentRepository {
     try {
       final model = await _dataSource.createEquipment(tenantId, equip);
       return Right(model);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể tạo thiết bị.'));
     }
   }
 
@@ -38,8 +39,8 @@ class EquipmentRepositoryImpl implements EquipmentRepository {
     try {
       await _dataSource.updateEquipment(equip);
       return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể cập nhật thiết bị.'));
     }
   }
 
@@ -48,8 +49,8 @@ class EquipmentRepositoryImpl implements EquipmentRepository {
     try {
       await _dataSource.deleteEquipment(id);
       return const Right(null);
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể xóa thiết bị.'));
     }
   }
 }

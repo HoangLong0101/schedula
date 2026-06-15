@@ -1,1 +1,43 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"schedula-543b1","appId":"1:1088213596238:android:6d03e3f3e28cb1aa30ab1f","fileOutput":"android/app/google-services.json"},"buildConfigurations":{".":{"projectId":"schedula-543b1","appId":"1:1088213596238:android:6d03e3f3e28cb1aa30ab1f","fileOutput":"android/app/google-services.json"}}},"dart":{"lib/firebase_options.dart":{"projectId":"schedula-543b1","configurations":{"android":"1:1088213596238:android:6d03e3f3e28cb1aa30ab1f","ios":"1:1088213596238:ios:92c229b071870c8f30ab1f"}},".firebase-temp/firebase_options.dart":{"projectId":"schedula-543b1","configurations":{"android":"1:1088213596238:android:6d03e3f3e28cb1aa30ab1f","ios":"1:1088213596238:ios:92c229b071870c8f30ab1f"}}}}},"firestore":{"rules":"firestore.rules","indexes":"firestore.indexes.json"},"functions":{"source":"functions"}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": {
+    "source": "functions"
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/flutter_service_worker.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/assets/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public,max-age=31536000,immutable"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

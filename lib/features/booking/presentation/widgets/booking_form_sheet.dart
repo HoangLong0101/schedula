@@ -8,6 +8,7 @@ import '../../../catalog/domain/entities/service_item.dart';
 import '../../../catalog/domain/repositories/catalog_repository.dart';
 import '../../../staff/domain/entities/staff_member.dart';
 import '../../../staff/domain/usecases/watch_staff_usecase.dart';
+import '../../domain/entities/appointment_image_upload.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
 import '../../domain/usecases/scan_appointment_image_usecase.dart';
@@ -245,7 +246,13 @@ class _BookingFormContentState extends State<_BookingFormContent> {
     if (picked == null) {
       return;
     }
-    await cubit.scanImage(picked.path);
+    await cubit.scanImage(
+      AppointmentImageUpload(
+        bytes: await picked.readAsBytes(),
+        filename: picked.name,
+        contentType: picked.mimeType,
+      ),
+    );
   }
 
   Future<void> _submit(BuildContext context, BookingFormState state) async {
@@ -288,7 +295,9 @@ class _BookingFormContentState extends State<_BookingFormContent> {
       (failure) {
         debugPrint('Create booking failed: ${failure.message}');
         messenger.showSnackBar(
-          SnackBar(content: Text('Không lưu được lịch hẹn: ${failure.message}')),
+          SnackBar(
+            content: Text('Không lưu được lịch hẹn: ${failure.message}'),
+          ),
         );
       },
       (_) {
@@ -443,7 +452,10 @@ class _ScanSourceButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(color: _Tokens.teal.withValues(alpha: 0.45)),
           ),
-          textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -540,7 +552,9 @@ class _ServiceSelectField extends StatelessWidget {
       label: 'Dịch vụ',
       child: _SelectButton(
         icon: Icons.spa_outlined,
-        label: selectedServiceName.isEmpty ? 'Chọn dịch vụ' : selectedServiceName,
+        label: selectedServiceName.isEmpty
+            ? 'Chọn dịch vụ'
+            : selectedServiceName,
         onPressed: () => _showServicePicker(context),
       ),
     );
@@ -756,7 +770,9 @@ class _StaffOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final staff = recommendation.staff;
-    final statusText = recommendation.available ? 'Có thể nhận' : 'Bận khung giờ';
+    final statusText = recommendation.available
+        ? 'Có thể nhận'
+        : 'Bận khung giờ';
     final statusColor = recommendation.available
         ? const Color(0xFF16A34A)
         : const Color(0xFFDC2626);

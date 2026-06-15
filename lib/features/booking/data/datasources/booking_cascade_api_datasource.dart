@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 import 'package:logger/logger.dart';
 
+import '../../domain/entities/appointment_image_upload.dart';
+
 class BookingCascadeApiException implements Exception {
   BookingCascadeApiException(this.message);
 
@@ -44,11 +46,13 @@ class BookingCascadeApiDataSource {
     return _decodeJson(response.data);
   }
 
-  Future<Map<String, dynamic>> scanAppointmentImage(String imagePath) async {
+  Future<Map<String, dynamic>> scanAppointmentImage(
+    AppointmentImageUpload image,
+  ) async {
     _ensureConfigured();
 
     final formData = FormData.fromMap(<String, dynamic>{
-      'image': await MultipartFile.fromFile(imagePath),
+      'image': MultipartFile.fromBytes(image.bytes, filename: image.filename),
     });
 
     final response = await _request(

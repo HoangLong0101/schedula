@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/errors/failure.dart';
 import '../../domain/entities/appointment_extraction.dart';
+import '../../domain/entities/appointment_image_upload.dart';
 import '../../domain/repositories/appointment_extraction_repository.dart';
 import '../datasources/booking_cascade_api_datasource.dart';
 
@@ -14,17 +15,15 @@ class AppointmentExtractionRepositoryImpl
   final BookingCascadeApiDataSource _dataSource;
 
   @override
-  Future<Either<Failure, AppointmentExtraction>> extractFromText(
-    String text,
-  ) {
+  Future<Either<Failure, AppointmentExtraction>> extractFromText(String text) {
     return _guard(() => _dataSource.extractText(text));
   }
 
   @override
   Future<Either<Failure, AppointmentExtraction>> extractFromImage(
-    String imagePath,
+    AppointmentImageUpload image,
   ) {
-    return _guard(() => _dataSource.scanAppointmentImage(imagePath));
+    return _guard(() => _dataSource.scanAppointmentImage(image));
   }
 
   Future<Either<Failure, AppointmentExtraction>> _guard(

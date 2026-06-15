@@ -5,12 +5,16 @@ import 'package:flutter/foundation.dart'
 
 const String _apiKey = String.fromEnvironment('FIREBASE_API_KEY');
 const String _appId = String.fromEnvironment('FIREBASE_APP_ID');
-const String _messagingSenderId =
-    String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+const String _webAppId = String.fromEnvironment('FIREBASE_WEB_APP_ID');
+const String _authDomain = String.fromEnvironment('FIREBASE_AUTH_DOMAIN');
+const String _messagingSenderId = String.fromEnvironment(
+  'FIREBASE_MESSAGING_SENDER_ID',
+);
 const String _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
 const String _storageBucket = String.fromEnvironment('FIREBASE_STORAGE_BUCKET');
-const String _androidClientId =
-    String.fromEnvironment('FIREBASE_ANDROID_CLIENT_ID');
+const String _androidClientId = String.fromEnvironment(
+  'FIREBASE_ANDROID_CLIENT_ID',
+);
 const String _iosClientId = String.fromEnvironment('FIREBASE_IOS_CLIENT_ID');
 const String _iosBundleId = String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID');
 
@@ -19,10 +23,7 @@ class DefaultFirebaseOptions {
     _validate();
 
     if (kIsWeb) {
-      throw UnsupportedError(
-        'Firebase options are not configured for web. Use a local config file '
-        'with --dart-define-from-file.',
-      );
+      return _webOptions;
     }
 
     switch (defaultTargetPlatform) {
@@ -30,26 +31,45 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return _options;
       case TargetPlatform.macOS:
-        throw UnsupportedError('Firebase options are not configured for macOS.');
+        throw UnsupportedError(
+          'Firebase options are not configured for macOS.',
+        );
       case TargetPlatform.windows:
-        throw UnsupportedError('Firebase options are not configured for Windows.');
+        throw UnsupportedError(
+          'Firebase options are not configured for Windows.',
+        );
       case TargetPlatform.linux:
-        throw UnsupportedError('Firebase options are not configured for Linux.');
+        throw UnsupportedError(
+          'Firebase options are not configured for Linux.',
+        );
       default:
-        throw UnsupportedError('Firebase options are not supported for this platform.');
+        throw UnsupportedError(
+          'Firebase options are not supported for this platform.',
+        );
     }
   }
 
   static FirebaseOptions get _options => FirebaseOptions(
-        apiKey: _apiKey,
-        appId: _appId,
-        messagingSenderId: _messagingSenderId,
-        projectId: _projectId,
-        storageBucket: _storageBucket,
-        androidClientId: _androidClientId,
-        iosClientId: _iosClientId,
-        iosBundleId: _iosBundleId,
-      );
+    apiKey: _apiKey,
+    appId: _appId,
+    messagingSenderId: _messagingSenderId,
+    projectId: _projectId,
+    storageBucket: _storageBucket,
+    androidClientId: _androidClientId,
+    iosClientId: _iosClientId,
+    iosBundleId: _iosBundleId,
+  );
+
+  static FirebaseOptions get _webOptions => FirebaseOptions(
+    apiKey: _apiKey,
+    appId: _webAppId.isEmpty ? _appId : _webAppId,
+    messagingSenderId: _messagingSenderId,
+    projectId: _projectId,
+    authDomain: _authDomain.isEmpty
+        ? '$_projectId.firebaseapp.com'
+        : _authDomain,
+    storageBucket: _storageBucket,
+  );
 }
 
 void _validate() {
@@ -59,9 +79,11 @@ void _validate() {
   if (_messagingSenderId.isEmpty) missing.add('FIREBASE_MESSAGING_SENDER_ID');
   if (_projectId.isEmpty) missing.add('FIREBASE_PROJECT_ID');
   if (_storageBucket.isEmpty) missing.add('FIREBASE_STORAGE_BUCKET');
-  if (_androidClientId.isEmpty) missing.add('FIREBASE_ANDROID_CLIENT_ID');
-  if (_iosClientId.isEmpty) missing.add('FIREBASE_IOS_CLIENT_ID');
-  if (_iosBundleId.isEmpty) missing.add('FIREBASE_IOS_BUNDLE_ID');
+  if (!kIsWeb) {
+    if (_androidClientId.isEmpty) missing.add('FIREBASE_ANDROID_CLIENT_ID');
+    if (_iosClientId.isEmpty) missing.add('FIREBASE_IOS_CLIENT_ID');
+    if (_iosBundleId.isEmpty) missing.add('FIREBASE_IOS_BUNDLE_ID');
+  }
 
   if (missing.isNotEmpty) {
     throw StateError(

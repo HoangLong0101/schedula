@@ -11,6 +11,7 @@ import '../../../catalog/domain/repositories/catalog_repository.dart';
 import '../../../staff/domain/entities/staff_member.dart';
 import '../../../staff/domain/usecases/watch_staff_usecase.dart';
 import '../../domain/entities/appointment_extraction.dart';
+import '../../domain/entities/appointment_image_upload.dart';
 import '../../domain/entities/booking.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/scan_appointment_image_usecase.dart';
@@ -139,10 +140,10 @@ class BookingFormCubit extends Cubit<BookingFormState> {
   /// the form with whatever fields were extracted. Staff and service are
   /// rarely extracted by the API, so when absent they are auto-assigned
   /// from the tenant's own staff list and service catalog.
-  Future<void> scanImage(String imagePath) async {
+  Future<void> scanImage(AppointmentImageUpload image) async {
     emit(state.copyWith(aiScanning: true, clearAiError: true));
 
-    final result = await _scanAppointmentImage(imagePath);
+    final result = await _scanAppointmentImage(image);
 
     await result.fold(
       (failure) async =>
@@ -268,9 +269,9 @@ class BookingFormCubit extends Cubit<BookingFormState> {
   }
 
   void _watchOptions() {
-    _servicesSubscription = _catalogRepository
-        .watchServices(_tenantId)
-        .listen((result) {
+    _servicesSubscription = _catalogRepository.watchServices(_tenantId).listen((
+      result,
+    ) {
       result.fold(
         (_) {},
         (services) => emit(state.copyWith(services: services)),
@@ -279,22 +280,27 @@ class BookingFormCubit extends Cubit<BookingFormState> {
 
     _staffSubscription = _watchStaff(WatchStaffParams(tenantId: _tenantId))
         .listen((result) {
-      result.fold((_) {}, (staff) => emit(state.copyWith(staff: staff)));
-    });
+          result.fold((_) {}, (staff) => emit(state.copyWith(staff: staff)));
+        });
   }
 
   void _watchBookingsForSelectedDay() {
     final start = DateTime(state.date.year, state.date.month, state.date.day);
     final end = start.add(const Duration(days: 1));
     _bookingsSubscription?.cancel();
-    _bookingsSubscription = _watchBookings(
-      WatchBookingsParams(tenantId: _tenantId, startDate: start, endDate: end),
-    ).listen((result) {
-      result.fold(
-        (_) {},
-        (bookings) => emit(state.copyWith(bookingsForDay: bookings)),
-      );
-    });
+    _bookingsSubscription =
+        _watchBookings(
+          WatchBookingsParams(
+            tenantId: _tenantId,
+            startDate: start,
+            endDate: end,
+          ),
+        ).listen((result) {
+          result.fold(
+            (_) {},
+            (bookings) => emit(state.copyWith(bookingsForDay: bookings)),
+          );
+        });
   }
 
   ServiceItem? _selectedService() {

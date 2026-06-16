@@ -220,7 +220,7 @@ class _HomeContent extends StatelessWidget {
         _SectionHeader(
           title: 'Nhân viên',
           linkLabel: 'Xem thêm',
-          onTap: () => context.go(StaffPage.routePath),
+          onTap: () => context.push(StaffPage.routePath),
         ),
         const SizedBox(height: 16),
         _StaffPanel(staff: stats.staffAvailability),
@@ -228,7 +228,7 @@ class _HomeContent extends StatelessWidget {
         _SectionHeader(
           title: 'Quản lý Khách hàng',
           linkLabel: 'Xem tất cả',
-          onTap: () => context.go(CustomerPage.routePath),
+          onTap: () => context.push(CustomerPage.routePath),
         ),
         const SizedBox(height: 16),
         _CustomerPanel(overview: stats.customerOverview),

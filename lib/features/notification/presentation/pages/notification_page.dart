@@ -498,10 +498,18 @@ class _PrimaryActionButton extends StatelessWidget {
 
   final _NotificationItem item;
 
+  void _openTarget(BuildContext context) {
+    if (item.routePath == StaffPage.routePath) {
+      context.push(item.routePath);
+      return;
+    }
+    context.go(item.routePath);
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go(item.routePath),
+      onTap: () => _openTarget(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(

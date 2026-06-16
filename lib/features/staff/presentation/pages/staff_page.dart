@@ -38,6 +38,14 @@ class StaffPage extends StatelessWidget {
 class _StaffView extends StatelessWidget {
   const _StaffView();
 
+  void _goBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/dashboard');
+    }
+  }
+
   void _showStaffForm(BuildContext context, {StaffMember? staff}) {
     final cubit = context.read<StaffManagementCubit>();
     showModalBottomSheet(
@@ -119,7 +127,7 @@ class _StaffView extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _IconButton(icon: Icons.chevron_left, onTap: () => context.pop()),
+                  _IconButton(icon: Icons.chevron_left, onTap: () => _goBack(context)),
                   const Text('Quản Lý Nhân Viên', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
                   _IconButton(
                     icon: Icons.add,

@@ -45,6 +45,14 @@ class _CustomerViewState extends State<_CustomerView> {
   String _searchQuery = '';
   CustomerStatus? _filter; // null = All
 
+  void _goBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/dashboard');
+    }
+  }
+
   void _showForm(BuildContext context, {Customer? customer}) {
     final cubit = context.read<CustomerManagementCubit>();
     showModalBottomSheet(
@@ -79,7 +87,7 @@ class _CustomerViewState extends State<_CustomerView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _IconButton(icon: Icons.chevron_left, onTap: () => context.pop()),
+                  _IconButton(icon: Icons.chevron_left, onTap: () => _goBack(context)),
                   const Text('Quản lý Khách hàng', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
                   _IconButton(
                     icon: Icons.add,

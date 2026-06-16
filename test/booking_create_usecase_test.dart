@@ -41,6 +41,11 @@ class FakeBookingRepository implements BookingRepository {
   }
 
   @override
+  Future<Either<Failure, Booking>> markBookingPaid(MarkBookingPaidParams params) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Either<Failure, void>> cancelBooking(CancelBookingParams params) {
     throw UnimplementedError();
   }
@@ -96,6 +101,30 @@ void main() {
 
       final result = await usecase(params);
       expect(result.isLeft(), true);
+    });
+
+    test('returns validation failure when required fields are missing', () async {
+      final fakeRepo = FakeBookingRepository();
+      final usecase = CreateBookingUseCase(fakeRepo);
+      final now = DateTime.now();
+
+      final result = await usecase(
+        CreateBookingParams(
+          tenantId: '',
+          staffId: '',
+          customerId: '',
+          serviceId: '',
+          startTime: now,
+          endTime: now,
+          status: BookingStatus.pending,
+        ),
+      );
+
+      expect(result.isLeft(), true);
+      result.fold(
+        (failure) => expect(failure, isA<ValidationFailure>()),
+        (_) => fail('expected validation failure'),
+      );
     });
   });
 }

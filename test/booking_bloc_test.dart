@@ -37,6 +37,13 @@ class FakeUpdateBookingStatusUseCase implements UpdateBookingStatusUseCase {
   Future<Either<Failure, Booking>> call(UpdateBookingStatusParams params) => fn(params);
 }
 
+class FakeMarkBookingPaidUseCase implements MarkBookingPaidUseCase {
+  final Future<Either<Failure, Booking>> Function(MarkBookingPaidParams) fn;
+  FakeMarkBookingPaidUseCase(this.fn);
+  @override
+  Future<Either<Failure, Booking>> call(MarkBookingPaidParams params) => fn(params);
+}
+
 class FakeCancelBookingUseCase implements CancelBookingUseCase {
   final Future<Either<Failure, void>> Function(CancelBookingParams) fn;
   FakeCancelBookingUseCase(this.fn);
@@ -72,9 +79,20 @@ void main() {
             endTime: DateTime.now().add(const Duration(hours: 1)),
             status: BookingStatus.confirmed,
           )));
+      final markPaid = FakeMarkBookingPaidUseCase((_) async => Right(Booking(
+            id: 'b1',
+            tenantId: 't1',
+            staffId: 's1',
+            customerId: 'c1',
+            serviceId: 'svc1',
+            startTime: DateTime.now(),
+            endTime: DateTime.now().add(const Duration(hours: 1)),
+            status: BookingStatus.confirmed,
+            paymentStatus: 'paid',
+          )));
       final cancel = FakeCancelBookingUseCase((_) async => Right(null));
 
-      bloc = BookingBloc(watch, create, update, cancel);
+      bloc = BookingBloc(watch, create, update, markPaid, cancel);
     });
 
     tearDown(() {
@@ -119,8 +137,19 @@ void main() {
             endTime: DateTime.now().add(const Duration(hours: 1)),
             status: BookingStatus.confirmed,
           )));
+      final markPaid = FakeMarkBookingPaidUseCase((_) async => Right(Booking(
+            id: 'b1',
+            tenantId: 't1',
+            staffId: 's1',
+            customerId: 'c1',
+            serviceId: 'svc1',
+            startTime: DateTime.now(),
+            endTime: DateTime.now().add(const Duration(hours: 1)),
+            status: BookingStatus.confirmed,
+            paymentStatus: 'paid',
+          )));
       final cancel = FakeCancelBookingUseCase((_) async => Right(null));
-      final failingBloc = BookingBloc(watch, create, update, cancel);
+      final failingBloc = BookingBloc(watch, create, update, markPaid, cancel);
 
       failingBloc.add(BookingCreateRequested(CreateBookingParams(
         tenantId: 't1',

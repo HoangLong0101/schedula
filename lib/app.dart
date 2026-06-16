@@ -20,6 +20,7 @@ class App extends StatelessWidget {
       value: authBloc,
       child: MaterialApp.router(
         title: F.title,
+        debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         routerConfig: router,
       ),

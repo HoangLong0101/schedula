@@ -95,11 +95,30 @@ class BookingCascadeApiDataSource {
     try {
       return await send();
     } on DioException catch (error) {
-      throw BookingCascadeApiException(
-        'Không thể gọi dịch vụ AI đặt lịch: '
-        '${error.response?.statusCode ?? error.type.name} '
-        '${error.response?.data ?? error.message}',
-      );
+      throw BookingCascadeApiException(_friendlyMessage(error));
+    }
+  }
+
+  String _friendlyMessage(DioException error) {
+    final statusCode = error.response?.statusCode;
+    if (statusCode != null) {
+      return 'Không thể gọi dịch vụ AI đặt lịch: máy chủ trả về mã $statusCode.';
+    }
+
+    switch (error.type) {
+      case DioExceptionType.connectionError:
+        return 'Không thể kết nối dịch vụ AI đặt lịch. Vui lòng kiểm tra máy chủ AI có đang chạy và đúng địa chỉ $_baseUrl.';
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return 'Dịch vụ AI đặt lịch phản hồi quá lâu. Vui lòng thử lại hoặc kiểm tra địa chỉ $_baseUrl.';
+      case DioExceptionType.badCertificate:
+        return 'Chứng chỉ HTTPS của dịch vụ AI không hợp lệ. Vui lòng kiểm tra lại địa chỉ $_baseUrl.';
+      case DioExceptionType.cancel:
+        return 'Yêu cầu gọi dịch vụ AI đã bị hủy.';
+      case DioExceptionType.badResponse:
+      case DioExceptionType.unknown:
+        return 'Không thể gọi dịch vụ AI đặt lịch. Vui lòng kiểm tra địa chỉ $_baseUrl.';
     }
   }
 }

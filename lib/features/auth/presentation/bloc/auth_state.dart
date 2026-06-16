@@ -30,6 +30,10 @@ final class Unauthenticated extends AuthState {
   const Unauthenticated();
 }
 
+final class AuthProfileSetupRequired extends AuthState {
+  const AuthProfileSetupRequired();
+}
+
 final class AuthFailure extends AuthState {
   const AuthFailure(this.message);
 

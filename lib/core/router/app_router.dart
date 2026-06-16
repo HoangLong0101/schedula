@@ -38,10 +38,17 @@ class AppRouter {
       final isPublicRoute =
           location == SplashPage.routePath ||
           location == LoginPage.routePath ||
-          location == RegisterPage.routePath;
+          location == RegisterPage.routePath ||
+          location == RegisterPage.googleSetupPath;
 
       if (authState is AuthLoading) {
         return null;
+      }
+
+      if (authState is AuthProfileSetupRequired) {
+        return location == RegisterPage.googleSetupPath
+            ? null
+            : RegisterPage.googleSetupPath;
       }
 
       if ((authState is AuthInitial ||
@@ -72,6 +79,11 @@ class AppRouter {
         path: RegisterPage.routePath,
         name: RegisterPage.routeName,
         builder: (_, _) => const RegisterPage(),
+      ),
+      GoRoute(
+        path: RegisterPage.googleSetupPath,
+        name: RegisterPage.googleSetupRouteName,
+        builder: (_, _) => const RegisterPage(googleSetup: true),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

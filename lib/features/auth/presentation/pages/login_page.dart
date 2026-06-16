@@ -66,6 +66,11 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
+        if (state is AuthProfileSetupRequired) {
+          context.go(RegisterPage.googleSetupPath);
+          return;
+        }
+
         if (state is AuthFailure) {
           setState(() {
             _errorMessage = state.message;

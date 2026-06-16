@@ -44,7 +44,21 @@ class FirebaseAuthDataSource {
     );
 
     final userCredential = await _firebaseAuth.signInWithCredential(credential);
-    await _ensureAuthorized(userCredential.user);
+    final user = userCredential.user;
+    final token = await user?.getIdTokenResult(true);
+    final claimsRole = token?.claims?['role'] as String?;
+    final claimsTenantId = token?.claims?['tenantId'] as String?;
+    final profile =
+        user != null && (claimsRole == null || claimsTenantId == null)
+        ? await _readUserProfile(user.uid)
+        : null;
+    final role = claimsRole ?? profile?['role'] as String?;
+    final tenantId = claimsTenantId ?? profile?['tenantId'] as String?;
+
+    if (role == null || role.isEmpty || tenantId == null || tenantId.isEmpty) {
+      throw const AuthProfileSetupRequiredException();
+    }
+
     return _mapUserAsync(userCredential.user);
   }
 

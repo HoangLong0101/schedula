@@ -16,6 +16,11 @@ typedef _AggregateEntry = ({
   Map<String, Object> metadata,
 });
 
+typedef _StaffStatusUpdate = ({
+  DocumentReference<Map<String, dynamic>> ref,
+  Map<String, Object> data,
+});
+
 class BookingConflictException implements Exception {
   BookingConflictException(this.message);
 
@@ -49,6 +54,9 @@ class BookingDataSource {
   CollectionReference<Map<String, dynamic>> get _services =>
       _firestore.collection('services');
 
+  CollectionReference<Map<String, dynamic>> get _users =>
+      _firestore.collection('users');
+
   CollectionReference<Map<String, dynamic>> get _tenantStatsDaily =>
       _firestore.collection('tenantStatsDaily');
 
@@ -66,6 +74,9 @@ class BookingDataSource {
 
     if (params.staffId != null && params.staffId!.isNotEmpty) {
       query = query.where('staffId', isEqualTo: params.staffId);
+    }
+    if (params.customerId != null && params.customerId!.isNotEmpty) {
+      query = query.where('customerId', isEqualTo: params.customerId);
     }
     if (params.status != null) {
       query = query.where('status', isEqualTo: params.status!.value);
@@ -175,7 +186,17 @@ class BookingDataSource {
       serviceName: params.serviceName,
     );
 
-    await bookingRef.set(booking.toFirestore());
+    final staffRef = _users.doc(params.staffId);
+    final staffSnapshot = await staffRef.get();
+    final batch = _firestore.batch();
+    batch.set(bookingRef, booking.toFirestore());
+    if (staffSnapshot.exists && _shouldMarkStaffInSession(params.status)) {
+      batch.update(staffRef, {
+        'status': 'in_session',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
     return booking;
   }
 
@@ -202,6 +223,11 @@ class BookingDataSource {
           params.status == BookingStatus.completed && booking.paymentAmount == null
           ? await _servicePrice(transaction, booking.serviceId)
           : booking.paymentAmount;
+      final staffStatusUpdate = await _staffStatusUpdateForBookingTransition(
+        transaction,
+        booking.staffId,
+        params.status,
+      );
 
       transaction.update(ref, {
         'status': params.status.value,
@@ -209,6 +235,10 @@ class BookingDataSource {
           'paymentAmount': paymentAmount,
         'updatedAt': Timestamp.now(),
       });
+
+      if (staffStatusUpdate != null) {
+        transaction.update(staffStatusUpdate.ref, staffStatusUpdate.data);
+      }
 
       if (params.status == BookingStatus.completed &&
           booking.status != BookingStatus.completed) {
@@ -251,11 +281,69 @@ class BookingDataSource {
 
   Future<void> cancelBooking(CancelBookingParams params) async {
     final ref = _bookings.doc(params.bookingId);
-    await ref.update({
-      'status': 'cancelled',
-      'updatedAt': Timestamp.now(),
-      if (params.reason != null) 'notes': params.reason,
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(ref);
+      if (!snapshot.exists) {
+        throw BookingNotFoundException('Không tìm thấy lịch hẹn.');
+      }
+
+      final booking = BookingModel.fromFirestore(snapshot);
+      final staffStatusUpdate = await _staffStatusUpdateForBookingTransition(
+        transaction,
+        booking.staffId,
+        BookingStatus.cancelled,
+      );
+      transaction.update(ref, {
+        'status': 'cancelled',
+        'updatedAt': Timestamp.now(),
+        if (params.reason != null) 'notes': params.reason,
+      });
+      if (staffStatusUpdate != null) {
+        transaction.update(staffStatusUpdate.ref, staffStatusUpdate.data);
+      }
     });
+  }
+
+  Future<_StaffStatusUpdate?> _staffStatusUpdateForBookingTransition(
+    Transaction transaction,
+    String staffId,
+    BookingStatus status,
+  ) async {
+    if (staffId.isEmpty) {
+      return null;
+    }
+
+    final statusValue = _staffStatusForBookingStatus(status);
+    if (statusValue == null) {
+      return null;
+    }
+
+    final staffRef = _users.doc(staffId);
+    final staffSnapshot = await transaction.get(staffRef);
+    if (!staffSnapshot.exists) {
+      return null;
+    }
+
+    return (
+      ref: staffRef,
+      data: {
+        'status': statusValue,
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+    );
+  }
+
+  bool _shouldMarkStaffInSession(BookingStatus status) {
+    return status != BookingStatus.completed &&
+        status != BookingStatus.cancelled &&
+        status != BookingStatus.noShow;
+  }
+
+  String? _staffStatusForBookingStatus(BookingStatus status) {
+    if (_shouldMarkStaffInSession(status)) {
+      return 'in_session';
+    }
+    return 'available';
   }
 
   bool _isPermissionDenied(Object error) {

@@ -8,6 +8,8 @@ import '../../../../core/errors/failure.dart';
 import '../../../../core/utils/string_utils.dart';
 import '../../../catalog/domain/entities/service_item.dart';
 import '../../../catalog/domain/repositories/catalog_repository.dart';
+import '../../../customer/domain/entities/customer.dart';
+import '../../../customer/domain/usecases/watch_customers_usecase.dart';
 import '../../../staff/domain/entities/staff_member.dart';
 import '../../../staff/domain/usecases/watch_staff_usecase.dart';
 import '../../domain/entities/appointment_extraction.dart';
@@ -24,6 +26,7 @@ class BookingFormCubit extends Cubit<BookingFormState> {
     this._scanAppointmentImage,
     this._watchStaff,
     this._watchBookings,
+    this._watchCustomers,
     this._catalogRepository,
   ) : super(BookingFormState()) {
     _watchOptions();
@@ -34,17 +37,48 @@ class BookingFormCubit extends Cubit<BookingFormState> {
   final ScanAppointmentImageUseCase _scanAppointmentImage;
   final WatchStaffUseCase _watchStaff;
   final WatchBookingsUseCase _watchBookings;
+  final WatchCustomersUseCase _watchCustomers;
   final CatalogRepository _catalogRepository;
   StreamSubscription<Either<Failure, List<StaffMember>>>? _staffSubscription;
+  StreamSubscription<Either<Failure, List<Customer>>>? _customersSubscription;
   StreamSubscription<Either<Failure, List<ServiceItem>>>? _servicesSubscription;
   StreamSubscription<Either<Failure, List<Booking>>>? _bookingsSubscription;
+  StreamSubscription<Either<Failure, List<Booking>>>?
+  _customerBookingsSubscription;
 
   void updateCustomerLookup(String value) {
-    emit(state.copyWith(customerLookup: value));
+    emit(
+      state.copyWith(
+        customerLookup: value,
+        customerId: '',
+        customerBookings: const [],
+      ),
+    );
+    _customerBookingsSubscription?.cancel();
   }
 
   void updateCustomerName(String value) {
-    emit(state.copyWith(customerName: value));
+    emit(
+      state.copyWith(
+        customerName: value,
+        customerId: '',
+        customerBookings: const [],
+      ),
+    );
+    _customerBookingsSubscription?.cancel();
+  }
+
+  void selectCustomer(Customer customer) {
+    emit(
+      state.copyWith(
+        customerId: customer.id,
+        customerLookup: customer.phone,
+        customerName: customer.name,
+        staffId: '',
+        staffName: '',
+      ),
+    );
+    _watchCustomerBookings(customer.id);
   }
 
   void updateStaffName(String value) {
@@ -107,19 +141,33 @@ class BookingFormCubit extends Cubit<BookingFormState> {
 
   List<StaffRecommendation> staffRecommendations() {
     final service = _selectedService();
+    final customerStaffCounts = _customerStaffCounts();
     final recommendations = [
       for (final member in state.staff)
         StaffRecommendation(
           staff: member,
           available: _isAvailable(member),
           serviceMatch: _matchesService(member, service),
-          score: _score(member, service),
+          servedCustomerBefore: customerStaffCounts.containsKey(member.id),
+          customerBookingCount: customerStaffCounts[member.id] ?? 0,
+          score: _score(member, service, customerStaffCounts[member.id] ?? 0),
         ),
     ];
 
     recommendations.sort((a, b) {
       final available = _compareBool(b.available, a.available);
       if (available != 0) return available;
+
+      final servedBefore = _compareBool(
+        b.servedCustomerBefore,
+        a.servedCustomerBefore,
+      );
+      if (servedBefore != 0) return servedBefore;
+
+      final customerCount = b.customerBookingCount.compareTo(
+        a.customerBookingCount,
+      );
+      if (customerCount != 0) return customerCount;
 
       final serviceMatch = _compareBool(b.serviceMatch, a.serviceMatch);
       if (serviceMatch != 0) return serviceMatch;
@@ -282,6 +330,16 @@ class BookingFormCubit extends Cubit<BookingFormState> {
         .listen((result) {
           result.fold((_) {}, (staff) => emit(state.copyWith(staff: staff)));
         });
+
+    _customersSubscription =
+        _watchCustomers(WatchCustomersParams(tenantId: _tenantId)).listen((
+          result,
+        ) {
+          result.fold(
+            (_) {},
+            (customers) => emit(state.copyWith(customers: customers)),
+          );
+        });
   }
 
   void _watchBookingsForSelectedDay() {
@@ -299,6 +357,24 @@ class BookingFormCubit extends Cubit<BookingFormState> {
           result.fold(
             (_) {},
             (bookings) => emit(state.copyWith(bookingsForDay: bookings)),
+          );
+        });
+  }
+
+  void _watchCustomerBookings(String customerId) {
+    _customerBookingsSubscription?.cancel();
+    if (customerId.trim().isEmpty) {
+      emit(state.copyWith(customerBookings: const []));
+      return;
+    }
+
+    _customerBookingsSubscription =
+        _watchBookings(
+          WatchBookingsParams(tenantId: _tenantId, customerId: customerId),
+        ).listen((result) {
+          result.fold(
+            (_) {},
+            (bookings) => emit(state.copyWith(customerBookings: bookings)),
           );
         });
   }
@@ -384,9 +460,31 @@ class BookingFormCubit extends Cubit<BookingFormState> {
         .any(staffTerms.contains);
   }
 
-  double _score(StaffMember staff, ServiceItem? service) {
+  Map<String, int> _customerStaffCounts() {
+    final counts = <String, int>{};
+    if (state.customerId.isEmpty) {
+      return counts;
+    }
+    for (final booking in state.customerBookings) {
+      if (booking.staffId.isEmpty ||
+          booking.status == BookingStatus.cancelled ||
+          booking.status == BookingStatus.noShow) {
+        continue;
+      }
+      counts[booking.staffId] = (counts[booking.staffId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  double _score(
+    StaffMember staff,
+    ServiceItem? service,
+    int customerBookingCount,
+  ) {
     return (_isAvailable(staff) ? 1000 : 0) +
         (_matchesService(staff, service) ? 100 : 0) +
+        (customerBookingCount > 0 ? 250 : 0) +
+        customerBookingCount * 20 +
         staff.rating * 10 -
         staff.appointments * 0.05;
   }
@@ -418,8 +516,10 @@ class BookingFormCubit extends Cubit<BookingFormState> {
   @override
   Future<void> close() {
     _staffSubscription?.cancel();
+    _customersSubscription?.cancel();
     _servicesSubscription?.cancel();
     _bookingsSubscription?.cancel();
+    _customerBookingsSubscription?.cancel();
     return super.close();
   }
 }
@@ -429,11 +529,15 @@ class StaffRecommendation {
     required this.staff,
     required this.available,
     required this.serviceMatch,
+    required this.servedCustomerBefore,
+    required this.customerBookingCount,
     required this.score,
   });
 
   final StaffMember staff;
   final bool available;
   final bool serviceMatch;
+  final bool servedCustomerBefore;
+  final int customerBookingCount;
   final double score;
 }

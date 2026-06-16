@@ -4,8 +4,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/string_utils.dart';
 import '../../../catalog/domain/entities/service_item.dart';
 import '../../../catalog/domain/repositories/catalog_repository.dart';
+import '../../../customer/domain/entities/customer.dart';
+import '../../../customer/domain/usecases/watch_customers_usecase.dart';
 import '../../../staff/domain/entities/staff_member.dart';
 import '../../../staff/domain/usecases/watch_staff_usecase.dart';
 import '../../domain/entities/appointment_image_upload.dart';
@@ -29,6 +32,7 @@ class BookingFormSheet {
             getIt<ScanAppointmentImageUseCase>(),
             getIt<WatchStaffUseCase>(),
             getIt<WatchBookingsUseCase>(),
+            getIt<WatchCustomersUseCase>(),
             getIt<CatalogRepository>(),
           ),
           child: _BookingFormContent(tenantId: tenantId),
@@ -69,12 +73,17 @@ class _BookingFormContentState extends State<_BookingFormContent> {
         ),
         child: BlocConsumer<BookingFormCubit, BookingFormState>(
           listenWhen: (previous, current) =>
-              previous.extraction != current.extraction &&
-              current.extraction != null,
+              (previous.extraction != current.extraction &&
+                  current.extraction != null) ||
+              previous.customerId != current.customerId,
           listener: (context, state) {
             // Reflect AI-extracted values in the editable text fields.
-            _lookupController.text = state.customerLookup;
-            _customerNameController.text = state.customerName;
+            if (_lookupController.text != state.customerLookup) {
+              _lookupController.text = state.customerLookup;
+            }
+            if (_customerNameController.text != state.customerName) {
+              _customerNameController.text = state.customerName;
+            }
           },
           builder: (context, state) {
             return SingleChildScrollView(
@@ -191,7 +200,7 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                         .updateStaffName,
                   ),
                   const SizedBox(height: 20),
-                  const _SectionLabel('Khách hàng'),
+                  const _SectionLabel('Số điện thoại'),
                   const SizedBox(height: 8),
                   _InputField(
                     controller: _lookupController,
@@ -205,14 +214,14 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                   const SizedBox(height: 16),
                   const _SectionLabel('Tên khách hàng'),
                   const SizedBox(height: 8),
-                  _InputField(
+                  _CustomerAutocompleteField(
                     controller: _customerNameController,
+                    customers: state.customers,
                     hintText: 'Nhập tên khách hàng',
-                    icon: Icons.person_outline,
-                    textInputAction: TextInputAction.next,
                     onChanged: context
                         .read<BookingFormCubit>()
                         .updateCustomerName,
+                    onSelected: context.read<BookingFormCubit>().selectCustomer,
                   ),
                   const SizedBox(height: 16),
                   const _SectionLabel('Ghi chú'),
@@ -284,7 +293,9 @@ class _BookingFormContentState extends State<_BookingFormContent> {
       CreateBookingParams(
         tenantId: widget.tenantId,
         staffId: staffId,
-        customerId: lookup.isNotEmpty
+        customerId: state.customerId.isNotEmpty
+            ? state.customerId
+            : lookup.isNotEmpty
             ? _stableId('customer', lookup)
             : _stableId('customer', customerName),
         serviceId: serviceId,
@@ -801,6 +812,8 @@ class _StaffOption extends StatelessWidget {
       subtitle: Text(
         [
           statusText,
+          if (recommendation.servedCustomerBefore)
+            'đã phục vụ ${recommendation.customerBookingCount} lần',
           if (recommendation.serviceMatch) 'hợp dịch vụ',
           '${staff.rating.toStringAsFixed(1)} sao',
           '${staff.appointments} lịch',
@@ -868,6 +881,153 @@ class _SectionLabel extends StatelessWidget {
         fontSize: 16,
         fontWeight: FontWeight.w700,
       ),
+    );
+  }
+}
+
+class _CustomerAutocompleteField extends StatefulWidget {
+  const _CustomerAutocompleteField({
+    required this.controller,
+    required this.customers,
+    required this.hintText,
+    required this.onChanged,
+    required this.onSelected,
+  });
+
+  final TextEditingController controller;
+  final List<Customer> customers;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<Customer> onSelected;
+
+  @override
+  State<_CustomerAutocompleteField> createState() =>
+      _CustomerAutocompleteFieldState();
+}
+
+class _CustomerAutocompleteFieldState
+    extends State<_CustomerAutocompleteField> {
+  final _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RawAutocomplete<Customer>(
+      textEditingController: widget.controller,
+      focusNode: _focusNode,
+      displayStringForOption: (customer) => customer.name,
+      optionsBuilder: (value) {
+        final query = StringUtilsX.normalizeForSearch(value.text);
+        final customers = [...widget.customers];
+        customers.sort((a, b) {
+          final visits = b.totalVisits.compareTo(a.totalVisits);
+          if (visits != 0) return visits;
+          return a.name.compareTo(b.name);
+        });
+
+        if (query.isEmpty) {
+          return customers.take(8);
+        }
+
+        return customers.where((customer) {
+          final name = StringUtilsX.normalizeForSearch(customer.name);
+          final phone = StringUtilsX.normalizeForSearch(customer.phone);
+          return name.contains(query) || phone.contains(query);
+        }).take(8);
+      },
+      onSelected: (customer) {
+        widget.controller.text = customer.name;
+        widget.onSelected(customer);
+      },
+      fieldViewBuilder:
+          (context, textEditingController, focusNode, onFieldSubmitted) {
+            return TextField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              onChanged: widget.onChanged,
+              textInputAction: TextInputAction.next,
+              style: const TextStyle(
+                color: _Tokens.text,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                prefixIcon: const Icon(
+                  Icons.person_outline,
+                  color: Color(0xFF98A1B2),
+                  size: 20,
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF7F8FA),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: const BorderSide(color: _Tokens.teal, width: 1.2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 17,
+                ),
+              ),
+            );
+          },
+      optionsViewBuilder: (context, onSelected, options) {
+        final items = options.toList(growable: false);
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            color: Colors.white,
+            elevation: 8,
+            borderRadius: BorderRadius.circular(14),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280, maxWidth: 420),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shrinkWrap: true,
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final customer = items[index];
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.person_outline,
+                      color: _Tokens.teal,
+                    ),
+                    title: Text(
+                      customer.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      [
+                        if (customer.phone.isNotEmpty) customer.phone,
+                        '${customer.totalVisits} lượt',
+                      ].join(' - '),
+                    ),
+                    onTap: () => onSelected(customer),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../booking/domain/entities/booking.dart';
+import '../../../booking/domain/entities/booking_status.dart';
+import '../../../booking/domain/usecases/watch_bookings_usecase.dart';
 
 import '../../domain/entities/staff_member.dart';
 import '../cubit/staff_management_cubit.dart';
@@ -30,13 +34,15 @@ class StaffPage extends StatelessWidget {
     return BlocProvider(
       // 2. Dùng GetIt để tiêm UseCases và truyền tenantId vào
       create: (_) => getIt<StaffManagementCubit>()..init(tenantId),
-      child: const _StaffView(),
+      child: _StaffView(tenantId: tenantId),
     );
   }
 }
 
 class _StaffView extends StatelessWidget {
-  const _StaffView();
+  const _StaffView({required this.tenantId});
+
+  final String tenantId;
 
   void _goBack(BuildContext context) {
     if (context.canPop()) {
@@ -114,6 +120,110 @@ class _StaffView extends StatelessWidget {
     );
   }
 
+  void _showTodayAppointments(BuildContext context, StaffMember staff) {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    final bookingsFuture = _loadTodayAppointments(staff, start, end);
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: const EdgeInsets.fromLTRB(22, 20, 14, 0),
+        contentPadding: const EdgeInsets.fromLTRB(22, 16, 22, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Lịch hôm nay của ${staff.name}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: FutureBuilder<List<Booking>>(
+            future: bookingsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 120,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  child: Text(
+                    'Không thể tải lịch hẹn: ${snapshot.error}',
+                    style: const TextStyle(color: Color(0xFFDC2626)),
+                  ),
+                );
+              }
+
+              final activeBookings = snapshot.data ?? const <Booking>[];
+              if (activeBookings.isEmpty) {
+                return const _AppointmentEmptyState();
+              }
+
+              return ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 420),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: activeBookings.length,
+                  separatorBuilder: (_, _) => const Divider(height: 18),
+                  itemBuilder: (context, index) =>
+                      _StaffAppointmentTile(booking: activeBookings[index]),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<List<Booking>> _loadTodayAppointments(
+    StaffMember staff,
+    DateTime start,
+    DateTime end,
+  ) async {
+    final result = await getIt<WatchBookingsUseCase>()(
+      WatchBookingsParams(
+        tenantId: tenantId,
+        staffId: staff.id,
+        startDate: start,
+        endDate: end,
+      ),
+    ).first;
+
+    return result.fold(
+      (failure) => throw _StaffAppointmentsException(failure.message),
+      (bookings) => bookings
+          .where((booking) => booking.status != BookingStatus.cancelled)
+          .toList(growable: false),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -168,6 +278,8 @@ class _StaffView extends StatelessWidget {
                           staff: staff,
                           onEdit: () => _showStaffForm(context, staff: staff),
                           onDelete: () => _confirmDelete(context, staff.id),
+                          onAppointmentsTap: () =>
+                              _showTodayAppointments(context, staff),
                         ),
                       )),
 
@@ -211,8 +323,14 @@ class _StaffCard extends StatelessWidget {
   final StaffMember staff;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onAppointmentsTap;
 
-  const _StaffCard({required this.staff, required this.onEdit, required this.onDelete});
+  const _StaffCard({
+    required this.staff,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onAppointmentsTap,
+  });
 
   Color _parseColor(String hex) => Color(int.parse(hex.replaceFirst('#', '0xFF')));
 
@@ -301,7 +419,19 @@ class _StaffCard extends StatelessWidget {
             children: [
               Container(width: 6, height: 6, decoration: BoxDecoration(color: Colors.grey.shade400, shape: BoxShape.circle)),
               const SizedBox(width: 6),
-              Text('${staff.appointments} lịch hôm nay', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              GestureDetector(
+                onTap: onAppointmentsTap,
+                child: Text(
+                  '${staff.appointments} lịch hôm nay',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF148A9C),
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Color(0xFF148A9C),
+                  ),
+                ),
+              ),
               const SizedBox(width: 16),
               Container(width: 6, height: 6, decoration: BoxDecoration(color: Colors.yellow.shade500, shape: BoxShape.circle)),
               const SizedBox(width: 6),
@@ -313,6 +443,167 @@ class _StaffCard extends StatelessWidget {
             ],
           )
         ],
+      ),
+    );
+  }
+}
+
+class _AppointmentEmptyState extends StatelessWidget {
+  const _AppointmentEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 120,
+      child: Center(
+        child: Text(
+          'Nhân viên này chưa có lịch hẹn hôm nay.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey),
+        ),
+      ),
+    );
+  }
+}
+
+class _StaffAppointmentsException implements Exception {
+  const _StaffAppointmentsException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class _StaffAppointmentTile extends StatelessWidget {
+  const _StaffAppointmentTile({required this.booking});
+
+  final Booking booking;
+
+  @override
+  Widget build(BuildContext context) {
+    final time =
+        '${DateFormat.Hm().format(booking.startTime)} - ${DateFormat.Hm().format(booking.endTime)}';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE0F8FC),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(
+            Icons.event_available_outlined,
+            color: Color(0xFF148A9C),
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                booking.customerName ?? booking.customerId,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                booking.serviceName ?? booking.serviceId,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                time,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF148A9C),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (booking.notes != null && booking.notes!.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    booking.notes!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        _BookingStatusPill(status: booking.status),
+      ],
+    );
+  }
+}
+
+class _BookingStatusPill extends StatelessWidget {
+  const _BookingStatusPill({required this.status});
+
+  final BookingStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color, background) = switch (status) {
+      BookingStatus.pending => (
+        'Chờ xác nhận',
+        const Color(0xFFD97706),
+        const Color(0xFFFFF7ED),
+      ),
+      BookingStatus.confirmed => (
+        'Đã xác nhận',
+        const Color(0xFF148A9C),
+        const Color(0xFFE0F8FC),
+      ),
+      BookingStatus.inProgress => (
+        'Đang làm',
+        const Color(0xFF2563EB),
+        const Color(0xFFDBEAFE),
+      ),
+      BookingStatus.completed => (
+        'Hoàn thành',
+        const Color(0xFF16A34A),
+        const Color(0xFFE1FFDE),
+      ),
+      BookingStatus.cancelled => (
+        'Đã hủy',
+        const Color(0xFFDC2626),
+        const Color(0xFFFEF2F2),
+      ),
+      BookingStatus.noShow => (
+        'Không đến',
+        const Color(0xFF6B7280),
+        const Color(0xFFF3F4F6),
+      ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

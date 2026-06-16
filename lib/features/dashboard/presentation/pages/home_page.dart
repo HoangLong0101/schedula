@@ -12,6 +12,12 @@ import '../../domain/entities/dashboard_stats.dart';
 import '../cubit/dashboard_cubit.dart';
 import '../cubit/dashboard_state.dart';
 
+final ValueNotifier<int> dashboardRefreshNotifier = ValueNotifier<int>(0);
+
+void requestDashboardRefresh() {
+  dashboardRefreshNotifier.value++;
+}
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key, this.tenantId});
 
@@ -48,10 +54,35 @@ class _TenantMissingView extends StatelessWidget {
   }
 }
 
-class _DashboardView extends StatelessWidget {
+class _DashboardView extends StatefulWidget {
   const _DashboardView({required this.tenantId});
 
   final String tenantId;
+
+  @override
+  State<_DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends State<_DashboardView> {
+  @override
+  void initState() {
+    super.initState();
+    dashboardRefreshNotifier.addListener(_refreshDashboard);
+  }
+
+  @override
+  void dispose() {
+    dashboardRefreshNotifier.removeListener(_refreshDashboard);
+    super.dispose();
+  }
+
+  void _refreshDashboard() {
+    if (!mounted) return;
+    context.read<DashboardCubit>().load(
+      widget.tenantId,
+      forceRefresh: true,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +93,7 @@ class _DashboardView extends StatelessWidget {
         child: RefreshIndicator(
           color: _HomeColors.teal,
           onRefresh: () => context.read<DashboardCubit>().load(
-            tenantId,
+            widget.tenantId,
             forceRefresh: true,
           ),
           child: BlocBuilder<DashboardCubit, DashboardState>(
@@ -72,7 +103,7 @@ class _DashboardView extends StatelessWidget {
                 DashboardLoading() => const _LoadingView(),
                 DashboardFailure(:final message) => _ErrorView(
                   message: message,
-                  tenantId: tenantId,
+                  tenantId: widget.tenantId,
                 ),
                 DashboardLoaded(:final stats) => _HomeContent(stats: stats),
               };
@@ -845,11 +876,18 @@ class _StaffRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final available = !staff.inSession && index != 2;
+    final normalizedStatus = staff.status.trim().toLowerCase();
+    final inSession =
+        normalizedStatus == 'in_session' ||
+        (staff.inSession && normalizedStatus != 'available');
+    final absent = normalizedStatus == 'absent';
+    final available = !inSession && !absent;
     final color = available ? _HomeColors.staffGreen : _HomeColors.staffAmber;
-    final label = available
-        ? 'Sẵn sàng'
-        : (index == 1 ? 'Trong phiên' : 'Vắng mặt');
+    final label = switch ((absent, inSession)) {
+      (true, _) => 'Vắng mặt',
+      (_, true) => 'Trong phiên',
+      _ => 'Sẵn sàng',
+    };
     final role = switch (index) {
       0 => 'Chuyên gia da mặt',
       1 => 'Massage',

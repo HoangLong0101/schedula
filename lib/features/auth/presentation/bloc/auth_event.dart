@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../domain/entities/user.dart';
+
 abstract class AuthEvent extends Equatable {
   const AuthEvent();
 
@@ -26,6 +28,15 @@ final class AuthSignInRequested extends AuthEvent {
 
 final class AuthGoogleSignInRequested extends AuthEvent {
   const AuthGoogleSignInRequested();
+}
+
+final class AuthProfileCompleted extends AuthEvent {
+  const AuthProfileCompleted(this.user);
+
+  final AppUser user;
+
+  @override
+  List<Object?> get props => [user];
 }
 
 final class AuthSignOutRequested extends AuthEvent {

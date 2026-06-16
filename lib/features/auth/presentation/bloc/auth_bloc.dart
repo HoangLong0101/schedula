@@ -18,6 +18,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthStarted>(_onStarted);
     on<AuthSignInRequested>(_onSignInRequested);
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
+    on<AuthProfileCompleted>(_onProfileCompleted);
     on<AuthSignOutRequested>(_onSignOutRequested);
   }
 
@@ -67,13 +68,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       emit(Authenticated(user));
+    } on AuthProfileSetupRequiredException {
+      emit(const AuthProfileSetupRequired());
     } on AuthAccessDeniedException {
       emit(const AuthFailure('Tài khoản chưa được cấp quyền truy cập.'));
     } catch (_) {
       emit(const AuthFailure('Đăng nhập Google đã bị hủy hoặc thất bại.'));
     }
   }
-
   Future<void> _onSignOutRequested(
     AuthSignOutRequested event,
     Emitter<AuthState> emit,
@@ -81,5 +83,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(const AuthLoading());
     await _signOutUseCase();
     emit(const Unauthenticated());
+  }
+
+  void _onProfileCompleted(
+    AuthProfileCompleted event,
+    Emitter<AuthState> emit,
+  ) {
+    emit(Authenticated(event.user));
   }
 }

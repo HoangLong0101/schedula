@@ -13,6 +13,11 @@ class DashboardDataSource {
 
   static const _heatmapWindow = Duration(days: 30);
   static const _followUpWindow = Duration(days: 30);
+  static const _activeBookingStatuses = [
+    BookingStatus.pending,
+    BookingStatus.confirmed,
+    BookingStatus.inProgress,
+  ];
 
   CollectionReference<Map<String, dynamic>> get _bookings =>
       _firestore.collection('bookings');
@@ -59,7 +64,17 @@ class DashboardDataSource {
       _safeCount(
         base.where('status', isEqualTo: BookingStatus.noShow.value).count(),
       ),
-      _safeCount(base.where('startTime', isGreaterThanOrEqualTo: now).count()),
+      _safeCount(
+        base
+            .where(
+              'status',
+              whereIn: _activeBookingStatuses
+                  .map((status) => status.value)
+                  .toList(),
+            )
+            .where('startTime', isGreaterThanOrEqualTo: now)
+            .count(),
+      ),
       _safeDocs(
         base
             .where('startTime', isGreaterThanOrEqualTo: heatmapStart)
@@ -69,12 +84,15 @@ class DashboardDataSource {
       _safeDocs(_tenantStatsDaily.where('tenantId', isEqualTo: tenantId)),
       _safeDocs(
         base
+            .where(
+              'status',
+              whereIn: _activeBookingStatuses
+                  .map((status) => status.value)
+                  .toList(),
+            )
             .where('startTime', isGreaterThanOrEqualTo: startOfToday)
             .where('startTime', isLessThan: startOfTomorrow)
             .orderBy('startTime'),
-      ),
-      _safeDocs(
-        base.where('status', isEqualTo: BookingStatus.inProgress.value),
       ),
       _safeDocs(_users.where('tenantId', isEqualTo: tenantId)),
       _safeCount(customersBase.count()),
@@ -98,13 +116,11 @@ class DashboardDataSource {
           results[6] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
       todayBookingDocs:
           results[7] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-      inProgressBookingDocs:
-          results[8] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
       staffDocs:
-          results[9] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-      totalCustomers: results[10] as int,
-      returningCustomers: results[11] as int,
-      needsFollowUpCustomers: results[12] as int,
+          results[8] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
+      totalCustomers: results[9] as int,
+      returningCustomers: results[10] as int,
+      needsFollowUpCustomers: results[11] as int,
     );
   }
 

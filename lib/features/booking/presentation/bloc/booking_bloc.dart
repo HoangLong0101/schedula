@@ -131,6 +131,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
         a?.startDate == b.startDate &&
         a?.endDate == b.endDate &&
         a?.staffId == b.staffId &&
+        a?.customerId == b.customerId &&
         a?.status == b.status;
   }
 

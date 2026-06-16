@@ -19,6 +19,11 @@ class DashboardStatsModel extends DashboardStats {
   });
 
   static const _trendWindow = Duration(days: 6);
+  static const _hiddenAppointmentStatuses = {
+    'completed',
+    'cancelled',
+    'no_show',
+  };
 
   factory DashboardStatsModel.fromAggregates({
     required int totalBookings,
@@ -29,8 +34,6 @@ class DashboardStatsModel extends DashboardStats {
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> heatmapDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> tenantStatsDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> todayBookingDocs,
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>>
-    inProgressBookingDocs,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> staffDocs,
     required int totalCustomers,
     required int returningCustomers,
@@ -94,6 +97,8 @@ class DashboardStatsModel extends DashboardStats {
     final todayAppointments = <DashboardAppointment>[];
     for (final doc in todayBookingDocs) {
       final data = doc.data();
+      final status = data['status'] as String?;
+      if (_hiddenAppointmentStatuses.contains(status)) continue;
       final startTime = _timestampFrom(data['startTime']);
       if (startTime == null) continue;
 
@@ -108,18 +113,14 @@ class DashboardStatsModel extends DashboardStats {
       );
     }
 
-    final inSessionStaffIds = {
-      for (final doc in inProgressBookingDocs)
-        if (doc.data()['staffId'] is String) doc.data()['staffId'] as String,
-    };
-
     final staffAvailability = [
       for (final doc in staffDocs)
         if (doc.data()['role'] != 'owner')
           StaffAvailability(
             id: doc.id,
             name: doc.data()['name'] as String? ?? 'Nhan vien',
-            inSession: inSessionStaffIds.contains(doc.id),
+            status: doc.data()['status'] as String? ?? 'available',
+            inSession: doc.data()['status'] == 'in_session',
             bookingCount: staffBookingCounts[doc.id] ?? 0,
           ),
     ];

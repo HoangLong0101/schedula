@@ -55,6 +55,7 @@ void main() {
           StaffAvailability(
             id: 's1',
             name: 'Nhân viên A',
+            status: 'in_session',
             inSession: true,
             bookingCount: 4,
           ),

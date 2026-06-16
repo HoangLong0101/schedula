@@ -3,16 +3,25 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../dashboard/presentation/pages/home_page.dart';
+import '../../domain/entities/user.dart';
+import '../bloc/auth_bloc.dart';
+import '../bloc/auth_event.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  const RegisterPage({super.key, this.googleSetup = false});
 
   static const routePath = '/register';
   static const routeName = 'register';
+  static const googleSetupPath = '/google-setup';
+  static const googleSetupRouteName = 'google-setup';
+
+  final bool googleSetup;
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -52,9 +61,18 @@ class _RegisterPageState extends State<RegisterPage> {
     _BusinessType('✨', 'Khác'),
   ];
 
+  bool get _isGoogleSetup => widget.googleSetup;
+
   @override
   void initState() {
     super.initState();
+    if (_isGoogleSetup) {
+      final user = FirebaseAuth.instance.currentUser;
+      _nameController.text = user?.displayName?.trim().isNotEmpty == true
+          ? user!.displayName!.trim()
+          : '';
+      _emailController.text = user?.email ?? '';
+    }
     for (final controller in [
       _weekdayOpenController,
       _weekdayCloseController,
@@ -115,6 +133,16 @@ class _RegisterPageState extends State<RegisterPage> {
   String _validateAccount() {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+
+    if (_isGoogleSetup) {
+      if (_nameController.text.trim().isEmpty || email.isEmpty) {
+        return 'Vui lòng nhập đầy đủ thông tin tài khoản.';
+      }
+      if (!_acceptedTerms) {
+        return 'Bạn cần đồng ý với điều khoản sử dụng.';
+      }
+      return '';
+    }
 
     if (_nameController.text.trim().isEmpty ||
         email.isEmpty ||
@@ -197,7 +225,7 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final auth = FirebaseAuth.instance;
       final firestore = FirebaseFirestore.instance;
-      final email = _emailController.text.trim();
+      var email = _emailController.text.trim();
       final ownerName = _nameController.text.trim();
       final tenantRef = firestore.collection('tenants').doc();
       final planStartedAt = Timestamp.now();
@@ -206,17 +234,25 @@ class _RegisterPageState extends State<RegisterPage> {
       );
       final now = FieldValue.serverTimestamp();
 
-      final credential = await auth.createUserWithEmailAndPassword(
-        email: email,
-        password: _passwordController.text,
-      );
-      createdUser = credential.user;
+      if (_isGoogleSetup) {
+        createdUser = auth.currentUser;
+      } else {
+        final credential = await auth.createUserWithEmailAndPassword(
+          email: email,
+          password: _passwordController.text,
+        );
+        createdUser = credential.user;
+      }
 
       if (createdUser == null) {
         throw FirebaseAuthException(
           code: 'user-create-failed',
           message: 'Không tạo được tài khoản.',
         );
+      }
+
+      if (_isGoogleSetup) {
+        email = createdUser.email ?? email;
       }
 
       await createdUser.updateDisplayName(ownerName);
@@ -251,12 +287,30 @@ class _RegisterPageState extends State<RegisterPage> {
       });
 
       await batch.commit();
-      await auth.signOut();
 
       if (!mounted) {
         return;
       }
 
+      if (_isGoogleSetup) {
+        context.read<AuthBloc>().add(
+          AuthProfileCompleted(
+            AppUser(
+              id: createdUser.uid,
+              email: email,
+              role: 'owner',
+              tenantId: tenantRef.id,
+            ),
+          ),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thiết lập cơ sở thành công.')),
+        );
+        context.go(HomePage.routePath);
+        return;
+      }
+
+      await auth.signOut();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đăng ký thành công. Vui lòng đăng nhập.'),
@@ -278,7 +332,7 @@ class _RegisterPageState extends State<RegisterPage> {
       });
     } on FirebaseException catch (error) {
       debugPrint('register firestore failed: ${error.code} ${error.message}');
-      if (createdUser != null) {
+      if (createdUser != null && !_isGoogleSetup) {
         await createdUser.delete().catchError((_) {});
         await FirebaseAuth.instance.signOut();
       }
@@ -386,6 +440,18 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildStep() {
+    if (_step == 0 && _isGoogleSetup) {
+      return _GoogleAccountStep(
+        nameController: _nameController,
+        emailController: _emailController,
+        acceptedTerms: _acceptedTerms,
+        onTermsChanged: (value) {
+          setState(() => _acceptedTerms = value ?? false);
+        },
+        onSubmitted: (_) => _nextStep(),
+      );
+    }
+
     return switch (_step) {
       0 => _AccountStep(
         nameController: _nameController,
@@ -434,7 +500,9 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget _buildActions() {
     if (_step == 0) {
       return _PrimaryButton(
-        label: 'Đăng ký & Thiết lập doanh nghiệp →',
+        label: _isGoogleSetup
+            ? 'Tiếp tục thiết lập cơ sở →'
+            : 'Đăng ký & Thiết lập doanh nghiệp →',
         onPressed: _isSubmitting ? null : _nextStep,
       );
     }
@@ -534,6 +602,59 @@ class _RegisterHero extends StatelessWidget {
           const Spacer(),
         ],
       ),
+    );
+  }
+}
+
+class _GoogleAccountStep extends StatelessWidget {
+  const _GoogleAccountStep({
+    required this.nameController,
+    required this.emailController,
+    required this.acceptedTerms,
+    required this.onTermsChanged,
+    required this.onSubmitted,
+  });
+
+  final TextEditingController nameController;
+  final TextEditingController emailController;
+  final bool acceptedTerms;
+  final ValueChanged<bool?> onTermsChanged;
+  final ValueChanged<String> onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _InfoBox(
+          icon: Icons.g_mobiledata_rounded,
+          text:
+              'Tài khoản Google của bạn chưa có cơ sở trong Schedula. Vui lòng hoàn tất thông tin để bắt đầu sử dụng.',
+        ),
+        const SizedBox(height: 20),
+        const _FormLabel('Họ và tên'),
+        const SizedBox(height: 9),
+        _InputField(
+          controller: nameController,
+          hintText: 'Nguyễn Văn A',
+          icon: Icons.person_outline_rounded,
+          textInputAction: TextInputAction.done,
+          onSubmitted: onSubmitted,
+        ),
+        const SizedBox(height: 20),
+        const _FormLabel('Email Google'),
+        const SizedBox(height: 9),
+        _InputField(
+          controller: emailController,
+          hintText: 'email@example.com',
+          icon: Icons.mail_outline_rounded,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          onSubmitted: onSubmitted,
+        ),
+        const SizedBox(height: 18),
+        _TermsCheckbox(value: acceptedTerms, onChanged: onTermsChanged),
+      ],
     );
   }
 }
@@ -662,6 +783,47 @@ class _AccountStep extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TermsCheckbox extends StatelessWidget {
+  const _TermsCheckbox({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 28,
+          height: 28,
+          child: Checkbox(
+            value: value,
+            onChanged: onChanged,
+            activeColor: _RegisterColors.tealDark,
+            side: const BorderSide(color: _RegisterColors.icon, width: 1.6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Text(
+            'Tôi đồng ý với điều khoản sử dụng và chính sách bảo mật của Schedula',
+            style: TextStyle(
+              color: _RegisterColors.subtle,
+              fontSize: 14,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
       ],
     );

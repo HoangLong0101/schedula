@@ -21,6 +21,8 @@ abstract class AppModule {
 
   @lazySingleton
   GoogleSignIn get googleSignIn => GoogleSignIn(
+        clientId:
+            const String.fromEnvironment('FIREBASE_ANDROID_WEB_CLIENT_ID'),
         serverClientId:
             const String.fromEnvironment('FIREBASE_ANDROID_WEB_CLIENT_ID'),
         scopes: const <String>['email', 'profile'],

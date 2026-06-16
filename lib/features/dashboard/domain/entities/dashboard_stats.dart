@@ -66,17 +66,19 @@ class StaffAvailability extends Equatable {
   const StaffAvailability({
     required this.id,
     required this.name,
+    required this.status,
     required this.inSession,
     required this.bookingCount,
   });
 
   final String id;
   final String name;
+  final String status;
   final bool inSession;
   final int bookingCount;
 
   @override
-  List<Object?> get props => [id, name, inSession, bookingCount];
+  List<Object?> get props => [id, name, status, inSession, bookingCount];
 }
 
 /// Aggregate counts for the tenant's customer base, used by the

@@ -14,6 +14,7 @@ class WatchBookingsParams {
     this.startDate,
     this.endDate,
     this.staffId,
+    this.customerId,
     this.status,
   });
 
@@ -21,6 +22,7 @@ class WatchBookingsParams {
   final DateTime? startDate;
   final DateTime? endDate;
   final String? staffId;
+  final String? customerId;
   final BookingStatus? status;
 }
 

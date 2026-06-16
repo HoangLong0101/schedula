@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/booking/presentation/widgets/booking_form_sheet.dart';
+import '../../features/dashboard/presentation/pages/home_page.dart';
 
 class MainShellPage extends StatelessWidget {
   const MainShellPage({super.key, required this.navigationShell});
@@ -20,6 +21,9 @@ class MainShellPage extends StatelessWidget {
       index,
       initialLocation: index == navigationShell.currentIndex,
     );
+    if (index == 0) {
+      requestDashboardRefresh();
+    }
   }
 
   void _onAddPressed(BuildContext context) {

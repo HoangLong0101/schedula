@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_flavor.dart';
-import '../../../dashboard/presentation/pages/dashboard_page.dart';
+import '../../../dashboard/presentation/pages/home_page.dart';
 import 'login_page.dart';
 
 class SplashPage extends StatelessWidget {
@@ -34,37 +34,37 @@ class SplashPage extends StatelessWidget {
                 Text(
                   F.title,
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Booking operations, staff, and clients in one layered workspace.',
+                  'Quản lý lịch hẹn, nhân viên và khách hàng trong một không gian làm việc.',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white.withAlpha(220),
-                      ),
+                    color: Colors.white.withAlpha(220),
+                  ),
                 ),
                 const SizedBox(height: 28),
                 FilledButton(
                   onPressed: () => context.go(LoginPage.routePath),
-                  child: const Text('Sign in'),
+                  child: const Text('Đăng nhập'),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton(
-                  onPressed: () => context.go(DashboardPage.routePath),
+                  onPressed: () => context.go(HomePage.routePath),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
                     side: const BorderSide(color: Colors.white70),
                   ),
-                  child: const Text('Enter dashboard'),
+                  child: const Text('Vào trang tổng quan'),
                 ),
                 const Spacer(),
                 Text(
-                  'MVP development build',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white70,
-                      ),
+                  'Bản phát triển MVP',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                 ),
               ],
             ),

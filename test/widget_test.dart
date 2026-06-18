@@ -7,11 +7,16 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:schedula/app.dart';
+import 'package:schedula/flavors.dart';
+import 'package:schedula/features/auth/presentation/pages/splash_page.dart';
+import 'package:flutter/material.dart';
 
 void main() {
   testWidgets('App renders the splash page', (WidgetTester tester) async {
-    await tester.pumpWidget(const App());
+    // Ensure a flavor is set for tests so `F.title` is available and
+    // pump only the SplashPage to avoid router/DI side-effects.
+    F.appFlavor = Flavor.prod;
+    await tester.pumpWidget(const MaterialApp(home: SplashPage()));
 
     expect(find.text('Schedula'), findsWidgets);
     expect(find.text('Enter dashboard'), findsOneWidget);

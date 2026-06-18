@@ -7,6 +7,11 @@
   "scripts": {
     "build": "tsc",
     "lint": "tsc --noEmit",
+    "seed:mock": "node scripts/seedMockData.js",
+    "seed:verify": "node scripts/verifySeedData.js",
+    "data:audit": "node scripts/auditDataConsistency.js",
+    "data:sync": "node scripts/syncTenantData.js",
+    "data:aggregate": "node scripts/buildAggregateStats.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

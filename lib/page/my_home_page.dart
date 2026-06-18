@@ -1,5 +1,5 @@
-import '../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../features/dashboard/presentation/pages/home_page.dart';
 
-class MyHomePage extends DashboardPage {
+class MyHomePage extends HomePage {
   const MyHomePage({super.key});
 }

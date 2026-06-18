@@ -7,6 +7,8 @@ import 'app.dart';
 import 'core/di/injection.dart';
 import 'core/services/notification_service.dart';
 import 'flavors.dart';
+import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/auth/presentation/bloc/auth_event.dart';
 import 'firebase_options_dev.dart' as dev;
 import 'firebase_options_prod.dart' as prod;
 import 'firebase_options_staging.dart' as staging;
@@ -32,6 +34,7 @@ Future<void> main() async {
   await _initializeFirebase(firebaseOptions);
 
   await configureDependencies();
+  getIt<AuthBloc>().add(const AuthStarted());
   runApp(const App());
   unawaited(NotificationService().initialize());
 }

@@ -1,13 +1,14 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../domain/entities/auth_exception.dart';
 import '../../domain/usecases/sign_in_usecase.dart';
 import '../../domain/usecases/sign_in_with_google_usecase.dart';
 import '../../domain/usecases/sign_out_usecase.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
-@injectable
+@lazySingleton
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc(
     this._signInUseCase,
@@ -24,10 +25,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignInWithGoogleUseCase _signInWithGoogleUseCase;
   final SignOutUseCase _signOutUseCase;
 
-  Future<void> _onStarted(
-    AuthStarted event,
-    Emitter<AuthState> emit,
-  ) async {
+  Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
     emit(const Unauthenticated());
   }
 
@@ -36,17 +34,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(const AuthLoading());
-    final user = await _signInUseCase(
-      email: event.email,
-      password: event.password,
-    );
+    try {
+      final user = await _signInUseCase(
+        email: event.email,
+        password: event.password,
+      );
 
-    if (user == null) {
-      emit(const AuthFailure('Unable to sign in'));
-      return;
+      if (user == null) {
+        emit(const AuthFailure('Không thể đăng nhập.'));
+        return;
+      }
+
+      emit(Authenticated(user));
+    } on AuthAccessDeniedException {
+      emit(const AuthFailure('Tài khoản chưa được cấp quyền truy cập.'));
+    } catch (_) {
+      emit(const AuthFailure('Không thể đăng nhập.'));
     }
-
-    emit(Authenticated(user));
   }
 
   Future<void> _onGoogleSignInRequested(
@@ -54,14 +58,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(const AuthLoading());
-    final user = await _signInWithGoogleUseCase();
+    try {
+      final user = await _signInWithGoogleUseCase();
 
-    if (user == null) {
-      emit(const AuthFailure('Google sign-in was cancelled or failed'));
-      return;
+      if (user == null) {
+        emit(const AuthFailure('Đăng nhập Google đã bị hủy hoặc thất bại.'));
+        return;
+      }
+
+      emit(Authenticated(user));
+    } on AuthAccessDeniedException {
+      emit(const AuthFailure('Tài khoản chưa được cấp quyền truy cập.'));
+    } catch (_) {
+      emit(const AuthFailure('Đăng nhập Google đã bị hủy hoặc thất bại.'));
     }
-
-    emit(Authenticated(user));
   }
 
   Future<void> _onSignOutRequested(

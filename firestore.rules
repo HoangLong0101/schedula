@@ -26,6 +26,27 @@ service cloud.firestore {
     function sameTenant(docTenantId) { return myTenant() == docTenantId; }
     function isOwner() { return role() == 'owner'; }
     function canBook() { return role() == 'owner' || role() == 'receptionist'; }
+    function canReadBooking(data) {
+      return isAuth()
+        && sameTenant(data.tenantId)
+        && (
+          role() != 'staff'
+          || request.auth.uid == data.staffId
+        );
+    }
+    function ownProfileUpdateFields() {
+      return [
+        'name',
+        'phone',
+        'email',
+        'avatarUrl',
+        'faceIdEnabled',
+        'fingerprintEnabled',
+        'twoFaEnabled',
+        'twoFaMethod',
+        'updatedAt',
+      ];
+    }
     function paymentFields() {
       return [
         'paymentStatus',
@@ -59,7 +80,7 @@ service cloud.firestore {
     }
 
     match /bookings/{id} {
-      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow read: if canReadBooking(resource.data);
       allow create: if isAuth()
         && canBook()
         && sameTenant(request.resource.data.tenantId)
@@ -122,6 +143,15 @@ service cloud.firestore {
           isOwner() && sameTenant(request.resource.data.tenantId)
         ) || (
           isAuth()
+          && request.auth.uid == userId
+          && sameTenant(resource.data.tenantId)
+          && request.resource.data.tenantId == resource.data.tenantId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+            ownProfileUpdateFields()
+          )
+        ) || (
+          isAuth()
           && canBook()
           && sameTenant(resource.data.tenantId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -143,7 +173,12 @@ service cloud.firestore {
     }
 
     match /slots/{id} {
-      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow read: if isAuth()
+        && sameTenant(resource.data.tenantId)
+        && (
+          role() != 'staff'
+          || request.auth.uid == resource.data.staffId
+        );
       allow write: if isAuth() && canBook() && sameTenant(request.resource.data.tenantId);
     }
 

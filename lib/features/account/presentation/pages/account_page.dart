@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../booking/presentation/pages/booking_page.dart';
 import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../../dashboard/presentation/cubit/dashboard_state.dart';
 import '../../domain/entities/business_info.dart';
@@ -27,11 +30,16 @@ class AccountPage extends StatelessWidget {
     // Trích xuất tenantId từ AuthBloc
     final authState = context.read<AuthBloc>().state;
     final tenantId = authState is Authenticated ? authState.user.tenantId : '';
+    final isStaff = authState is Authenticated && authState.user.isStaff;
 
     if (tenantId.isEmpty) {
       return const Scaffold(
         body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở')),
       );
+    }
+
+    if (isStaff) {
+      return const _StaffAccountView();
     }
 
     return MultiBlocProvider(
@@ -43,6 +51,162 @@ class AccountPage extends StatelessWidget {
         BlocProvider(create: (_) => getIt<DashboardCubit>()..load(tenantId)),
       ],
       child: const _AccountView(),
+    );
+  }
+}
+
+class _StaffAccountView extends StatelessWidget {
+  const _StaffAccountView();
+
+  static const _tealGradient = LinearGradient(
+    colors: [Color(0xFF22AFC2), Color(0xFF148a9c)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = context.watch<AuthBloc>().state;
+    final user = authState is Authenticated ? authState.user : null;
+    final userName = user?.email.split('@').first ?? 'Nhan vien';
+    final userEmail = user?.email ?? '';
+    final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'S';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFCFCFD),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: Text(
+                  'Tài khoản',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: _tealGradient,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            userEmail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.82),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text(
+                              'Nhân viên',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              _MenuSection(
+                title: 'Cá nhân',
+                items: [
+                  _MenuItem(
+                    icon: Icons.person_outline,
+                    label: 'Chỉnh sửa hồ sơ cá nhân',
+                    hint: 'Tên, email, số điện thoại và bảo mật',
+                    color: const Color(0xFF148a9c),
+                    onTap: () => context.push(AccountInfoPage.routePath),
+                  ),
+                  _MenuItem(
+                    icon: Icons.calendar_month_outlined,
+                    label: 'Lịch làm việc của tôi',
+                    hint: 'Chỉ hiển thị lịch hẹn được phân công',
+                    color: const Color(0xFF22AFC2),
+                    onTap: () => context.go(BookingPage.routePath),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _MenuSection(
+                title: 'Hỗ trợ',
+                items: [
+                  _MenuItem(
+                    icon: Icons.logout,
+                    label: 'Đăng xuất',
+                    color: const Color(0xFFef4444),
+                    isDestructive: true,
+                    onTap: () {
+                      context.read<AuthBloc>().add(
+                        const AuthSignOutRequested(),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -588,6 +752,8 @@ class _AccountView extends StatelessWidget {
                               icon: Icons.workspace_premium_outlined,
                               label: 'Nâng cấp gói dịch vụ',
                               color: const Color(0xFFeab308),
+                              onTap: () =>
+                                  _showPlanUpgradeSheet(context, business),
                             ),
                             _MenuItem(
                               icon: Icons.star_outline,
@@ -649,9 +815,304 @@ class _AccountView extends StatelessWidget {
       ),
     );
   }
+
+  void _showPlanUpgradeSheet(BuildContext context, BusinessInfo business) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _PlanUpgradeSheet(currentPlan: business.planTier),
+    );
+  }
 }
 
 // CÁC WIDGET PHỤ TRỢ (HELPER WIDGETS)
+
+class _PlanUpgradeSheet extends StatefulWidget {
+  const _PlanUpgradeSheet({required this.currentPlan});
+
+  final String currentPlan;
+
+  @override
+  State<_PlanUpgradeSheet> createState() => _PlanUpgradeSheetState();
+}
+
+class _PlanUpgradeSheetState extends State<_PlanUpgradeSheet> {
+  static final _paymentService = _PlanPaymentService();
+
+  String? _loadingPlan;
+
+  Future<void> _startPayment(_PlanOptionData plan) async {
+    if (_loadingPlan != null) {
+      return;
+    }
+
+    setState(() => _loadingPlan = plan.tier);
+    try {
+      final link = await _paymentService.createUpgradePayment(
+        planTier: plan.tier,
+      );
+      final uri = Uri.parse(link.checkoutUrl);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể mở trang thanh toán PayOS.')),
+        );
+      } else if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Hoàn tất thanh toán để hệ thống tự nâng cấp gói.'),
+          ),
+        );
+      }
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? 'Không thể tạo thanh toán.')),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể tạo thanh toán PayOS.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingPlan = null);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const plans = [
+      _PlanOptionData(
+        tier: 'pro',
+        name: 'Schedula Pro',
+        price: 699000,
+        description:
+            'Không giới hạn lịch hẹn, 10 nhân viên, thống kê nâng cao.',
+        color: Color(0xFF14B8A6),
+      ),
+      _PlanOptionData(
+        tier: 'premium',
+        name: 'Schedula Premium',
+        price: 1499000,
+        description:
+            'Không giới hạn nhân viên, báo cáo đầy đủ và hỗ trợ ưu tiên.',
+        color: Color(0xFF7C3AED),
+      ),
+    ];
+
+    final currentPlan = widget.currentPlan.trim().toLowerCase();
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).padding.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Nâng cấp gói dịch vụ',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Thanh toán qua PayOS. Gói sẽ tự cập nhật khi webhook xác nhận giao dịch thành công.',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          ),
+          const SizedBox(height: 18),
+          for (final plan in plans) ...[
+            _PlanOptionCard(
+              plan: plan,
+              isCurrent:
+                  currentPlan == plan.tier ||
+                  (currentPlan == 'professional' && plan.tier == 'pro'),
+              isLoading: _loadingPlan == plan.tier,
+              onTap: () => _startPayment(plan),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanOptionCard extends StatelessWidget {
+  const _PlanOptionCard({
+    required this.plan,
+    required this.isCurrent,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  final _PlanOptionData plan;
+  final bool isCurrent;
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: isCurrent ? plan.color : Colors.grey.shade200,
+          width: isCurrent ? 1.4 : 1,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: isCurrent || isLoading ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: plan.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.workspace_premium, color: plan.color),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            plan.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          _formatVnd(plan.price),
+                          style: TextStyle(
+                            color: plan.color,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      plan.description,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (isLoading)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: plan.color,
+                  ),
+                )
+              else if (isCurrent)
+                Icon(Icons.check_circle, color: plan.color)
+              else
+                Icon(Icons.chevron_right, color: Colors.grey.shade400),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _formatVnd(int amount) {
+    final text = amount.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (match) => '${match[1]}.',
+    );
+    return '$textđ/tháng';
+  }
+}
+
+class _PlanOptionData {
+  const _PlanOptionData({
+    required this.tier,
+    required this.name,
+    required this.price,
+    required this.description,
+    required this.color,
+  });
+
+  final String tier;
+  final String name;
+  final int price;
+  final String description;
+  final Color color;
+}
+
+class _PlanPaymentLink {
+  const _PlanPaymentLink({required this.checkoutUrl});
+
+  final String checkoutUrl;
+}
+
+class _PlanPaymentService {
+  _PlanPaymentService({FirebaseFunctions? functions})
+    : _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'asia-southeast1');
+
+  final FirebaseFunctions _functions;
+
+  Future<_PlanPaymentLink> createUpgradePayment({
+    required String planTier,
+  }) async {
+    final callable = _functions.httpsCallable('createPayOSPlanUpgradePayment');
+    final result = await callable.call<Map<String, dynamic>>({
+      'planTier': planTier,
+      'billingPeriod': 'monthly',
+    });
+    final data = result.data;
+    return _PlanPaymentLink(checkoutUrl: data['checkoutUrl'] as String);
+  }
+}
 
 class _StatItem extends StatelessWidget {
   final String value;

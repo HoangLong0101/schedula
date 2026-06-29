@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
@@ -20,12 +19,13 @@ import '../widgets/booking_actions.dart';
 import '../widgets/booking_form_sheet.dart';
 
 class BookingPage extends StatelessWidget {
-  const BookingPage({super.key, this.tenantId});
+  const BookingPage({super.key, this.tenantId, this.restrictedStaffId});
 
   static const routePath = '/booking';
   static const routeName = 'booking';
 
   final String? tenantId;
+  final String? restrictedStaffId;
 
   @override
   Widget build(BuildContext context) {
@@ -36,13 +36,22 @@ class BookingPage extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) =>
-              getIt<BookingBloc>()
-                ..add(BookingStarted(WatchBookingsParams(tenantId: tenantId!))),
+          create: (_) => getIt<BookingBloc>()
+            ..add(
+              BookingStarted(
+                WatchBookingsParams(
+                  tenantId: tenantId!,
+                  staffId: restrictedStaffId,
+                ),
+              ),
+            ),
         ),
         BlocProvider(create: (_) => getIt<BookingFiltersCubit>()),
       ],
-      child: _BookingView(tenantId: tenantId!),
+      child: _BookingView(
+        tenantId: tenantId!,
+        restrictedStaffId: restrictedStaffId,
+      ),
     );
   }
 }
@@ -67,9 +76,13 @@ class _TenantMissingView extends StatelessWidget {
 }
 
 class _BookingView extends StatelessWidget {
-  const _BookingView({required this.tenantId});
+  const _BookingView({required this.tenantId, this.restrictedStaffId});
 
   final String tenantId;
+  final String? restrictedStaffId;
+
+  bool get _isStaffRestricted =>
+      restrictedStaffId != null && restrictedStaffId!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -117,10 +130,12 @@ class _BookingView extends StatelessWidget {
                               sliver: SliverList.list(
                                 children: [
                                   _Header(
-                                    onAdd: () => BookingFormSheet.show(
-                                      context,
-                                      tenantId: tenantId,
-                                    ),
+                                    onAdd: _isStaffRestricted
+                                        ? null
+                                        : () => BookingFormSheet.show(
+                                            context,
+                                            tenantId: tenantId,
+                                          ),
                                   ),
                                   const SizedBox(height: 28),
                                   _SearchBox(
@@ -137,14 +152,16 @@ class _BookingView extends StatelessWidget {
                                         .updateRange,
                                   ),
                                   const SizedBox(height: 12),
-                                  _StaffChips(
-                                    selectedStaffId: filters.staffId,
-                                    staff: staffOptions,
-                                    onChanged: context
-                                        .read<BookingFiltersCubit>()
-                                        .updateStaff,
-                                  ),
-                                  const SizedBox(height: 18),
+                                  if (!_isStaffRestricted) ...[
+                                    _StaffChips(
+                                      selectedStaffId: filters.staffId,
+                                      staff: staffOptions,
+                                      onChanged: context
+                                          .read<BookingFiltersCubit>()
+                                          .updateStaff,
+                                    ),
+                                    const SizedBox(height: 18),
+                                  ],
                                   _StatsRow(bookings: bookings),
                                   const SizedBox(height: 18),
                                   _AiConflictPanel(conflicts: conflicts),
@@ -194,8 +211,9 @@ class _BookingView extends StatelessWidget {
                                         if (nextStatus ==
                                                 BookingStatus.completed &&
                                             booking.paymentStatus != 'paid') {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             const SnackBar(
                                               content: Text(
                                                 'Vui long xac nhan thanh toan truoc khi hoan thanh lich hen.',
@@ -225,8 +243,7 @@ class _BookingView extends StatelessWidget {
                                               ),
                                             ),
                                           ),
-                                      onPaymentTap: () =>
-                                          _markPaymentComplete(
+                                      onPaymentTap: () => _markPaymentComplete(
                                         context,
                                         booking,
                                       ),
@@ -272,7 +289,7 @@ class _BookingView extends StatelessWidget {
           tenantId: tenantId,
           startDate: start,
           endDate: end,
-          staffId: filters.staffId,
+          staffId: restrictedStaffId ?? filters.staffId,
         ),
       ),
     );
@@ -420,7 +437,7 @@ class _BookingView extends StatelessWidget {
 class _Header extends StatelessWidget {
   const _Header({required this.onAdd});
 
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -445,15 +462,16 @@ class _Header extends StatelessWidget {
             height: 1,
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: _IconSurfaceButton(
-            icon: Icons.add,
-            onPressed: onAdd,
-            background: _Tokens.teal,
-            foreground: Colors.white,
+        if (onAdd != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: _IconSurfaceButton(
+              icon: Icons.add,
+              onPressed: onAdd!,
+              background: _Tokens.teal,
+              foreground: Colors.white,
+            ),
           ),
-        ),
       ],
     );
   }

@@ -13,6 +13,14 @@ class AppUser extends Equatable {
   final String role;
   final String tenantId;
 
+  String get normalizedRole => role.trim().toLowerCase();
+
+  bool get isOwner => normalizedRole == 'owner';
+  bool get isReceptionist => normalizedRole == 'receptionist';
+  bool get isStaff => normalizedRole == 'staff';
+  bool get canManageTenant => isOwner;
+  bool get canManageBookings => isOwner || isReceptionist;
+
   @override
   List<Object?> get props => [id, email, role, tenantId];
 }

@@ -29,6 +29,14 @@ class MainShellPage extends StatelessWidget {
   void _onAddPressed(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
+      if (!authState.user.canManageBookings) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bạn chỉ có quyền xem lịch được phân công.'),
+          ),
+        );
+        return;
+      }
       // Giả định state Authenticated chứa thông tin user
       // Nếu thuộc tính khác, bạn điều chỉnh lại biến .user.tenantId cho khớp nhé
       final tenantId = authState.user.tenantId;

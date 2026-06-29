@@ -181,6 +181,8 @@ class BookingDataSource {
       createdBy: params.createdBy,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      reminder24Sent: false,
+      reminder1hSent: false,
       customerName: params.customerName,
       staffName: params.staffName,
       serviceName: params.serviceName,

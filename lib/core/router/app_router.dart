@@ -20,6 +20,7 @@ import '../../features/dashboard/presentation/pages/home_page.dart';
 import '../../features/dashboard/presentation/pages/statistics_page_wrapper.dart';
 import '../../features/equipment/presentation/pages/equipment_page.dart';
 import '../../features/notification/presentation/pages/notification_page.dart';
+import '../../features/payment/presentation/pages/payment_result_page.dart';
 import '../../features/staff/presentation/pages/staff_page.dart';
 import 'main_shell_page.dart';
 
@@ -36,6 +37,13 @@ class AppRouter {
       final location = state.uri.toString();
 
       final isPublicRoute =
+          location == SplashPage.routePath ||
+          location == LoginPage.routePath ||
+          location == RegisterPage.routePath ||
+          location == RegisterPage.googleSetupPath ||
+          location.startsWith(PaymentResultPage.successRoutePath) ||
+          location.startsWith(PaymentResultPage.cancelRoutePath);
+      final isAuthEntryRoute =
           location == SplashPage.routePath ||
           location == LoginPage.routePath ||
           location == RegisterPage.routePath ||
@@ -58,8 +66,21 @@ class AppRouter {
         return LoginPage.routePath;
       }
 
-      if (authState is Authenticated && isPublicRoute) {
+      if (authState is Authenticated && isAuthEntryRoute) {
         return HomePage.routePath;
+      }
+
+      if (authState is Authenticated && authState.user.isStaff) {
+        final staffBlockedRoutes = <String>{
+          StaffPage.routePath,
+          CustomerPage.routePath,
+          EquipmentPage.routePath,
+          CatalogPage.routePath,
+          NotificationPage.routePath,
+        };
+        if (staffBlockedRoutes.contains(location)) {
+          return BookingPage.routePath;
+        }
       }
 
       return null;
@@ -85,6 +106,18 @@ class AppRouter {
         name: RegisterPage.googleSetupRouteName,
         builder: (_, _) => const RegisterPage(googleSetup: true),
       ),
+      GoRoute(
+        path: PaymentResultPage.successRoutePath,
+        builder: (context, state) => PaymentResultPage.success(
+          orderCode: state.uri.queryParameters['orderCode'],
+        ),
+      ),
+      GoRoute(
+        path: PaymentResultPage.cancelRoutePath,
+        builder: (context, state) => PaymentResultPage.cancelled(
+          orderCode: state.uri.queryParameters['orderCode'],
+        ),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return MainShellPage(navigationShell: navigationShell);
@@ -109,8 +142,15 @@ class AppRouter {
                   final tenantId = authState is Authenticated
                       ? authState.user.tenantId
                       : null;
+                  final staffId =
+                      authState is Authenticated && authState.user.isStaff
+                      ? authState.user.id
+                      : null;
 
-                  return BookingPage(tenantId: tenantId);
+                  return BookingPage(
+                    tenantId: tenantId,
+                    restrictedStaffId: staffId,
+                  );
                 },
               ),
             ],

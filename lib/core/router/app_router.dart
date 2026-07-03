@@ -76,7 +76,6 @@ class AppRouter {
           CustomerPage.routePath,
           EquipmentPage.routePath,
           CatalogPage.routePath,
-          NotificationPage.routePath,
         };
         if (staffBlockedRoutes.contains(location)) {
           return BookingPage.routePath;

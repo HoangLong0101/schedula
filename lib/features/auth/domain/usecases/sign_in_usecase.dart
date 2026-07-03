@@ -15,4 +15,8 @@ class SignInUseCase {
   }) {
     return _repository.signIn(email: email, password: password);
   }
+
+  Future<AppUser?> currentUser() {
+    return _repository.watchCurrentUser().first;
+  }
 }

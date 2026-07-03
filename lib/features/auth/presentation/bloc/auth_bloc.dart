@@ -27,7 +27,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignOutUseCase _signOutUseCase;
 
   Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
-    emit(const Unauthenticated());
+    emit(const AuthLoading());
+    try {
+      final user = await _signInUseCase.currentUser();
+      if (user == null || user.role.isEmpty || user.tenantId.isEmpty) {
+        await _signOutUseCase();
+        emit(const Unauthenticated());
+        return;
+      }
+      emit(Authenticated(user));
+    } catch (_) {
+      await _signOutUseCase();
+      emit(const Unauthenticated());
+    }
   }
 
   Future<void> _onSignInRequested(

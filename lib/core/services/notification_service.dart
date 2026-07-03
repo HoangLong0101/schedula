@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+
+import '../router/app_router.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
@@ -29,6 +32,11 @@ class NotificationService {
     FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
 
     await _messaging.requestPermission(alert: true, badge: true, sound: true);
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
     _currentToken = await _messaging.getToken();
     if (_currentToken != null) {
@@ -46,9 +54,7 @@ class NotificationService {
       }
     });
 
-    FirebaseMessaging.onMessage.listen((message) {
-      // In-app presentation can be added here when the UI is ready.
-    });
+    FirebaseMessaging.onMessage.listen(_showForegroundMessage);
   }
 
   /// Cancels any active subscriptions. Call on app shutdown to avoid leaks.
@@ -69,6 +75,28 @@ class NotificationService {
         'fcmUpdatedAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
+    );
+  }
+
+  void _showForegroundMessage(RemoteMessage message) {
+    final notification = message.notification;
+    final context = AppRouter.rootNavigatorKey.currentContext;
+    final messenger = context == null
+        ? null
+        : ScaffoldMessenger.maybeOf(context);
+    if (notification == null || messenger == null) {
+      return;
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          [
+            notification.title,
+            notification.body,
+          ].whereType<String>().where((value) => value.isNotEmpty).join('\n'),
+        ),
+      ),
     );
   }
 }

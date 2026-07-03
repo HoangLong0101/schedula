@@ -10,17 +10,22 @@ class AccountDataSource {
 
   final FirebaseFirestore _firestore;
 
-  // Giả định thông tin tiệm được lưu ở collection 'tenants'
   DocumentReference<Map<String, dynamic>> _tenantDoc(String tenantId) =>
       _firestore.collection('tenants').doc(tenantId);
 
   Stream<BusinessInfoModel> watchBusinessInfo(String tenantId) {
     return _tenantDoc(tenantId).snapshots().map((snapshot) {
       if (!snapshot.exists) {
-        // Trả về default nếu DB chưa có
         return const BusinessInfoModel(
-          name: "Chưa cập nhật tên", type: "Spa", address: "", phone: "",
-          website: "", hoursWeekday: "", hoursWeekend: "", description: "",
+          name: 'Chua cap nhat ten',
+          type: 'Spa',
+          address: '',
+          phone: '',
+          website: '',
+          hoursWeekday: '',
+          hoursWeekend: '',
+          description: '',
+          staffReminderLeadMinutes: 60,
         );
       }
       return BusinessInfoModel.fromFirestore(snapshot);
@@ -29,10 +34,18 @@ class AccountDataSource {
 
   Future<void> updateBusinessInfo(String tenantId, BusinessInfo info) async {
     final model = BusinessInfoModel(
-      name: info.name, type: info.type, address: info.address,
-      phone: info.phone, website: info.website,
-      hoursWeekday: info.hoursWeekday, hoursWeekend: info.hoursWeekend,
+      name: info.name,
+      type: info.type,
+      address: info.address,
+      phone: info.phone,
+      website: info.website,
+      hoursWeekday: info.hoursWeekday,
+      hoursWeekend: info.hoursWeekend,
       description: info.description,
+      planTier: info.planTier,
+      planStartedAt: info.planStartedAt,
+      planExpiresAt: info.planExpiresAt,
+      staffReminderLeadMinutes: info.staffReminderLeadMinutes,
     );
     await _tenantDoc(tenantId).set(model.toFirestore(), SetOptions(merge: true));
   }

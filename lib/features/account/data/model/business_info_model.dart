@@ -14,6 +14,7 @@ class BusinessInfoModel extends BusinessInfo {
     super.planTier,
     super.planStartedAt,
     super.planExpiresAt,
+    super.staffReminderLeadMinutes,
   });
 
   factory BusinessInfoModel.fromFirestore(
@@ -32,6 +33,8 @@ class BusinessInfoModel extends BusinessInfo {
       planTier: data['planTier'] as String? ?? 'basic',
       planStartedAt: (data['planStartedAt'] as Timestamp?)?.toDate(),
       planExpiresAt: (data['planExpiresAt'] as Timestamp?)?.toDate(),
+      staffReminderLeadMinutes:
+          (data['staffReminderLeadMinutes'] as num?)?.round() ?? 60,
     );
   }
 
@@ -46,6 +49,7 @@ class BusinessInfoModel extends BusinessInfo {
       'hoursWeekend': hoursWeekend,
       'description': description,
       'planTier': planTier,
+      'staffReminderLeadMinutes': staffReminderLeadMinutes,
       'updatedAt': FieldValue.serverTimestamp(),
     };
 

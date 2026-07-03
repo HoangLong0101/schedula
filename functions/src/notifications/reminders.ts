@@ -16,7 +16,8 @@ const zaloZnsTemplateId = defineString('ZALO_ZNS_TEMPLATE_ID');
 const db = admin.firestore();
 const minute = 60 * 1000;
 const customerReminderLead = 24 * 60 * minute;
-const staffReminderLead = 60 * minute;
+const defaultStaffReminderLeadMinutes = 60;
+const maxStaffReminderLeadMinutes = 24 * 60;
 const windowSize = 15 * minute;
 
 type BookingData = {
@@ -92,11 +93,22 @@ async function sendCustomer24hReminders(): Promise<void> {
 }
 
 async function sendStaff1hReminders(): Promise<void> {
-  const docs = await upcomingBookings(staffReminderLead);
+  const docs = await upcomingBookingsRange(
+    0,
+    maxStaffReminderLeadMinutes * minute + windowSize,
+  );
+  const tenantLeadCache = new Map<string, Promise<number>>();
 
   for (const doc of docs) {
     const booking = doc.data() as BookingData;
     if (booking.reminder1hSent === true) {
+      continue;
+    }
+    const leadTimeMs = await staffReminderLeadMs(
+      booking.tenantId,
+      tenantLeadCache,
+    );
+    if (!isReminderWindow(booking.startTime, leadTimeMs)) {
       continue;
     }
 
@@ -123,6 +135,13 @@ async function sendStaff1hReminders(): Promise<void> {
 async function upcomingBookings(leadTimeMs: number) {
   const start = Date.now() + leadTimeMs;
   const end = start + windowSize;
+  return upcomingBookingsRange(start - Date.now(), end - Date.now());
+}
+
+async function upcomingBookingsRange(fromNowMs: number, toNowMs: number) {
+  const now = Date.now();
+  const start = now + fromNowMs;
+  const end = now + toNowMs;
 
   const snapshot = await db
     .collection('bookings')
@@ -132,6 +151,39 @@ async function upcomingBookings(leadTimeMs: number) {
     .get();
 
   return snapshot.docs;
+}
+
+async function staffReminderLeadMs(
+  tenantId: string | undefined,
+  cache: Map<string, Promise<number>>,
+): Promise<number> {
+  if (!tenantId) {
+    return defaultStaffReminderLeadMinutes * minute;
+  }
+  if (!cache.has(tenantId)) {
+    cache.set(tenantId, readStaffReminderLeadMinutes(tenantId));
+  }
+  return (await cache.get(tenantId)!) * minute;
+}
+
+async function readStaffReminderLeadMinutes(tenantId: string): Promise<number> {
+  const snapshot = await db.collection('tenants').doc(tenantId).get();
+  const value = snapshot.data()?.staffReminderLeadMinutes;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return defaultStaffReminderLeadMinutes;
+  }
+  return Math.min(maxStaffReminderLeadMinutes, Math.max(15, Math.round(value)));
+}
+
+function isReminderWindow(
+  startTime: Timestamp | undefined,
+  leadTimeMs: number,
+): boolean {
+  if (!startTime) {
+    return false;
+  }
+  const diff = startTime.toMillis() - Date.now();
+  return diff >= leadTimeMs && diff < leadTimeMs + windowSize;
 }
 
 async function contact(

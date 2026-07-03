@@ -238,6 +238,26 @@ class _AccountView extends StatelessWidget {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
+  void _showNotificationSettingsSheet(
+    BuildContext context,
+    BusinessInfo business,
+  ) {
+    final cubit = context.read<AccountCubit>();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _NotificationSettingsSheet(
+        initialMinutes: business.staffReminderLeadMinutes,
+        onSave: (minutes) {
+          cubit.updateBusinessInfo(
+            business.copyWith(staffReminderLeadMinutes: minutes),
+          );
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Lấy thông tin User thực tế từ AuthBloc
@@ -730,6 +750,12 @@ class _AccountView extends StatelessWidget {
                             ),
                             _MenuItem(
                               icon: Icons.notifications_outlined,
+                              hint:
+                                  'Nhac nhan vien truoc ${business.staffReminderLeadMinutes} phut',
+                              onTap: () => _showNotificationSettingsSheet(
+                                context,
+                                business,
+                              ),
                               label: 'Thông báo & Âm thanh',
                               color: const Color(0xFFf97316),
                             ),
@@ -1111,6 +1137,110 @@ class _PlanPaymentService {
     });
     final data = result.data;
     return _PlanPaymentLink(checkoutUrl: data['checkoutUrl'] as String);
+  }
+}
+
+class _NotificationSettingsSheet extends StatefulWidget {
+  const _NotificationSettingsSheet({
+    required this.initialMinutes,
+    required this.onSave,
+  });
+
+  final int initialMinutes;
+  final ValueChanged<int> onSave;
+
+  @override
+  State<_NotificationSettingsSheet> createState() =>
+      _NotificationSettingsSheetState();
+}
+
+class _NotificationSettingsSheetState
+    extends State<_NotificationSettingsSheet> {
+  static const _options = [15, 30, 60, 120, 180, 1440];
+
+  late int _minutes;
+
+  @override
+  void initState() {
+    super.initState();
+    _minutes = _options.contains(widget.initialMinutes)
+        ? widget.initialMinutes
+        : 60;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Notification settings',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Notify staff before appointment',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<int>(
+            value: _minutes,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            items: [
+              for (final minutes in _options)
+                DropdownMenuItem(
+                  value: minutes,
+                  child: Text(_leadLabel(minutes)),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) setState(() => _minutes = value);
+            },
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => widget.onSave(_minutes),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF22AFC2),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Save',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _leadLabel(int minutes) {
+    if (minutes == 1440) return '1 day before';
+    if (minutes >= 60) return '${minutes ~/ 60} hours before';
+    return '$minutes minutes before';
   }
 }
 

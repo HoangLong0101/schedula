@@ -224,6 +224,34 @@ class _StaffView extends StatelessWidget {
     );
   }
 
+  Stream<Map<String, int>> _watchTodayAppointmentCounts() {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+
+    return getIt<WatchBookingsUseCase>()(
+      WatchBookingsParams(tenantId: tenantId, startDate: start, endDate: end),
+    ).map(
+      (result) => result.fold(
+        (_) => const <String, int>{},
+        (bookings) {
+          final counts = <String, int>{};
+          for (final booking in bookings) {
+            if (booking.status == BookingStatus.cancelled) {
+              continue;
+            }
+            counts.update(
+              booking.staffId,
+              (count) => count + 1,
+              ifAbsent: () => 1,
+            );
+          }
+          return counts;
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -250,15 +278,27 @@ class _StaffView extends StatelessWidget {
             ),
 
             Expanded(
-              child: BlocBuilder<StaffManagementCubit, List<StaffMember>>(
-                builder: (context, staffList) {
-                  final available = staffList.where((s) => s.status == StaffStatus.available).length;
-                  final inSession = staffList.where((s) => s.status == StaffStatus.inSession).length;
-                  final absent = staffList.where((s) => s.status == StaffStatus.absent).length;
+              child: StreamBuilder<Map<String, int>>(
+                stream: _watchTodayAppointmentCounts(),
+                builder: (context, appointmentsSnapshot) {
+                  final appointmentCounts =
+                      appointmentsSnapshot.data ?? const <String, int>{};
 
-                  return ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    children: [
+                  return BlocBuilder<StaffManagementCubit, List<StaffMember>>(
+                    builder: (context, staffList) {
+                      final available = staffList
+                          .where((s) => s.status == StaffStatus.available)
+                          .length;
+                      final inSession = staffList
+                          .where((s) => s.status == StaffStatus.inSession)
+                          .length;
+                      final absent = staffList
+                          .where((s) => s.status == StaffStatus.absent)
+                          .length;
+
+                      return ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        children: [
                       // Stats Row
                       Row(
                         children: [
@@ -276,6 +316,8 @@ class _StaffView extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _StaffCard(
                           staff: staff,
+                          todayAppointments:
+                              appointmentCounts[staff.id] ?? 0,
                           onEdit: () => _showStaffForm(context, staff: staff),
                           onDelete: () => _confirmDelete(context, staff.id),
                           onAppointmentsTap: () =>
@@ -304,8 +346,10 @@ class _StaffView extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 40),
-                    ],
+                          const SizedBox(height: 40),
+                        ],
+                      );
+                    },
                   );
                 },
               ),
@@ -321,12 +365,14 @@ class _StaffView extends StatelessWidget {
 
 class _StaffCard extends StatelessWidget {
   final StaffMember staff;
+  final int todayAppointments;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onAppointmentsTap;
 
   const _StaffCard({
     required this.staff,
+    required this.todayAppointments,
     required this.onEdit,
     required this.onDelete,
     required this.onAppointmentsTap,
@@ -422,7 +468,7 @@ class _StaffCard extends StatelessWidget {
               GestureDetector(
                 onTap: onAppointmentsTap,
                 child: Text(
-                  '${staff.appointments} lịch hôm nay',
+                  '$todayAppointments lịch hôm nay',
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF148A9C),

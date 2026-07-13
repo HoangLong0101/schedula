@@ -39,8 +39,14 @@ class StaffManagementCubit extends Cubit<List<StaffMember>> {
     });
   }
 
-  Future<void> addStaff(StaffMember staff) async {
-    await _createStaff(CreateStaffParams(tenantId: _currentTenantId, staff: staff));
+  Future<String?> addStaff(StaffMember staff) async {
+    final result = await _createStaff(
+      CreateStaffParams(tenantId: _currentTenantId, staff: staff),
+    );
+    return result.fold(
+      (failure) => null,
+      (created) => created.temporaryPassword,
+    );
   }
 
   Future<void> updateStaff(StaffMember staff) async {

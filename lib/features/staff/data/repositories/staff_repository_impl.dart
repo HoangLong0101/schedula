@@ -26,10 +26,12 @@ class StaffRepositoryImpl implements StaffRepository {
   }
 
   @override
-  Future<Either<Failure, StaffMember>> createStaff(String tenantId, StaffMember staff) async {
+  Future<Either<Failure, CreatedStaff>> createStaff(
+    String tenantId,
+    StaffMember staff,
+  ) async {
     try {
-      final model = await _dataSource.createStaff(tenantId, staff);
-      return Right(model);
+      return Right(await _dataSource.createStaff(tenantId, staff));
     } catch (_) {
       return const Left(ServerFailure('Không thể tạo nhân viên.'));
     }

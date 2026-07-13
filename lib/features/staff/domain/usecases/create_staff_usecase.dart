@@ -21,7 +21,7 @@ class CreateStaffUseCase {
 
   final StaffRepository _repository;
 
-  Future<Either<Failure, StaffMember>> call(CreateStaffParams params) {
+  Future<Either<Failure, CreatedStaff>> call(CreateStaffParams params) {
     if (params.tenantId.trim().isEmpty) {
       return Future.value(const Left(ValidationFailure('Thiếu mã cơ sở.')));
     }
@@ -30,6 +30,11 @@ class CreateStaffUseCase {
     }
     if (params.staff.role.trim().isEmpty) {
       return Future.value(const Left(ValidationFailure('Vui lòng chọn vai trò nhân viên.')));
+    }
+    if (!params.staff.email.contains('@')) {
+      return Future.value(
+        const Left(ValidationFailure('Vui long nhap email nhan vien hop le.')),
+      );
     }
     return _repository.createStaff(params.tenantId, params.staff);
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -58,16 +59,74 @@ class _StaffView extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _StaffFormSheet(
+      builder: (sheetContext) => _StaffFormSheet(
         initialStaff: staff,
-        onSave: (newStaff) {
+        onSave: (newStaff) async {
           if (staff == null) {
-            cubit.addStaff(newStaff);
+            final password = await cubit.addStaff(newStaff);
+            if (password == null) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Could not create staff login. Check email.'),
+                  ),
+                );
+              }
+              return;
+            }
+            if (!sheetContext.mounted) return;
+            Navigator.pop(sheetContext);
+            if (!context.mounted) return;
+            await _showTemporaryPassword(
+              context,
+              email: newStaff.email,
+              password: password,
+            );
           } else {
-            cubit.updateStaff(newStaff);
+            await cubit.updateStaff(newStaff);
+            if (sheetContext.mounted) Navigator.pop(sheetContext);
           }
-          Navigator.pop(context);
         },
+      ),
+    );
+  }
+
+  Future<void> _showTemporaryPassword(
+    BuildContext context, {
+    required String email,
+    required String password,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Staff login created'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(email),
+            const SizedBox(height: 12),
+            const Text('Temporary password'),
+            const SizedBox(height: 4),
+            SelectableText(
+              password,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: password));
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Copy and close'),
+          ),
+        ],
       ),
     );
   }
@@ -687,7 +746,7 @@ class _ShiftBar extends StatelessWidget {
 
 class _StaffFormSheet extends StatefulWidget {
   final StaffMember? initialStaff;
-  final Function(StaffMember) onSave;
+  final Future<void> Function(StaffMember) onSave;
 
   const _StaffFormSheet({this.initialStaff, required this.onSave});
 
@@ -699,6 +758,7 @@ class _StaffFormSheetState extends State<_StaffFormSheet> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  bool _saving = false;
   String _role = '';
   StaffStatus _status = StaffStatus.available;
   String _color = '#148a9c';
@@ -873,7 +933,7 @@ class _StaffFormSheetState extends State<_StaffFormSheet> {
             SizedBox(
               width: double.infinity, height: 50,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: _saving ? null : () async {
                   if (_nameCtrl.text.trim().isEmpty || _role.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -882,7 +942,8 @@ class _StaffFormSheetState extends State<_StaffFormSheet> {
                     );
                     return;
                   }
-                  widget.onSave(StaffMember(
+                  setState(() => _saving = true);
+                  await widget.onSave(StaffMember(
                     id: widget.initialStaff?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                     name: _nameCtrl.text.trim(),
                     role: _role,
@@ -893,6 +954,7 @@ class _StaffFormSheetState extends State<_StaffFormSheet> {
                     specialties: _specialties,
                     shift: _shift,
                   ));
+                  if (mounted) setState(() => _saving = false);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF22AFC2),

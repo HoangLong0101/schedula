@@ -27,6 +27,11 @@ class Booking extends Equatable {
     this.paymentOrderCode,
     this.paymentCheckoutUrl,
     this.paymentPaidAt,
+    this.resourceIds = const [],
+    this.paymentMethod,
+    this.paymentRecordedBy,
+    this.paymentReference,
+    this.paymentRecordedAt,
   });
 
   final String id;
@@ -54,6 +59,11 @@ class Booking extends Equatable {
   final int? paymentOrderCode;
   final String? paymentCheckoutUrl;
   final DateTime? paymentPaidAt;
+  final List<String> resourceIds;
+  final String? paymentMethod;
+  final String? paymentRecordedBy;
+  final String? paymentReference;
+  final DateTime? paymentRecordedAt;
 
   @override
   List<Object?> get props => [
@@ -80,5 +90,10 @@ class Booking extends Equatable {
     paymentOrderCode,
     paymentCheckoutUrl,
     paymentPaidAt,
+    resourceIds,
+    paymentMethod,
+    paymentRecordedBy,
+    paymentReference,
+    paymentRecordedAt,
   ];
 }

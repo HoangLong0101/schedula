@@ -11,11 +11,11 @@ import '../../domain/usecases/watch_equipment_usecase.dart';
 @injectable
 class EquipmentManagementCubit extends Cubit<List<Equipment>> {
   EquipmentManagementCubit(
-      this._watchEquipment,
-      this._createEquipment,
-      this._updateEquipment,
-      this._deleteEquipment,
-      ) : super(const []);
+    this._watchEquipment,
+    this._createEquipment,
+    this._updateEquipment,
+    this._deleteEquipment,
+  ) : super(const []);
 
   final WatchEquipmentUseCase _watchEquipment;
   final CreateEquipmentUseCase _createEquipment;
@@ -29,19 +29,18 @@ class EquipmentManagementCubit extends Cubit<List<Equipment>> {
     _currentTenantId = tenantId;
     _subscription?.cancel();
     _subscription = _watchEquipment(tenantId).listen((either) {
-      either.fold(
-            (failure) => print('Lỗi tải thiết bị: ${failure.message}'),
-            (equipment) => emit(equipment),
-      );
+      either.fold((_) {}, (equipment) => emit(equipment));
     });
   }
 
-  Future<void> addEquipment(Equipment equip) async {
-    await _createEquipment(_currentTenantId, equip);
+  Future<String?> addEquipment(Equipment equip) async {
+    final result = await _createEquipment(_currentTenantId, equip);
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
-  Future<void> updateEquipment(Equipment equip) async {
-    await _updateEquipment(equip);
+  Future<String?> updateEquipment(Equipment equip) async {
+    final result = await _updateEquipment(equip);
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
   Future<void> deleteEquipment(String id) async {

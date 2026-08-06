@@ -14,10 +14,14 @@ class CreateEquipmentUseCase {
       return Future.value(const Left(ValidationFailure('Thiếu mã cơ sở.')));
     }
     if (equip.name.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng nhập tên thiết bị.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng nhập tên thiết bị.')),
+      );
     }
     if (equip.quantity <= 0) {
-      return Future.value(const Left(ValidationFailure('Số lượng thiết bị phải lớn hơn 0.')));
+      return Future.value(
+        const Left(ValidationFailure('Số lượng thiết bị phải lớn hơn 0.')),
+      );
     }
     return _repository.createEquipment(tenantId, equip);
   }

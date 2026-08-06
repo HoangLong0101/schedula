@@ -21,10 +21,16 @@ class CreateCustomerUseCase {
       return Future.value(const Left(ValidationFailure('Thiếu mã cơ sở.')));
     }
     if (params.customer.name.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng nhập tên khách hàng.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng nhập tên khách hàng.')),
+      );
     }
     if (params.customer.phone.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng nhập số điện thoại khách hàng.')));
+      return Future.value(
+        const Left(
+          ValidationFailure('Vui lòng nhập số điện thoại khách hàng.'),
+        ),
+      );
     }
     return _repository.createCustomer(params.tenantId, params.customer);
   }

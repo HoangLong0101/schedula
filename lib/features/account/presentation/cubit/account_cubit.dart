@@ -8,10 +8,18 @@ import '../../domain/usecases/watch_business_info_usecase.dart';
 @injectable
 class AccountCubit extends Cubit<BusinessInfo> {
   AccountCubit(this._watchBusinessInfo, this._updateBusinessInfo)
-      : super(const BusinessInfo(
-    name: "Đang tải...", type: "", address: "", phone: "",
-    website: "", hoursWeekday: "", hoursWeekend: "", description: "",
-  ));
+    : super(
+        const BusinessInfo(
+          name: "Đang tải...",
+          type: "",
+          address: "",
+          phone: "",
+          website: "",
+          hoursWeekday: "",
+          hoursWeekend: "",
+          description: "",
+        ),
+      );
 
   final WatchBusinessInfoUseCase _watchBusinessInfo;
   final UpdateBusinessInfoUseCase _updateBusinessInfo;
@@ -23,10 +31,7 @@ class AccountCubit extends Cubit<BusinessInfo> {
     _currentTenantId = tenantId;
     _subscription?.cancel();
     _subscription = _watchBusinessInfo(tenantId).listen((either) {
-      either.fold(
-            (failure) => print('Lỗi tải thông tin Spa: ${failure.message}'),
-            (info) => emit(info),
-      );
+      either.fold((_) {}, (info) => emit(info));
     });
   }
 

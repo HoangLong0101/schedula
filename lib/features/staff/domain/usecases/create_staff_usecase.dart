@@ -6,10 +6,7 @@ import '../entities/staff_member.dart';
 import '../repositories/staff_repository.dart';
 
 class CreateStaffParams {
-  const CreateStaffParams({
-    required this.tenantId,
-    required this.staff,
-  });
+  const CreateStaffParams({required this.tenantId, required this.staff});
 
   final String tenantId;
   final StaffMember staff;
@@ -26,14 +23,18 @@ class CreateStaffUseCase {
       return Future.value(const Left(ValidationFailure('Thiếu mã cơ sở.')));
     }
     if (params.staff.name.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng nhập tên nhân viên.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng nhập tên nhân viên.')),
+      );
     }
     if (params.staff.role.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng chọn vai trò nhân viên.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng chọn vai trò nhân viên.')),
+      );
     }
     if (!params.staff.email.contains('@')) {
       return Future.value(
-        const Left(ValidationFailure('Vui long nhap email nhan vien hop le.')),
+        const Left(ValidationFailure('Vui lòng nhập email nhân viên hợp lệ.')),
       );
     }
     return _repository.createStaff(params.tenantId, params.staff);

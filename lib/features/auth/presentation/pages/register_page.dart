@@ -311,6 +311,9 @@ class _RegisterPageState extends State<RegisterPage> {
       }
 
       await auth.signOut();
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đăng ký thành công. Vui lòng đăng nhập.'),
@@ -974,14 +977,14 @@ class _HoursStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _HoursCard(
-          title: 'Thứ 2 — Thứ 6',
+          title: 'Thứ 2 - Thứ 6',
           subtitle: 'Ngày làm việc',
           openController: weekdayOpenController,
           closeController: weekdayCloseController,
         ),
         const SizedBox(height: 26),
         _HoursCard(
-          title: 'Thứ 7 — Chủ nhật',
+          title: 'Thứ 7 - Chủ nhật',
           subtitle: 'Cuối tuần',
           openController: weekendOpenController,
           closeController: weekendCloseController,

@@ -34,13 +34,13 @@ export const registerOwnerTenant = onCall(
     const business = data.business;
 
     if (!email || !password || !ownerName || !business) {
-      throw new HttpsError('invalid-argument', 'Missing registration fields');
+      throw new HttpsError('invalid-argument', 'Vui lòng nhập đủ thông tin đăng ký');
     }
 
     if (password.length < 8) {
       throw new HttpsError(
         'invalid-argument',
-        'Password must be at least 8 characters',
+        'Mật khẩu phải có ít nhất 8 ký tự',
       );
     }
 
@@ -54,7 +54,7 @@ export const registerOwnerTenant = onCall(
     ];
 
     if (requiredBusinessFields.some((value) => !value?.trim())) {
-      throw new HttpsError('invalid-argument', 'Missing tenant fields');
+      throw new HttpsError('invalid-argument', 'Vui lòng nhập đủ thông tin cơ sở');
     }
 
     const tenantRef = db.collection('tenants').doc();
@@ -114,7 +114,7 @@ export const registerOwnerTenant = onCall(
           : undefined;
 
       if (errorCode === 'auth/email-already-exists') {
-        throw new HttpsError('already-exists', 'Email already exists');
+        throw new HttpsError('already-exists', 'Email đã được sử dụng');
       }
 
       throw error;

@@ -14,6 +14,9 @@ class Customer extends Equatable {
   final int totalVisits;
   final String avatar;
   final String color;
+  final bool emailMarketingConsent;
+  final DateTime? emailConsentAt;
+  final bool emailOptedOut;
 
   // Các trường phái sinh (Derived) phục vụ UI
   final CustomerStatus derivedStatus;
@@ -36,6 +39,9 @@ class Customer extends Equatable {
     this.totalVisits = 0,
     required this.avatar,
     required this.color,
+    this.emailMarketingConsent = false,
+    this.emailConsentAt,
+    this.emailOptedOut = false,
     this.derivedStatus = CustomerStatus.newCustomer,
     this.futureCount = 0,
     this.recent30Count = 0,
@@ -46,28 +52,75 @@ class Customer extends Equatable {
   });
 
   Customer copyWith({
-    String? name, String? phone, String? email, String? birthday,
-    String? notes, String? allergies, String? lastVisit,
-    int? totalVisits, String? avatar, String? color,
-    CustomerStatus? derivedStatus, int? futureCount, int? recent30Count,
-    int? daysSinceLast, int? birthdayInDays, int? age, String? nextApptDate,
+    String? name,
+    String? phone,
+    String? email,
+    String? birthday,
+    String? notes,
+    String? allergies,
+    String? lastVisit,
+    int? totalVisits,
+    String? avatar,
+    String? color,
+    bool? emailMarketingConsent,
+    DateTime? emailConsentAt,
+    bool? emailOptedOut,
+    CustomerStatus? derivedStatus,
+    int? futureCount,
+    int? recent30Count,
+    int? daysSinceLast,
+    int? birthdayInDays,
+    int? age,
+    String? nextApptDate,
   }) {
     return Customer(
       id: id,
-      name: name ?? this.name, phone: phone ?? this.phone, email: email ?? this.email,
-      birthday: birthday ?? this.birthday, notes: notes ?? this.notes, allergies: allergies ?? this.allergies,
-      lastVisit: lastVisit ?? this.lastVisit, totalVisits: totalVisits ?? this.totalVisits,
-      avatar: avatar ?? this.avatar, color: color ?? this.color,
-      derivedStatus: derivedStatus ?? this.derivedStatus, futureCount: futureCount ?? this.futureCount,
-      recent30Count: recent30Count ?? this.recent30Count, daysSinceLast: daysSinceLast ?? this.daysSinceLast,
-      birthdayInDays: birthdayInDays ?? this.birthdayInDays, age: age ?? this.age, nextApptDate: nextApptDate ?? this.nextApptDate,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      birthday: birthday ?? this.birthday,
+      notes: notes ?? this.notes,
+      allergies: allergies ?? this.allergies,
+      lastVisit: lastVisit ?? this.lastVisit,
+      totalVisits: totalVisits ?? this.totalVisits,
+      avatar: avatar ?? this.avatar,
+      color: color ?? this.color,
+      emailMarketingConsent:
+          emailMarketingConsent ?? this.emailMarketingConsent,
+      emailConsentAt: emailConsentAt ?? this.emailConsentAt,
+      emailOptedOut: emailOptedOut ?? this.emailOptedOut,
+      derivedStatus: derivedStatus ?? this.derivedStatus,
+      futureCount: futureCount ?? this.futureCount,
+      recent30Count: recent30Count ?? this.recent30Count,
+      daysSinceLast: daysSinceLast ?? this.daysSinceLast,
+      birthdayInDays: birthdayInDays ?? this.birthdayInDays,
+      age: age ?? this.age,
+      nextApptDate: nextApptDate ?? this.nextApptDate,
     );
   }
 
   @override
   List<Object?> get props => [
-    id, name, phone, email, birthday, notes, allergies, lastVisit, totalVisits,
-    avatar, color, derivedStatus, futureCount, recent30Count, daysSinceLast,
-    birthdayInDays, age, nextApptDate,
+    id,
+    name,
+    phone,
+    email,
+    birthday,
+    notes,
+    allergies,
+    lastVisit,
+    totalVisits,
+    avatar,
+    color,
+    emailMarketingConsent,
+    emailConsentAt,
+    emailOptedOut,
+    derivedStatus,
+    futureCount,
+    recent30Count,
+    daysSinceLast,
+    birthdayInDays,
+    age,
+    nextApptDate,
   ];
 }

@@ -15,17 +15,22 @@ class EquipmentRepositoryImpl implements EquipmentRepository {
 
   @override
   Stream<Either<Failure, List<Equipment>>> watchEquipment(String tenantId) {
-    return _dataSource.watchEquipment(tenantId).transform(
-      StreamTransformer.fromHandlers(
-        handleData: (data, sink) => sink.add(Right(data)),
-        handleError: (_, _, sink) =>
-            sink.add(const Left(ServerFailure('Không thể tải thiết bị.'))),
-      ),
-    );
+    return _dataSource
+        .watchEquipment(tenantId)
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleData: (data, sink) => sink.add(Right(data)),
+            handleError: (_, _, sink) =>
+                sink.add(const Left(ServerFailure('Không thể tải thiết bị.'))),
+          ),
+        );
   }
 
   @override
-  Future<Either<Failure, Equipment>> createEquipment(String tenantId, Equipment equip) async {
+  Future<Either<Failure, Equipment>> createEquipment(
+    String tenantId,
+    Equipment equip,
+  ) async {
     try {
       final model = await _dataSource.createEquipment(tenantId, equip);
       return Right(model);

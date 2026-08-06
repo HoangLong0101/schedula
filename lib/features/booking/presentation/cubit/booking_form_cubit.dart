@@ -27,8 +27,24 @@ class BookingFormCubit extends Cubit<BookingFormState> {
     this._watchStaff,
     this._watchBookings,
     this._watchCustomers,
-    this._catalogRepository,
-  ) : super(BookingFormState()) {
+    this._catalogRepository, [
+    Booking? initialBooking,
+  ]) : super(
+         initialBooking == null
+             ? BookingFormState()
+             : BookingFormState(
+                 customerId: initialBooking.customerId,
+                 customerName: initialBooking.customerName ?? '',
+                 staffId: initialBooking.staffId,
+                 staffName: initialBooking.staffName ?? '',
+                 serviceId: initialBooking.serviceId,
+                 serviceName: initialBooking.serviceName ?? '',
+                 date: initialBooking.startTime,
+                 startTime: TimeOfDay.fromDateTime(initialBooking.startTime),
+                 endTime: TimeOfDay.fromDateTime(initialBooking.endTime),
+                 notes: initialBooking.notes ?? '',
+               ),
+       ) {
     _watchOptions();
     _watchBookingsForSelectedDay();
   }

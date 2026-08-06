@@ -149,6 +149,8 @@ class AppRouter {
                   return BookingPage(
                     tenantId: tenantId,
                     restrictedStaffId: staffId,
+                    initialBookingId: state.uri.queryParameters['bookingId'],
+                    initialAction: state.uri.queryParameters['action'],
                   );
                 },
               ),

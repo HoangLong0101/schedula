@@ -34,6 +34,15 @@ final class AuthProfileSetupRequired extends AuthState {
   const AuthProfileSetupRequired();
 }
 
+final class AuthPasswordResetSent extends AuthState {
+  const AuthPasswordResetSent(this.email);
+
+  final String email;
+
+  @override
+  List<Object?> get props => [email];
+}
+
 final class AuthFailure extends AuthState {
   const AuthFailure(this.message);
 

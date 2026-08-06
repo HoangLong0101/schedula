@@ -18,29 +18,39 @@ class StaffDataSource {
   Stream<List<StaffModel>> watchStaff(String tenantId) {
     return _users
         .where('tenantId', isEqualTo: tenantId)
-        .where('role', isEqualTo: 'staff')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map(StaffModel.fromFirestore).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .where(
+                (document) =>
+                    document.data()['active'] != false &&
+                    const {
+                      'staff',
+                      'receptionist',
+                    }.contains(document.data()['role']),
+              )
+              .map(StaffModel.fromFirestore)
+              .toList(),
+        );
   }
 
   Future<CreatedStaff> createStaff(String tenantId, StaffMember staff) async {
     if (tenantId.isEmpty) {
       throw ArgumentError.value(tenantId, 'tenantId');
     }
-    final result = await FirebaseFunctions.instanceFor(
-      region: 'asia-southeast1',
-    ).httpsCallable('createStaffAccount').call<Map<String, dynamic>>({
-      'name': staff.name,
-      'email': staff.email,
-      'phone': staff.phone,
-      'roleTitle': staff.role,
-      'status': _statusToString(staff.status),
-      'color': staff.color,
-      'specialties': staff.specialties,
-      'shift': staff.shift.map(
-        (day, value) => MapEntry(day, value.name),
-      ),
-    });
+    final result =
+        await FirebaseFunctions.instanceFor(
+          region: 'asia-southeast1',
+        ).httpsCallable('createStaffAccount').call<Map<String, dynamic>>({
+          'name': staff.name,
+          'email': staff.email,
+          'phone': staff.phone,
+          'roleTitle': staff.role,
+          'status': _statusToString(staff.status),
+          'color': staff.color,
+          'specialties': staff.specialties,
+          'shift': staff.shift.map((day, value) => MapEntry(day, value.name)),
+        });
     final uid = result.data['uid'] as String;
     return (
       staff: StaffModel(
@@ -63,6 +73,7 @@ class StaffDataSource {
       id: staff.id,
       name: staff.name,
       role: staff.role,
+      accessRole: staff.accessRole,
       status: staff.status,
       color: staff.color,
       appointments: staff.appointments,
@@ -75,11 +86,44 @@ class StaffDataSource {
     await _users.doc(staff.id).update(model.toFirestore());
   }
 
-  Future<void> deleteStaff(String id) async {
+  Future<void> deleteStaff(
+    String id, {
+    required bool cancelFuture,
+    String? reassignTo,
+  }) async {
     await FirebaseFunctions.instanceFor(
       region: 'asia-southeast1',
-    ).httpsCallable('deleteStaffAccount').call<Map<String, dynamic>>({
+    ).httpsCallable('archiveStaffAccount').call<Map<String, dynamic>>({
       'uid': id,
+      'cancelFuture': cancelFuture,
+      'reassignTo': ?reassignTo,
+    });
+  }
+
+  Future<void> sendPasswordReset(String id) async {
+    await FirebaseFunctions.instanceFor(region: 'asia-southeast1')
+        .httpsCallable('sendStaffPasswordReset')
+        .call<Map<String, dynamic>>({'uid': id});
+  }
+
+  Future<void> setAccessRole(String id, String role) async {
+    await FirebaseFunctions.instanceFor(region: 'asia-southeast1')
+        .httpsCallable('setUserRole')
+        .call<Map<String, dynamic>>({'uid': id, 'role': role});
+  }
+
+  Future<void> addLeave({
+    required String tenantId,
+    required String staffId,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    await FirebaseFunctions.instanceFor(
+      region: 'asia-southeast1',
+    ).httpsCallable('manageStaffLeave').call<Map<String, dynamic>>({
+      'staffId': staffId,
+      'startTime': start.toUtc().toIso8601String(),
+      'endTime': end.toUtc().toIso8601String(),
     });
   }
 

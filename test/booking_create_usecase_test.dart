@@ -10,6 +10,7 @@ import 'package:schedula/features/booking/domain/usecases/watch_bookings_usecase
 import 'package:schedula/features/booking/domain/usecases/watch_slots_usecase.dart';
 import 'package:schedula/features/booking/domain/entities/slot.dart';
 import 'package:schedula/features/booking/domain/usecases/create_booking_usecase.dart';
+import 'package:schedula/features/booking/domain/usecases/update_booking_usecase.dart';
 import 'package:schedula/core/errors/failure.dart';
 
 class FakeBookingRepository implements BookingRepository {
@@ -18,30 +19,59 @@ class FakeBookingRepository implements BookingRepository {
   FakeBookingRepository({this.toReturn, this.shouldFail = false});
 
   @override
-  Future<Either<Failure, Booking>> createBooking(CreateBookingParams params) async {
+  Future<Either<Failure, Booking>> createBooking(
+    CreateBookingParams params,
+  ) async {
     if (shouldFail) {
       return Left(ServerFailure('failed'));
     }
-    return Right(toReturn ?? Booking(
-      id: 'id',
-      tenantId: params.tenantId,
-      staffId: params.staffId,
-      customerId: params.customerId,
-      serviceId: params.serviceId,
-      startTime: params.startTime,
-      endTime: params.endTime,
-      status: params.status,
-    ));
+    return Right(
+      toReturn ??
+          Booking(
+            id: 'id',
+            tenantId: params.tenantId,
+            staffId: params.staffId,
+            customerId: params.customerId,
+            serviceId: params.serviceId,
+            startTime: params.startTime,
+            endTime: params.endTime,
+            status: params.status,
+          ),
+    );
   }
 
   // Unused for this test.
   @override
-  Future<Either<Failure, Booking>> updateBookingStatus(UpdateBookingStatusParams params) {
+  Future<Either<Failure, Booking>> updateBookingStatus(
+    UpdateBookingStatusParams params,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<Either<Failure, Booking>> markBookingPaid(MarkBookingPaidParams params) {
+  Future<Either<Failure, Booking>> updateBooking(
+    UpdateBookingParams params,
+  ) async {
+    final booking = params.booking;
+    return Right(
+      Booking(
+        id: params.bookingId,
+        tenantId: booking.tenantId,
+        staffId: booking.staffId,
+        customerId: booking.customerId,
+        serviceId: booking.serviceId,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        status: booking.status,
+        notes: booking.notes,
+      ),
+    );
+  }
+
+  @override
+  Future<Either<Failure, Booking>> markBookingPaid(
+    MarkBookingPaidParams params,
+  ) {
     throw UnimplementedError();
   }
 
@@ -51,7 +81,9 @@ class FakeBookingRepository implements BookingRepository {
   }
 
   @override
-  Stream<Either<Failure, List<Booking>>> watchBookings(WatchBookingsParams params) {
+  Stream<Either<Failure, List<Booking>>> watchBookings(
+    WatchBookingsParams params,
+  ) {
     throw UnimplementedError();
   }
 
@@ -103,28 +135,82 @@ void main() {
       expect(result.isLeft(), true);
     });
 
-    test('returns validation failure when required fields are missing', () async {
-      final fakeRepo = FakeBookingRepository();
-      final usecase = CreateBookingUseCase(fakeRepo);
-      final now = DateTime.now();
+    test(
+      'returns validation failure when required fields are missing',
+      () async {
+        final fakeRepo = FakeBookingRepository();
+        final usecase = CreateBookingUseCase(fakeRepo);
+        final now = DateTime.now();
 
-      final result = await usecase(
-        CreateBookingParams(
-          tenantId: '',
-          staffId: '',
-          customerId: '',
-          serviceId: '',
-          startTime: now,
-          endTime: now,
-          status: BookingStatus.pending,
+        final result = await usecase(
+          CreateBookingParams(
+            tenantId: '',
+            staffId: '',
+            customerId: '',
+            serviceId: '',
+            startTime: now,
+            endTime: now,
+            status: BookingStatus.pending,
+          ),
+        );
+
+        expect(result.isLeft(), true);
+        result.fold(
+          (failure) => expect(failure, isA<ValidationFailure>()),
+          (_) => fail('expected validation failure'),
+        );
+      },
+    );
+  });
+
+  test(
+    'UpdateBookingUseCase preserves the booking id and submitted fields',
+    () async {
+      final useCase = UpdateBookingUseCase(FakeBookingRepository());
+      final start = DateTime(2026, 7, 27, 9);
+      final result = await useCase(
+        UpdateBookingParams(
+          bookingId: 'booking-1',
+          booking: CreateBookingParams(
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            customerId: 'customer-1',
+            serviceId: 'service-1',
+            startTime: start,
+            endTime: start.add(const Duration(hours: 1)),
+            status: BookingStatus.confirmed,
+            notes: 'updated',
+          ),
         ),
       );
 
-      expect(result.isLeft(), true);
-      result.fold(
-        (failure) => expect(failure, isA<ValidationFailure>()),
-        (_) => fail('expected validation failure'),
-      );
-    });
+      result.fold((failure) => fail(failure.message), (booking) {
+        expect(booking.id, 'booking-1');
+        expect(booking.notes, 'updated');
+        expect(booking.status, BookingStatus.confirmed);
+      });
+    },
+  );
+
+  test('MarkBookingPaidUseCase rejects invalid manual payment data', () async {
+    final useCase = MarkBookingPaidUseCase(FakeBookingRepository());
+
+    final badMethod = await useCase(
+      const MarkBookingPaidParams(
+        bookingId: 'booking-1',
+        method: 'card',
+        amount: 100000,
+      ),
+    );
+    final badAmount = await useCase(
+      const MarkBookingPaidParams(
+        bookingId: 'booking-1',
+        method: 'cash',
+        amount: 0,
+      ),
+    );
+
+    expect(badMethod.isLeft(), true);
+    expect(badAmount.isLeft(), true);
   });
 }

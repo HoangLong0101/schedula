@@ -62,6 +62,11 @@ class FirebaseAuthDataSource {
     return _mapUserAsync(userCredential.user);
   }
 
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _firebaseAuth.setLanguageCode('vi');
+    await _firebaseAuth.sendPasswordResetEmail(email: email);
+  }
+
   Future<void> signOut() async {
     await Future.wait([_firebaseAuth.signOut(), _googleSignIn.signOut()]);
   }

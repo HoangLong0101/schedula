@@ -9,10 +9,12 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../booking/presentation/pages/booking_page.dart';
+import '../../../catalog/presentaion/pages/catalog_page.dart';
 import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../../dashboard/presentation/cubit/dashboard_state.dart';
 import '../../domain/entities/business_info.dart';
 import '../cubit/account_cubit.dart';
+import '../widgets/account_operation_sheets.dart';
 
 // Import các trang con (nhớ kiểm tra lại đường dẫn import cho khớp cấu trúc dự án của bạn)
 import './account_info_page.dart';
@@ -191,6 +193,18 @@ class _StaffAccountView extends StatelessWidget {
                 title: 'Hỗ trợ',
                 items: [
                   _MenuItem(
+                    icon: Icons.help_outline,
+                    label: 'Trợ giúp',
+                    color: const Color(0xFF148A9C),
+                    onTap: () => showHelpSheet(context),
+                  ),
+                  _MenuItem(
+                    icon: Icons.keyboard_outlined,
+                    label: 'Phím tắt',
+                    color: const Color(0xFF22AFC2),
+                    onTap: () => showShortcutSheet(context),
+                  ),
+                  _MenuItem(
                     icon: Icons.logout,
                     label: 'Đăng xuất',
                     color: const Color(0xFFef4444),
@@ -266,6 +280,7 @@ class _AccountView extends StatelessWidget {
         ? authState.user.email.split('@')[0]
         : 'Người dùng';
     final userEmail = authState is Authenticated ? authState.user.email : '';
+    final tenantId = authState is Authenticated ? authState.user.tenantId : '';
     final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
 
     return Scaffold(
@@ -472,8 +487,8 @@ class _AccountView extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       gradient: const LinearGradient(
                                         colors: [
-                                          Color(0xFF8B5CF6),
-                                          Color(0xFF7C3AED),
+                                          Color(0xFF22AFC2),
+                                          Color(0xFF148A9C),
                                         ],
                                       ),
                                       borderRadius: BorderRadius.circular(12),
@@ -650,7 +665,7 @@ class _AccountView extends StatelessWidget {
                                       icon: Icons.access_time,
                                       label: 'Giờ hoạt động',
                                       value:
-                                          'T2–T6: ${business.hoursWeekday}\nT7–CN: ${business.hoursWeekend}',
+                                          'T2-T6: ${business.hoursWeekday}\nT7-CN: ${business.hoursWeekend}',
                                     ),
                                     const SizedBox(height: 16),
                                     Container(
@@ -685,16 +700,10 @@ class _AccountView extends StatelessWidget {
                             _MenuItem(
                               icon: Icons.person_outline,
                               label: 'Thông tin tài khoản & Bảo mật',
-                              hint: 'Hồ sơ, mật khẩu, FaceID/Vân tay, 2FA',
+                              hint: 'Hồ sơ, mật khẩu và ảnh đại diện',
                               color: const Color(0xFF148a9c),
                               onTap: () =>
                                   context.push(AccountInfoPage.routePath),
-                            ),
-                            _MenuItem(
-                              icon: Icons.keyboard_alt_outlined,
-                              label: 'Phím tắt & Trợ giúp',
-                              hint: 'Phím tắt PC/Tablet, hướng dẫn nhanh',
-                              color: const Color(0xFF8b5cf6),
                             ),
                           ],
                         ),
@@ -710,7 +719,7 @@ class _AccountView extends StatelessWidget {
                             _MenuItem(
                               icon: Icons.account_circle_outlined,
                               label: 'Quản lý khách hàng',
-                              color: const Color(0xFF14b8a6),
+                              color: const Color(0xFF148A9C),
                               onTap: () => context.push(CustomerPage.routePath),
                             ),
                             _MenuItem(
@@ -723,15 +732,21 @@ class _AccountView extends StatelessWidget {
                             _MenuItem(
                               icon: Icons.grid_view,
                               label: 'Danh mục SP & Dịch vụ',
-                              color: const Color(0xFF8b5cf6),
-                              onTap: () =>
-                                  context.push('/catalog'), // <-- Thêm dòng này
+                              color: const Color(0xFF22AFC2),
+                              onTap: () => context.push(CatalogPage.routePath),
                             ),
                             _MenuItem(
-                              icon: Icons.auto_awesome,
-                              label: 'Trợ lý AI Schedula',
-                              color: const Color(0xFFf97316),
-                              isNew: true,
+                              icon: Icons.history_outlined,
+                              label: 'Lịch sử hoạt động',
+                              color: const Color(0xFF148A9C),
+                              onTap: () =>
+                                  showAuditHistorySheet(context, tenantId),
+                            ),
+                            _MenuItem(
+                              icon: Icons.mark_email_read_outlined,
+                              label: 'Chăm sóc khách hàng qua email',
+                              color: const Color(0xFF22AFC2),
+                              onTap: () => showCampaignSheet(context, tenantId),
                             ),
                           ],
                         ),
@@ -739,30 +754,15 @@ class _AccountView extends StatelessWidget {
                           title: 'Cài đặt hệ thống',
                           items: [
                             _MenuItem(
-                              icon: Icons.edit_calendar_outlined,
-                              label: 'Quy tắc đặt lịch',
-                              color: const Color(0xFF22AFC2),
-                            ),
-                            _MenuItem(
-                              icon: Icons.admin_panel_settings_outlined,
-                              label: 'Phân quyền truy cập',
-                              color: const Color(0xFF148a9c),
-                            ),
-                            _MenuItem(
                               icon: Icons.notifications_outlined,
                               hint:
-                                  'Nhac nhan vien truoc ${business.staffReminderLeadMinutes} phut',
+                                  'Nhắc nhân viên trước ${business.staffReminderLeadMinutes} phút',
                               onTap: () => _showNotificationSettingsSheet(
                                 context,
                                 business,
                               ),
                               label: 'Thông báo & Âm thanh',
-                              color: const Color(0xFFf97316),
-                            ),
-                            _MenuItem(
-                              icon: Icons.message_outlined,
-                              label: 'SMS / Zalo ZNS',
-                              color: const Color(0xFF3b82f6),
+                              color: const Color(0xFF22AFC2),
                             ),
                           ],
                         ),
@@ -770,27 +770,29 @@ class _AccountView extends StatelessWidget {
                           title: 'Thanh toán',
                           items: [
                             _MenuItem(
-                              icon: Icons.credit_card_outlined,
-                              label: 'Quản lý thanh toán',
-                              color: const Color(0xFF14b8a6),
-                            ),
-                            _MenuItem(
                               icon: Icons.workspace_premium_outlined,
                               label: 'Nâng cấp gói dịch vụ',
                               color: const Color(0xFFeab308),
                               onTap: () =>
                                   _showPlanUpgradeSheet(context, business),
                             ),
-                            _MenuItem(
-                              icon: Icons.star_outline,
-                              label: 'Lịch sử giao dịch',
-                              color: const Color(0xFFec4899),
-                            ),
                           ],
                         ),
                         _MenuSection(
                           title: 'Hỗ trợ',
                           items: [
+                            _MenuItem(
+                              icon: Icons.help_outline,
+                              label: 'Trợ giúp',
+                              color: const Color(0xFF148A9C),
+                              onTap: () => showHelpSheet(context),
+                            ),
+                            _MenuItem(
+                              icon: Icons.keyboard_outlined,
+                              label: 'Phím tắt',
+                              color: const Color(0xFF22AFC2),
+                              onTap: () => showShortcutSheet(context),
+                            ),
                             _MenuItem(
                               icon: Icons.logout,
                               label: 'Đăng xuất',
@@ -933,7 +935,7 @@ class _PlanUpgradeSheetState extends State<_PlanUpgradeSheet> {
         price: 1499000,
         description:
             'Không giới hạn nhân viên, báo cáo đầy đủ và hỗ trợ ưu tiên.',
-        color: Color(0xFF7C3AED),
+        color: Color(0xFF148A9C),
       ),
     ];
 
@@ -1191,7 +1193,7 @@ class _NotificationSettingsSheetState
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<int>(
-            value: _minutes,
+            initialValue: _minutes,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey.shade50,
@@ -1365,24 +1367,22 @@ class _MenuItem extends StatelessWidget {
   final String label;
   final String? hint;
   final Color color;
-  final bool isNew;
   final bool isDestructive;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   const _MenuItem({
     required this.icon,
     required this.label,
     required this.color,
+    required this.onTap,
     this.hint,
-    this.isNew = false,
     this.isDestructive = false,
-    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap ?? () {},
+      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1413,29 +1413,6 @@ class _MenuItem extends StatelessWidget {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (isNew) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF22AFC2), Color(0xFF148a9c)],
-                            ),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: const Text(
-                            'MỚI',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                   if (hint != null) ...[
@@ -1556,9 +1533,9 @@ class _EditBusinessSheetState extends State<_EditBusinessSheet> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _buildTextField('Giờ T2–T6', hWeekdayCtrl)),
+                Expanded(child: _buildTextField('Giờ T2-T6', hWeekdayCtrl)),
                 const SizedBox(width: 12),
-                Expanded(child: _buildTextField('Giờ T7–CN', hWeekendCtrl)),
+                Expanded(child: _buildTextField('Giờ T7-CN', hWeekendCtrl)),
               ],
             ),
             const SizedBox(height: 12),

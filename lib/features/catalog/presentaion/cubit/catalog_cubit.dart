@@ -29,26 +29,70 @@ class CatalogCubit extends Cubit<CatalogState> {
     });
   }
 
-  void changeTab(CatalogTab tab) => emit(state.copyWith(currentTab: tab, showForm: false, resetEdit: true));
+  void changeTab(CatalogTab tab) =>
+      emit(state.copyWith(currentTab: tab, showForm: false, resetEdit: true));
   void toggleForm(bool show) => emit(state.copyWith(showForm: show));
-  void setEditItem(dynamic item) => emit(state.copyWith(editingItem: item, showForm: true));
+  void setEditItem(dynamic item) =>
+      emit(state.copyWith(editingItem: item, showForm: true));
   void cancelEdit() => emit(state.copyWith(showForm: false, resetEdit: true));
 
-  Future<void> saveService(String? id, String name, int price, int duration, String category, List<String> res) async {
-    if (_tenantId.trim().isEmpty || name.trim().isEmpty || price < 0 || duration <= 0) {
+  Future<void> saveService(
+    String? id,
+    String name,
+    int price,
+    int duration,
+    String category,
+    List<String> res,
+  ) async {
+    if (_tenantId.trim().isEmpty ||
+        name.trim().isEmpty ||
+        price < 0 ||
+        duration <= 0) {
       return;
     }
-    final item = ServiceItem(id: id ?? '', tenantId: _tenantId, name: name, price: price, duration: duration, category: category, resources: res);
-    id == null ? await _repository.createService(item) : await _repository.updateService(item);
+    final existing = id == null
+        ? null
+        : state.services.where((service) => service.id == id).firstOrNull;
+    final item = ServiceItem(
+      id: id ?? '',
+      tenantId: _tenantId,
+      name: name,
+      price: price,
+      duration: duration,
+      category: category,
+      resources: res,
+      resourceIds: existing?.resourceIds ?? const [],
+    );
+    id == null
+        ? await _repository.createService(item)
+        : await _repository.updateService(item);
     cancelEdit();
   }
 
-  Future<void> saveProduct(String? id, String name, int price, String unit, String category) async {
-    if (_tenantId.trim().isEmpty || name.trim().isEmpty || price < 0 || unit.trim().isEmpty) {
+  Future<void> saveProduct(
+    String? id,
+    String name,
+    int price,
+    String unit,
+    String category,
+  ) async {
+    if (_tenantId.trim().isEmpty ||
+        name.trim().isEmpty ||
+        price < 0 ||
+        unit.trim().isEmpty) {
       return;
     }
-    final item = ProductItem(id: id ?? '', tenantId: _tenantId, name: name, price: price, unit: unit, category: category);
-    id == null ? await _repository.createProduct(item) : await _repository.updateProduct(item);
+    final item = ProductItem(
+      id: id ?? '',
+      tenantId: _tenantId,
+      name: name,
+      price: price,
+      unit: unit,
+      category: category,
+    );
+    id == null
+        ? await _repository.createProduct(item)
+        : await _repository.updateProduct(item);
     cancelEdit();
   }
 

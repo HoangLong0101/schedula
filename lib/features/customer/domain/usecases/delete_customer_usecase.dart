@@ -15,7 +15,9 @@ class DeleteCustomerUseCase {
 
   Future<Either<Failure, void>> call(DeleteCustomerParams params) {
     if (params.customerId.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Thiếu mã khách hàng.')));
+      return Future.value(
+        const Left(ValidationFailure('Thiếu mã khách hàng.')),
+      );
     }
     return _repository.deleteCustomer(params.customerId);
   }

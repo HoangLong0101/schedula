@@ -14,9 +14,14 @@ class CustomerModel extends Customer {
     super.totalVisits,
     required super.avatar,
     required super.color,
+    super.emailMarketingConsent,
+    super.emailConsentAt,
+    super.emailOptedOut,
   });
 
-  factory CustomerModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory CustomerModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data() ?? const <String, dynamic>{};
 
     // Xử lý Timestamp lastVisit sang String (yyyy-MM-dd)
@@ -35,9 +40,13 @@ class CustomerModel extends Customer {
       notes: data['notes'] as String? ?? '',
       allergies: data['allergies'] as String? ?? '',
       lastVisit: lastVisitStr,
-      totalVisits: data['visitCount'] as int? ?? data['totalVisits'] as int? ?? 0,
+      totalVisits:
+          data['visitCount'] as int? ?? data['totalVisits'] as int? ?? 0,
       avatar: data['avatar'] as String? ?? 'U',
       color: data['color'] as String? ?? '#22AFC2',
+      emailMarketingConsent: data['emailMarketingConsent'] as bool? ?? false,
+      emailConsentAt: (data['emailConsentAt'] as Timestamp?)?.toDate(),
+      emailOptedOut: data['emailOptedOut'] as bool? ?? false,
     );
   }
 
@@ -60,6 +69,11 @@ class CustomerModel extends Customer {
       'visitCount': totalVisits,
       'avatar': avatar,
       'color': color,
+      'emailMarketingConsent': emailMarketingConsent,
+      'emailConsentAt': emailMarketingConsent && emailConsentAt != null
+          ? Timestamp.fromDate(emailConsentAt!)
+          : null,
+      'emailOptedOut': emailOptedOut,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }

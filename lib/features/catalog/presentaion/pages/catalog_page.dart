@@ -24,7 +24,9 @@ class CatalogPage extends StatelessWidget {
     final tenantId = authState is Authenticated ? authState.user.tenantId : '';
 
     if (tenantId.isEmpty) {
-      return const Scaffold(body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở')));
+      return const Scaffold(
+        body: Center(child: Text('Lỗi: Không tìm thấy mã cơ sở')),
+      );
     }
 
     return BlocProvider(
@@ -39,17 +41,26 @@ class _CatalogView extends StatelessWidget {
 
   Color _getCategoryColor(String cat) {
     switch (cat) {
-      case "Chăm sóc da": case "Skincare": return const Color(0xFF8B5CF6);
-      case "Massage": case "Body Care": return const Color(0xFF14B8A6);
-      case "Tóc": return const Color(0xFFF97316);
-      case "Nail": return const Color(0xFFEC4899);
-      default: return const Color(0xFF6B7280);
+      case "Chăm sóc da":
+      case "Skincare":
+        return const Color(0xFF8B5CF6);
+      case "Massage":
+      case "Body Care":
+        return const Color(0xFF14B8A6);
+      case "Tóc":
+        return const Color(0xFFF97316);
+      case "Nail":
+        return const Color(0xFFEC4899);
+      default:
+        return const Color(0xFF6B7280);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final violetGradient = const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)]);
+    final brandGradient = const LinearGradient(
+      colors: [Color(0xFF22AFC2), Color(0xFF148A9C)],
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFFCFCFD),
@@ -70,10 +81,19 @@ class _CatalogView extends StatelessWidget {
                       backgroundColor: Colors.white,
                       shadowColor: Colors.black.withValues(alpha: 0.1),
                       elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
-                  const Text('Danh mục SP & Dịch vụ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+                  const Text(
+                    'Danh mục SP & Dịch vụ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
                   const SizedBox(width: 40),
                 ],
               ),
@@ -86,7 +106,8 @@ class _CatalogView extends StatelessWidget {
                 buildWhen: (p, c) => p.currentTab != c.currentTab,
                 builder: (context, state) => CatalogTabs(
                   activeTab: state.currentTab,
-                  onTabChanged: (tab) => context.read<CatalogCubit>().changeTab(tab),
+                  onTabChanged: (tab) =>
+                      context.read<CatalogCubit>().changeTab(tab),
                 ),
               ),
             ),
@@ -95,7 +116,9 @@ class _CatalogView extends StatelessWidget {
             Expanded(
               child: BlocBuilder<CatalogCubit, CatalogState>(
                 builder: (context, state) {
-                  final listLength = state.currentTab == CatalogTab.service ? state.services.length : state.products.length;
+                  final listLength = state.currentTab == CatalogTab.service
+                      ? state.services.length
+                      : state.products.length;
 
                   return ListView(
                     padding: const EdgeInsets.all(20),
@@ -103,15 +126,34 @@ class _CatalogView extends StatelessWidget {
                       // Inline Add/Edit Form
                       if (state.showForm) ...[
                         CatalogFormCard(
-                          key: ValueKey(state.editingItem?.id ?? 'add_${state.currentTab}'),
+                          key: ValueKey(
+                            state.editingItem?.id ?? 'add_${state.currentTab}',
+                          ),
                           tab: state.currentTab,
                           editingItem: state.editingItem,
-                          onCancel: () => context.read<CatalogCubit>().cancelEdit(),
+                          onCancel: () =>
+                              context.read<CatalogCubit>().cancelEdit(),
                           onSave: (data) {
                             if (state.currentTab == CatalogTab.service) {
-                              context.read<CatalogCubit>().saveService(data['id'], data['name'], data['price'], data['extra'] != null ? int.tryParse(data['extra'].toString()) ?? 30 : 30, data['category'], data['resources']);
+                              context.read<CatalogCubit>().saveService(
+                                data['id'],
+                                data['name'],
+                                data['price'],
+                                data['extra'] != null
+                                    ? int.tryParse(data['extra'].toString()) ??
+                                          30
+                                    : 30,
+                                data['category'],
+                                data['resources'],
+                              );
                             } else {
-                              context.read<CatalogCubit>().saveProduct(data['id'], data['name'], data['price'], data['extra'].toString(), data['category']);
+                              context.read<CatalogCubit>().saveProduct(
+                                data['id'],
+                                data['name'],
+                                data['price'],
+                                data['extra'].toString(),
+                                data['category'],
+                              );
                             }
                           },
                         ),
@@ -124,22 +166,54 @@ class _CatalogView extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 60),
                           child: Column(
                             children: [
-                              Icon(state.currentTab == CatalogTab.service ? Icons.content_cut : Icons.card_giftcard, size: 40, color: Colors.grey.shade300),
+                              Icon(
+                                state.currentTab == CatalogTab.service
+                                    ? Icons.content_cut
+                                    : Icons.card_giftcard,
+                                size: 40,
+                                color: Colors.grey.shade300,
+                              ),
                               const SizedBox(height: 10),
-                              Text('Chưa có dữ liệu hiển thị', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                              Text(
+                                'Chưa có dữ liệu hiển thị',
+                                style: TextStyle(
+                                  color: Colors.grey.shade400,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         )
                       else if (state.currentTab == CatalogTab.service)
-                        ...state.services.map((s) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: ServiceItemCard(service: s, themeColor: _getCategoryColor(s.category), onEdit: () => context.read<CatalogCubit>().setEditItem(s), onDelete: () => context.read<CatalogCubit>().deleteService(s.id)),
-                        ))
+                        ...state.services.map(
+                          (s) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: ServiceItemCard(
+                              service: s,
+                              themeColor: _getCategoryColor(s.category),
+                              onEdit: () =>
+                                  context.read<CatalogCubit>().setEditItem(s),
+                              onDelete: () => context
+                                  .read<CatalogCubit>()
+                                  .deleteService(s.id),
+                            ),
+                          ),
+                        )
                       else
-                        ...state.products.map((p) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: ProductItemCard(product: p, themeColor: _getCategoryColor(p.category), onEdit: () => context.read<CatalogCubit>().setEditItem(p), onDelete: () => context.read<CatalogCubit>().deleteProduct(p.id)),
-                        )),
+                        ...state.products.map(
+                          (p) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: ProductItemCard(
+                              product: p,
+                              themeColor: _getCategoryColor(p.category),
+                              onEdit: () =>
+                                  context.read<CatalogCubit>().setEditItem(p),
+                              onDelete: () => context
+                                  .read<CatalogCubit>()
+                                  .deleteProduct(p.id),
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },
@@ -157,12 +231,14 @@ class _CatalogView extends StatelessWidget {
                     width: double.infinity,
                     height: 50,
                     decoration: BoxDecoration(
-                      gradient: violetGradient,
+                      gradient: brandGradient,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
                           // ĐÃ FIX: Thay .withOpacity bằng .withValues loại bỏ hoàn toàn cảnh báo deprecation
-                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.35),
+                          color: const Color(
+                            0xFF22AFC2,
+                          ).withValues(alpha: 0.28),
                           blurRadius: 16,
                           offset: const Offset(0, 4),
                         ),
@@ -170,11 +246,14 @@ class _CatalogView extends StatelessWidget {
                     ),
                     // ĐÃ FIX: Viết lại cấu trúc ElevatedButton chuẩn xác thay vì gọi hàm .build() sai cú pháp
                     child: ElevatedButton(
-                      onPressed: () => context.read<CatalogCubit>().toggleForm(true),
+                      onPressed: () =>
+                          context.read<CatalogCubit>().toggleForm(true),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -183,7 +262,11 @@ class _CatalogView extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             'Thêm ${state.currentTab == CatalogTab.service ? "dịch vụ" : "sản phẩm"} mới',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),

@@ -8,5 +8,6 @@ import '../repositories/account_repository.dart';
 class WatchBusinessInfoUseCase {
   const WatchBusinessInfoUseCase(this._repository);
   final AccountRepository _repository;
-  Stream<Either<Failure, BusinessInfo>> call(String tenantId) => _repository.watchBusinessInfo(tenantId);
+  Stream<Either<Failure, BusinessInfo>> call(String tenantId) =>
+      _repository.watchBusinessInfo(tenantId);
 }

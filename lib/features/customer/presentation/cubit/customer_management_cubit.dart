@@ -11,11 +11,11 @@ import '../../domain/usecases/watch_customers_usecase.dart';
 @injectable
 class CustomerManagementCubit extends Cubit<List<Customer>> {
   CustomerManagementCubit(
-      this._watchCustomers,
-      this._createCustomer,
-      this._updateCustomer,
-      this._deleteCustomer,
-      ) : super(const []);
+    this._watchCustomers,
+    this._createCustomer,
+    this._updateCustomer,
+    this._deleteCustomer,
+  ) : super(const []);
 
   final WatchCustomersUseCase _watchCustomers;
   final CreateCustomerUseCase _createCustomer;
@@ -32,18 +32,18 @@ class CustomerManagementCubit extends Cubit<List<Customer>> {
 
     _subscription = _watchCustomers(WatchCustomersParams(tenantId: tenantId))
         .listen((either) {
-      either.fold(
-            (failure) => print('Lỗi tải danh sách khách hàng: ${failure.message}'),
-            (customers) => emit(customers), // Cập nhật UI ngay lập tức khi có data mới
-      );
-    });
+          either.fold(
+            (_) {},
+            (customers) =>
+                emit(customers), // Cập nhật UI ngay lập tức khi có data mới
+          );
+        });
   }
 
   Future<void> addCustomer(Customer customer) async {
-    await _createCustomer(CreateCustomerParams(
-      tenantId: _currentTenantId,
-      customer: customer,
-    ));
+    await _createCustomer(
+      CreateCustomerParams(tenantId: _currentTenantId, customer: customer),
+    );
   }
 
   Future<void> updateCustomer(Customer customer) async {

@@ -7,12 +7,14 @@ import '../entities/booking.dart';
 import '../entities/slot.dart';
 import '../usecases/cancel_booking_usecase.dart';
 import '../usecases/create_booking_usecase.dart';
+import '../usecases/update_booking_usecase.dart';
 import '../usecases/update_booking_status_usecase.dart';
 import '../usecases/watch_bookings_usecase.dart';
 import '../usecases/watch_slots_usecase.dart';
 
 abstract class BookingRepository {
   Future<Either<Failure, Booking>> createBooking(CreateBookingParams params);
+  Future<Either<Failure, Booking>> updateBooking(UpdateBookingParams params);
 
   Stream<Either<Failure, List<Booking>>> watchBookings(
     WatchBookingsParams params,

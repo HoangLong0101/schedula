@@ -18,6 +18,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthStarted>(_onStarted);
     on<AuthSignInRequested>(_onSignInRequested);
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
+    on<AuthPasswordResetRequested>(_onPasswordResetRequested);
     on<AuthProfileCompleted>(_onProfileCompleted);
     on<AuthSignOutRequested>(_onSignOutRequested);
   }
@@ -88,6 +89,24 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(const AuthFailure('Đăng nhập Google đã bị hủy hoặc thất bại.'));
     }
   }
+
+  Future<void> _onPasswordResetRequested(
+    AuthPasswordResetRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      await _signInUseCase.sendPasswordResetEmail(event.email);
+      emit(AuthPasswordResetSent(event.email));
+    } catch (_) {
+      emit(
+        const AuthFailure(
+          'Không thể gửi email đặt lại mật khẩu. Vui lòng kiểm tra địa chỉ email và thử lại.',
+        ),
+      );
+    }
+  }
+
   Future<void> _onSignOutRequested(
     AuthSignOutRequested event,
     Emitter<AuthState> emit,

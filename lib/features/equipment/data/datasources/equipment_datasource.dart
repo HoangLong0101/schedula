@@ -16,16 +16,24 @@ class EquipmentDataSource {
     return _equipment
         .where('tenantId', isEqualTo: tenantId)
         .snapshots()
-        .map((snapshot) =>
-        snapshot.docs.map(EquipmentModel.fromFirestore).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map(EquipmentModel.fromFirestore).toList(),
+        );
   }
 
-  Future<EquipmentModel> createEquipment(String tenantId, Equipment equip) async {
+  Future<EquipmentModel> createEquipment(
+    String tenantId,
+    Equipment equip,
+  ) async {
     final docRef = _equipment.doc();
 
     final model = EquipmentModel(
-      id: docRef.id, name: equip.name, status: equip.status,
-      location: equip.location, lastMaintenance: equip.lastMaintenance,
+      id: docRef.id,
+      name: equip.name,
+      status: equip.status,
+      location: equip.location,
+      lastMaintenance: equip.lastMaintenance,
       quantity: equip.quantity,
     );
 
@@ -39,8 +47,11 @@ class EquipmentDataSource {
 
   Future<void> updateEquipment(Equipment equip) async {
     final model = EquipmentModel(
-      id: equip.id, name: equip.name, status: equip.status,
-      location: equip.location, lastMaintenance: equip.lastMaintenance,
+      id: equip.id,
+      name: equip.name,
+      status: equip.status,
+      location: equip.location,
+      lastMaintenance: equip.lastMaintenance,
       quantity: equip.quantity,
     );
     await _equipment.doc(equip.id).update(model.toFirestore());

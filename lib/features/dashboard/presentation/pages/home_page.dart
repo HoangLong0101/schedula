@@ -78,10 +78,7 @@ class _DashboardViewState extends State<_DashboardView> {
 
   void _refreshDashboard() {
     if (!mounted) return;
-    context.read<DashboardCubit>().load(
-      widget.tenantId,
-      forceRefresh: true,
-    );
+    context.read<DashboardCubit>().load(widget.tenantId, forceRefresh: true);
   }
 
   @override
@@ -226,9 +223,7 @@ class _HomeContent extends StatelessWidget {
               child: _KpiCard(
                 label: 'Lịch hẹn hôm nay',
                 value: todayCount,
-                delta: '+2.8%',
-                deltaPositive: true,
-                icon: Icons.arrow_outward,
+                icon: Icons.calendar_today_outlined,
               ),
             ),
             const SizedBox(width: 14),
@@ -236,9 +231,7 @@ class _HomeContent extends StatelessWidget {
               child: _KpiCard(
                 label: 'khách mới đặt lịch',
                 value: newCustomers,
-                delta: '-3.8%',
-                deltaPositive: false,
-                icon: Icons.south_east,
+                icon: Icons.person_add_alt_1_outlined,
               ),
             ),
           ],
@@ -263,15 +256,6 @@ class _HomeContent extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _CustomerPanel(overview: stats.customerOverview),
-        const SizedBox(height: 30),
-        _SectionHeader(
-          title: 'Đề xuất từ AI',
-          leadingIcon: Icons.auto_awesome,
-          linkLabel: 'Xem chi tiết',
-          onTap: () => context.go('/statistics'),
-        ),
-        const SizedBox(height: 16),
-        const _AiInsights(),
       ],
     );
   }
@@ -289,33 +273,15 @@ class _HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE1E1E4),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.person_outline, color: Color(0xFF777A80)),
-            ),
-            Positioned(
-              right: 1,
-              bottom: 1,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF75EA6A),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-              ),
-            ),
-          ],
+        Container(
+          width: 46,
+          height: 46,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: Color(0xFFE1E1E4),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.person_outline, color: Color(0xFF777A80)),
         ),
         const Spacer(),
         const _SchedulaLogo(),
@@ -323,46 +289,20 @@ class _HomeHeader extends StatelessWidget {
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => context.push(NotificationPage.routePath),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: _HomeShadow.card,
-                ),
-                child: const Icon(
-                  Icons.notifications_none,
-                  color: _HomeColors.teal,
-                  size: 23,
-                ),
-              ),
-              Positioned(
-                right: -3,
-                top: -4,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: _HomeColors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '3',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          child: Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: _HomeShadow.card,
+            ),
+            child: const Icon(
+              Icons.notifications_none,
+              color: _HomeColors.teal,
+              size: 23,
+            ),
           ),
         ),
       ],
@@ -468,22 +408,18 @@ class _KpiCard extends StatelessWidget {
   const _KpiCard({
     required this.label,
     required this.value,
-    required this.delta,
-    required this.deltaPositive,
     required this.icon,
   });
 
   final String label;
   final int value;
-  final String delta;
-  final bool deltaPositive;
   final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return _HomeCard(
-      minHeight: 198,
+      minHeight: 164,
       padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -492,15 +428,6 @@ class _KpiCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Icon(
-                  Icons.circle,
-                  size: 15,
-                  color: _HomeColors.greenDot,
-                ),
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   label,
@@ -512,37 +439,26 @@ class _KpiCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(icon, color: _HomeColors.ink, size: 18),
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _HomeColors.tealWash,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: _HomeColors.tealDark, size: 18),
+              ),
             ],
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 24),
           Text(
             '$value',
             style: theme.textTheme.headlineLarge?.copyWith(
-              color: _HomeColors.hotOrange,
+              color: _HomeColors.tealDark,
               fontWeight: FontWeight.w900,
-              fontSize: 68,
+              fontSize: 56,
               height: 0.95,
-            ),
-          ),
-          const SizedBox(height: 12),
-          RichText(
-            text: TextSpan(
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: _HomeColors.muted,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-              ),
-              children: [
-                TextSpan(
-                  text: delta,
-                  style: TextStyle(
-                    color: deltaPositive ? _HomeColors.green : _HomeColors.red,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const TextSpan(text: ' số lượng khách so với hôm qua'),
-              ],
             ),
           ),
         ],
@@ -557,32 +473,17 @@ class _SectionHeader extends StatelessWidget {
     this.trailing,
     this.linkLabel,
     this.onTap,
-    this.leadingIcon,
   });
 
   final String title;
   final String? trailing;
   final String? linkLabel;
   final VoidCallback? onTap;
-  final IconData? leadingIcon;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        if (leadingIcon != null) ...[
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _HomeColors.tealDark,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(leadingIcon, size: 18, color: Colors.white),
-          ),
-          const SizedBox(width: 10),
-        ],
         Expanded(
           child: Text(
             title,
@@ -597,18 +498,14 @@ class _SectionHeader extends StatelessWidget {
         ),
         if (trailing != null)
           Text(
-            trailing ?? '',
+            trailing!,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: _HomeColors.muted,
               fontWeight: FontWeight.w800,
             ),
           )
         else if (linkLabel != null && onTap != null)
-          _InlineLink(
-            label: linkLabel ?? '',
-            onTap: onTap ?? () {},
-            chevron: true,
-          ),
+          _InlineLink(label: linkLabel!, onTap: onTap!, chevron: true),
       ],
     );
   }
@@ -771,10 +668,21 @@ class _AppointmentCard extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Row(
-              children: const [
-                _SmallActionButton(icon: Icons.edit_outlined),
-                SizedBox(width: 12),
-                _SmallActionButton(icon: Icons.delete_outline, danger: true),
+              children: [
+                _SmallActionButton(
+                  icon: Icons.edit_outlined,
+                  onTap: () => context.go(
+                    '${BookingPage.routePath}?bookingId=${appointment.id}&action=edit',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _SmallActionButton(
+                  icon: Icons.delete_outline,
+                  danger: true,
+                  onTap: () => context.go(
+                    '${BookingPage.routePath}?bookingId=${appointment.id}&action=cancel',
+                  ),
+                ),
               ],
             ),
           ],
@@ -785,25 +693,34 @@ class _AppointmentCard extends StatelessWidget {
 }
 
 class _SmallActionButton extends StatelessWidget {
-  const _SmallActionButton({required this.icon, this.danger = false});
+  const _SmallActionButton({
+    required this.icon,
+    required this.onTap,
+    this.danger = false,
+  });
 
   final IconData icon;
+  final VoidCallback onTap;
   final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: _HomeColors.soft,
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: Icon(
-        icon,
-        size: 17,
-        color: danger ? _HomeColors.red : _HomeColors.grayBlue,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(11),
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: _HomeColors.soft,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Icon(
+          icon,
+          size: 17,
+          color: danger ? _HomeColors.red : _HomeColors.grayBlue,
+        ),
       ),
     );
   }
@@ -1120,152 +1037,6 @@ class _CustomerChip extends StatelessWidget {
   }
 }
 
-class _AiInsights extends StatelessWidget {
-  const _AiInsights();
-
-  @override
-  Widget build(BuildContext context) {
-    const insights = [
-      _InsightData(
-        icon: Icons.trending_up,
-        title: 'Khách hàng mới tăng 15%',
-        description:
-            'Tháng này, tỉ lệ khách hàng mới tăng 15% so với tháng trước. Hãy duy trì chương trình giới thiệu hiện tại.',
-        tag: 'Xu hướng',
-        color: _HomeColors.green,
-        bg: _HomeColors.greenBg,
-      ),
-      _InsightData(
-        icon: Icons.access_time,
-        title: 'Khung 13:00 thử lịch',
-        description:
-            'AI đề xuất chạy ưu đãi 15% trong khung giờ trống để tăng lấp đầy.',
-        tag: 'Đề xuất',
-        color: _HomeColors.orange,
-        bg: _HomeColors.orangeBg,
-      ),
-    ];
-
-    return SizedBox(
-      height: 250,
-      child: ListView.separated(
-        clipBehavior: Clip.none,
-        scrollDirection: Axis.horizontal,
-        itemCount: insights.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
-        itemBuilder: (context, index) => _InsightCard(data: insights[index]),
-      ),
-    );
-  }
-}
-
-class _InsightCard extends StatelessWidget {
-  const _InsightCard({required this.data});
-
-  final _InsightData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SizedBox(
-      width: 326,
-      child: _HomeCard(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: data.bg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(data.icon, color: data.color, size: 20),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: data.bg,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    data.tag,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: data.color,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Text(
-              data.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: _HomeColors.ink,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              data.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: _HomeColors.muted,
-                height: 1.5,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                Text(
-                  'Xem thống kê',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: data.color,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(Icons.chevron_right, size: 16, color: data.color),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InsightData {
-  const _InsightData({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.tag,
-    required this.color,
-    required this.bg,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final String tag;
-  final Color color;
-  final Color bg;
-}
-
 class _HomeCard extends StatelessWidget {
   const _HomeCard({
     required this.child,
@@ -1305,11 +1076,7 @@ class _HomeColors {
   static const tealWash = Color(0xFFE0F8FB);
   static const hotOrange = Color(0xFFF64404);
   static const orange = Color(0xFFFF6B1A);
-  static const orangeBg = Color(0xFFFFF1E6);
   static const red = Color(0xFFFF5A63);
-  static const green = Color(0xFF22C55E);
-  static const greenBg = Color(0xFFE7F7EC);
-  static const greenDot = Color(0xFF63CD5B);
   static const grayBlue = Color(0xFF8E99AA);
   static const staffGreen = Color(0xFF54C94E);
   static const staffGreenBg = Color(0xFFE1FFDE);

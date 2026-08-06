@@ -12,6 +12,10 @@
     "data:audit": "node scripts/auditDataConsistency.js",
     "data:sync": "node scripts/syncTenantData.js",
     "data:aggregate": "node scripts/buildAggregateStats.js",
+    "data:migrate-booking-integrity": "node scripts/migrateBookingIntegrity.js",
+    "test:rules": "firebase emulators:exec --config ../firebase.json --only firestore \"node scripts/testFirestoreRules.js\"",
+    "test:booking": "npm run build && node scripts/testBookingPolicy.js",
+    "test:campaign": "npm run build && node scripts/testCampaignContent.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },
@@ -21,6 +25,7 @@
     "firebase-functions": "^7.0.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
     "typescript": "^5.9.2"
   }
 }

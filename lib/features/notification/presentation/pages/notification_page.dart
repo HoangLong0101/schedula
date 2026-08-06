@@ -1,33 +1,44 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../auth/domain/entities/user.dart';
+import '../../../../core/di/injection.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../booking/presentation/pages/booking_page.dart';
+import '../../domain/entities/app_notification.dart';
+import '../cubit/notification_cubit.dart';
+import '../cubit/notification_state.dart';
 
-class NotificationPage extends StatefulWidget {
+class NotificationPage extends StatelessWidget {
   const NotificationPage({super.key});
 
   static const routePath = '/notifications';
   static const routeName = 'notifications';
 
   @override
-  State<NotificationPage> createState() => _NotificationPageState();
+  Widget build(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) {
+      return const Scaffold(body: Center(child: Text('Chưa có thông báo')));
+    }
+    return BlocProvider(
+      create: (_) => getIt<NotificationCubit>()
+        ..init(
+          tenantId: authState.user.tenantId,
+          userId: authState.user.id,
+          staffOnly: authState.user.isStaff,
+        ),
+      child: const _NotificationView(),
+    );
+  }
 }
 
-class _NotificationPageState extends State<NotificationPage> {
-  String _filter = 'all';
+class _NotificationView extends StatelessWidget {
+  const _NotificationView();
 
   @override
   Widget build(BuildContext context) {
-    final authState = context.watch<AuthBloc>().state;
-    if (authState is! Authenticated) {
-      return const Scaffold(body: Center(child: Text('No notifications')));
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFFEFFBFC),
       appBar: AppBar(
@@ -40,52 +51,47 @@ class _NotificationPageState extends State<NotificationPage> {
               : context.go(BookingPage.routePath),
         ),
         title: const Text(
-          'Notifications',
+          'Thông báo',
           style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black87),
         ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Tùy chọn thông báo',
+            onSelected: (_) => context.read<NotificationCubit>().markAllRead(),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'mark_all_read',
+                child: Text('Đánh dấu tất cả đã đọc'),
+              ),
+            ],
+          ),
+        ],
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _query(authState.user).snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(child: Text('Could not load notifications'));
-          }
-          if (!snapshot.hasData) {
+      body: BlocBuilder<NotificationCubit, NotificationState>(
+        builder: (context, state) {
+          if (state.loading) {
             return const Center(child: CircularProgressIndicator());
           }
-
-          final items = snapshot.requireData.docs
-              .map((doc) => _NotificationItem.from(doc.data()))
-              .where((item) => _filter == 'all' || item.type == _filter)
-              .toList(growable: false);
-
+          if (state.error != null && state.items.isEmpty) {
+            return Center(child: Text(state.error!));
+          }
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
             children: [
               _Filters(
-                selected: _filter,
-                onSelected: (value) => setState(() => _filter = value),
+                selected: state.filter,
+                onSelected: context.read<NotificationCubit>().setFilter,
               ),
               const SizedBox(height: 14),
-              if (items.isEmpty)
+              if (state.visible.isEmpty)
                 const _EmptyState()
               else
-                for (final item in items) _NotificationCard(item: item),
+                for (final item in state.visible) _NotificationCard(item: item),
             ],
           );
         },
       ),
     );
-  }
-
-  Query<Map<String, dynamic>> _query(AppUser user) {
-    var query = FirebaseFirestore.instance
-        .collection('notifications')
-        .where('tenantId', isEqualTo: user.tenantId);
-    if (user.isStaff) {
-      query = query.where('recipientUserId', isEqualTo: user.id);
-    }
-    return query.orderBy('sentAt', descending: true).limit(50);
   }
 }
 
@@ -100,9 +106,9 @@ class _Filters extends StatelessWidget {
     return Wrap(
       spacing: 8,
       children: [
-        _chip('all', 'All'),
-        _chip('staff_1h', 'Appointments'),
-        _chip('customer_24h', 'Customers'),
+        _chip('all', 'Tất cả'),
+        _chip('staff_1h', 'Lịch hẹn'),
+        _chip('customer_24h', 'Khách hàng'),
       ],
     );
   }
@@ -119,7 +125,7 @@ class _Filters extends StatelessWidget {
 class _NotificationCard extends StatelessWidget {
   const _NotificationCard({required this.item});
 
-  final _NotificationItem item;
+  final AppNotification item;
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +134,12 @@ class _NotificationCard extends StatelessWidget {
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: const Color(0xFFFFF0DE),
-          child: Icon(item.icon, color: const Color(0xFFFF7622)),
+          child: Icon(
+            item.type == 'staff_1h'
+                ? Icons.calendar_month_outlined
+                : Icons.notifications_none,
+            color: const Color(0xFFFF7622),
+          ),
         ),
         title: Text(
           item.title,
@@ -136,15 +147,32 @@ class _NotificationCard extends StatelessWidget {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text('${item.message}\n${item.timeAgo}'),
+          child: Text('${item.message}\n${_timeAgo(item.sentAt)}'),
         ),
         isThreeLine: true,
         trailing: item.read
             ? null
             : const Icon(Icons.circle, color: Color(0xFFFF4E57), size: 10),
-        onTap: () => context.go(BookingPage.routePath),
+        onTap: () {
+          context.read<NotificationCubit>().markRead(item.id);
+          final bookingId = item.bookingId;
+          context.go(
+            bookingId == null || bookingId.isEmpty
+                ? BookingPage.routePath
+                : '${BookingPage.routePath}?bookingId=$bookingId&action=view',
+          );
+        },
       ),
     );
+  }
+
+  String _timeAgo(DateTime? date) {
+    if (date == null) return '';
+    final difference = DateTime.now().difference(date);
+    if (difference.inMinutes < 1) return 'Vừa xong';
+    if (difference.inHours < 1) return '${difference.inMinutes} phút trước';
+    if (difference.inDays < 1) return '${difference.inHours} giờ trước';
+    return '${difference.inDays} ngày trước';
   }
 }
 
@@ -159,49 +187,9 @@ class _EmptyState extends StatelessWidget {
         children: [
           Icon(Icons.notifications_off_outlined, size: 42, color: Colors.grey),
           SizedBox(height: 10),
-          Text('No notifications yet'),
+          Text('Chưa có thông báo'),
         ],
       ),
     );
-  }
-}
-
-class _NotificationItem {
-  const _NotificationItem({
-    required this.type,
-    required this.title,
-    required this.message,
-    required this.sentAt,
-    required this.read,
-  });
-
-  factory _NotificationItem.from(Map<String, dynamic> data) {
-    return _NotificationItem(
-      type: data['type'] as String? ?? '',
-      title: data['title'] as String? ?? 'Notification',
-      message: data['message'] as String? ?? '',
-      sentAt: (data['sentAt'] as Timestamp?)?.toDate(),
-      read: data['read'] == true,
-    );
-  }
-
-  final String type;
-  final String title;
-  final String message;
-  final DateTime? sentAt;
-  final bool read;
-
-  IconData get icon => type == 'staff_1h'
-      ? Icons.calendar_month_outlined
-      : Icons.notifications_none;
-
-  String get timeAgo {
-    final date = sentAt;
-    if (date == null) return '';
-    final diff = DateTime.now().difference(date);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inHours < 1) return '${diff.inMinutes} minutes ago';
-    if (diff.inDays < 1) return '${diff.inHours} hours ago';
-    return '${diff.inDays} days ago';
   }
 }

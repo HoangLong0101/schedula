@@ -9,14 +9,15 @@ class SignInUseCase {
 
   final AuthRepository _repository;
 
-  Future<AppUser?> call({
-    required String email,
-    required String password,
-  }) {
+  Future<AppUser?> call({required String email, required String password}) {
     return _repository.signIn(email: email, password: password);
   }
 
   Future<AppUser?> currentUser() {
     return _repository.watchCurrentUser().first;
+  }
+
+  Future<void> sendPasswordResetEmail(String email) {
+    return _repository.sendPasswordResetEmail(email);
   }
 }

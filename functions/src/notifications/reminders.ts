@@ -78,7 +78,7 @@ async function sendCustomer24hReminders(): Promise<void> {
 
     await writeNotification(doc.id, booking, {
       type: 'customer_24h',
-      title: 'Nhac lich hen cho khach hang',
+      title: 'Nhắc lịch hẹn cho khách hàng',
       message: customerMessage(booking, customer),
       channels: results,
     });
@@ -117,7 +117,7 @@ async function sendStaff1hReminders(): Promise<void> {
 
     await writeNotification(doc.id, booking, {
       type: 'staff_1h',
-      title: 'Sap den lich hen',
+      title: 'Sắp đến lịch hẹn',
       message: staffMessage(booking),
       channels: [pushResult],
       recipientUserId: booking.staffId,
@@ -211,7 +211,7 @@ async function sendStaffPush(
     const providerId = await admin.messaging().send({
       token: staff.fcmToken,
       notification: {
-        title: 'Sap den lich hen',
+        title: 'Sắp đến lịch hẹn',
         body: staffMessage(booking),
       },
       data: {
@@ -250,7 +250,7 @@ async function sendCustomerEmail(
       body: JSON.stringify({
         from,
         to: [customer.email],
-        subject: 'Nhac lich hen Schedula',
+        subject: 'Nhắc lịch hẹn Schedula',
         text: customerMessage(booking, customer),
       }),
     });
@@ -356,26 +356,26 @@ async function writeNotification(
 function customerMessage(booking: BookingData, customer: ContactData | null): string {
   const name = displayName(customer, booking.customerName);
   return [
-    `Xin chao ${name}, Schedula nhac ban co lich hen vao ${formatAppointmentTime(booking.startTime)}.`,
-    booking.serviceName ? `Dich vu: ${booking.serviceName}.` : '',
-    booking.staffName ? `Nhan vien phu trach: ${booking.staffName}.` : '',
+    `Xin chào ${name}, Schedula nhắc bạn có lịch hẹn vào ${formatAppointmentTime(booking.startTime)}.`,
+    booking.serviceName ? `Dịch vụ: ${booking.serviceName}.` : '',
+    booking.staffName ? `Nhân viên phụ trách: ${booking.staffName}.` : '',
   ].filter(Boolean).join(' ');
 }
 
 function staffMessage(booking: BookingData): string {
   return [
-    `Ban co lich hen voi ${booking.customerName ?? 'khach hang'} luc ${formatAppointmentTime(booking.startTime)}.`,
-    booking.serviceName ? `Dich vu: ${booking.serviceName}.` : '',
+    `Bạn có lịch hẹn với ${booking.customerName ?? 'khách hàng'} lúc ${formatAppointmentTime(booking.startTime)}.`,
+    booking.serviceName ? `Dịch vụ: ${booking.serviceName}.` : '',
   ].filter(Boolean).join(' ');
 }
 
 function displayName(contact: ContactData | null, fallback?: string): string {
-  return contact?.name || fallback || 'quy khach';
+  return contact?.name || fallback || 'quý khách';
 }
 
 function formatAppointmentTime(value: Timestamp | undefined): string {
   if (!value) {
-    return 'thoi gian da hen';
+    return 'thời gian đã hẹn';
   }
 
   return new Intl.DateTimeFormat('vi-VN', {

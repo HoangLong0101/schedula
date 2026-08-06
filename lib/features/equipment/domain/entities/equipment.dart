@@ -37,5 +37,12 @@ class Equipment extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, status, location, lastMaintenance, quantity];
+  List<Object?> get props => [
+    id,
+    name,
+    status,
+    location,
+    lastMaintenance,
+    quantity,
+  ];
 }

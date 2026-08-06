@@ -15,10 +15,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       emit(const DashboardLoading());
     }
     final result = await _getDashboardStats(
-      GetDashboardStatsParams(
-        tenantId: tenantId,
-        forceRefresh: forceRefresh,
-      ),
+      GetDashboardStatsParams(tenantId: tenantId, forceRefresh: forceRefresh),
     );
     result.fold(
       (failure) => emit(DashboardFailure(failure.message)),

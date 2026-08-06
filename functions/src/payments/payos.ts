@@ -74,29 +74,29 @@ export const createPayOSPayment = onCall(
   },
   async (request) => {
     if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Authentication is required');
+      throw new HttpsError('unauthenticated', 'Vui lòng đăng nhập');
     }
 
     const role = request.auth.token.role;
     if (role !== 'owner' && role !== 'receptionist') {
-      throw new HttpsError('permission-denied', 'Owners and receptionists only');
+      throw new HttpsError('permission-denied', 'Chỉ chủ cơ sở và lễ tân được thực hiện');
     }
 
     const { bookingId, amount } = request.data as CreatePayOSPaymentData;
     if (!bookingId || !Number.isInteger(amount) || amount <= 0) {
-      throw new HttpsError('invalid-argument', 'Bad payment payload');
+      throw new HttpsError('invalid-argument', 'Thông tin thanh toán không hợp lệ');
     }
 
     const bookingRef = db.collection('bookings').doc(bookingId);
     const bookingSnap = await bookingRef.get();
     if (!bookingSnap.exists) {
-      throw new HttpsError('not-found', 'Booking not found');
+      throw new HttpsError('not-found', 'Không tìm thấy lịch hẹn');
     }
 
     const booking = bookingSnap.data() ?? {};
     const tenantId = booking.tenantId as string | undefined;
     if (!tenantId || tenantId !== request.auth.token.tenantId) {
-      throw new HttpsError('permission-denied', 'Booking is outside your tenant');
+      throw new HttpsError('permission-denied', 'Lịch hẹn không thuộc cơ sở này');
     }
 
     const existingPaymentSnap = await db
@@ -127,7 +127,7 @@ export const createPayOSPayment = onCall(
       cancelUrl: payosCancelUrl.value(),
       items: [
         {
-          name: String(booking.serviceName ?? booking.serviceId ?? 'Booking'),
+          name: String(booking.serviceName ?? booking.serviceId ?? 'Lịch hẹn'),
           quantity: 1,
           price: amount,
         },
@@ -137,7 +137,7 @@ export const createPayOSPayment = onCall(
     if (!isValidWebUrl(payload.returnUrl) || !isValidWebUrl(payload.cancelUrl)) {
       throw new HttpsError(
         'failed-precondition',
-        'PAYOS_RETURN_URL and PAYOS_CANCEL_URL must be valid http(s) URLs',
+        'PAYOS_RETURN_URL và PAYOS_CANCEL_URL phải là địa chỉ http(s) hợp lệ',
       );
     }
 
@@ -166,7 +166,7 @@ export const createPayOSPayment = onCall(
     if (!response.ok || result.code !== '00' || !result.data?.checkoutUrl) {
       throw new HttpsError(
         'internal',
-        result.desc || 'PayOS payment link creation failed',
+        result.desc || 'Không thể tạo liên kết thanh toán PayOS',
       );
     }
 
@@ -212,23 +212,23 @@ export const createPayOSPlanUpgradePayment = onCall(
   },
   async (request) => {
     if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Authentication is required');
+      throw new HttpsError('unauthenticated', 'Vui lòng đăng nhập');
     }
 
     if (request.auth.token.role !== 'owner') {
-      throw new HttpsError('permission-denied', 'Owners only');
+      throw new HttpsError('permission-denied', 'Chỉ chủ cơ sở được thực hiện');
     }
 
     const tenantId = request.auth.token.tenantId as string | undefined;
     if (!tenantId) {
-      throw new HttpsError('failed-precondition', 'Missing tenant claim');
+      throw new HttpsError('failed-precondition', 'Phiên đăng nhập thiếu mã cơ sở');
     }
 
     const { planTier, billingPeriod } =
       request.data as CreatePlanUpgradePaymentData;
     const normalizedPlanTier = String(planTier ?? '').trim().toLowerCase();
     if (!normalizedPlanTier || normalizedPlanTier === 'basic') {
-      throw new HttpsError('invalid-argument', 'Choose a paid plan');
+      throw new HttpsError('invalid-argument', 'Vui lòng chọn gói trả phí');
     }
 
     const plan = await resolveSubscriptionPlan(
@@ -236,13 +236,13 @@ export const createPayOSPlanUpgradePayment = onCall(
       billingPeriod,
     );
     if (!plan) {
-      throw new HttpsError('invalid-argument', 'Unknown subscription plan');
+      throw new HttpsError('invalid-argument', 'Gói dịch vụ không hợp lệ');
     }
 
     const tenantRef = db.collection('tenants').doc(tenantId);
     const tenantSnap = await tenantRef.get();
     if (!tenantSnap.exists) {
-      throw new HttpsError('not-found', 'Tenant not found');
+      throw new HttpsError('not-found', 'Không tìm thấy cơ sở');
     }
     const planExpiresAt = Timestamp.fromDate(
       subscriptionExpiryDate(tenantSnap.data()?.planExpiresAt, plan.periodMonths),
@@ -276,7 +276,7 @@ export const createPayOSPlanUpgradePayment = onCall(
     if (!isValidWebUrl(returnUrl) || !isValidWebUrl(cancelUrl)) {
       throw new HttpsError(
         'failed-precondition',
-        'PAYOS_RETURN_URL and PAYOS_CANCEL_URL must be valid http(s) URLs',
+        'PAYOS_RETURN_URL và PAYOS_CANCEL_URL phải là địa chỉ http(s) hợp lệ',
       );
     }
 
@@ -323,7 +323,7 @@ export const createPayOSPlanUpgradePayment = onCall(
     if (!response.ok || result.code !== '00' || !result.data?.checkoutUrl) {
       throw new HttpsError(
         'internal',
-        result.desc || 'PayOS subscription payment link creation failed',
+        result.desc || 'Không thể tạo liên kết nâng cấp gói PayOS',
       );
     }
 
@@ -383,7 +383,7 @@ export const payosWebhook = onRequest(
     }
 
     if (!verifyPayOSSignature(body.data, body.signature, payosChecksumKey.value())) {
-      response.status(401).send('Invalid signature');
+      response.status(401).send('Chữ ký không hợp lệ');
       return;
     }
 
@@ -400,7 +400,7 @@ export const payosWebhook = onRequest(
       .get();
 
     if (paymentSnap.empty) {
-      response.status(200).send('Payment not found');
+      response.status(200).send('Không tìm thấy thanh toán');
       return;
     }
 

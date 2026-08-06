@@ -19,6 +19,6 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SplashPage()));
 
     expect(find.text('Schedula'), findsWidgets);
-    expect(find.text('Enter dashboard'), findsOneWidget);
+    expect(find.text('Vào trang tổng quan'), findsOneWidget);
   });
 }

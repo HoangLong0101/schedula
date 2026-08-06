@@ -14,6 +14,7 @@ class _FakeAuthRepository implements AuthRepository {
 
   final AppUser? user;
   var signedOut = false;
+  String? passwordResetEmail;
 
   @override
   Stream<AppUser?> watchCurrentUser() => Stream.value(user);
@@ -26,6 +27,11 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<AppUser?> signInWithGoogle() {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {
+    passwordResetEmail = email;
   }
 
   @override
@@ -55,19 +61,24 @@ void main() {
       'restores persisted Firebase user on startup',
       build: () => blocFor(_FakeAuthRepository(user)),
       act: (bloc) => bloc.add(const AuthStarted()),
-      expect: () => [
-        const AuthLoading(),
-        const Authenticated(user),
-      ],
+      expect: () => [const AuthLoading(), const Authenticated(user)],
     );
 
     blocTest<AuthBloc, AuthState>(
       'stays signed out when Firebase has no user',
       build: () => blocFor(_FakeAuthRepository(null)),
       act: (bloc) => bloc.add(const AuthStarted()),
-      expect: () => [
-        const AuthLoading(),
-        const Unauthenticated(),
+      expect: () => [const AuthLoading(), const Unauthenticated()],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'sends a Firebase password reset email',
+      build: () => blocFor(_FakeAuthRepository(null)),
+      act: (bloc) =>
+          bloc.add(const AuthPasswordResetRequested('user@example.com')),
+      expect: () => const [
+        AuthLoading(),
+        AuthPasswordResetSent('user@example.com'),
       ],
     );
   });

@@ -25,7 +25,19 @@ service cloud.firestore {
     }
     function sameTenant(docTenantId) { return myTenant() == docTenantId; }
     function isOwner() { return role() == 'owner'; }
-    function canBook() { return role() == 'owner' || role() == 'receptionist'; }
+    function hasPermission(name) {
+      return isOwner()
+        || (
+          request.auth.token.permissions is list
+          && name in request.auth.token.permissions
+        )
+        || (
+          hasProfile()
+          && profile().permissions is list
+          && name in profile().permissions
+        );
+    }
+    function canBook() { return hasPermission('booking.manage'); }
     function canReadBooking(data) {
       return isAuth()
         && sameTenant(data.tenantId)
@@ -40,10 +52,8 @@ service cloud.firestore {
         'phone',
         'email',
         'avatarUrl',
-        'faceIdEnabled',
-        'fingerprintEnabled',
-        'twoFaEnabled',
-        'twoFaMethod',
+        'fcmToken',
+        'fcmUpdatedAt',
         'updatedAt',
       ];
     }
@@ -81,44 +91,23 @@ service cloud.firestore {
 
     match /bookings/{id} {
       allow read: if canReadBooking(resource.data);
-      allow create: if isAuth()
-        && canBook()
-        && sameTenant(request.resource.data.tenantId)
-        && request.resource.data.keys().hasAll([
-          'tenantId',
-          'staffId',
-          'customerId',
-          'serviceId',
-          'startTime',
-          'endTime',
-          'status',
-        ])
-        && !request.resource.data.keys().hasAny(paymentFields());
-      allow update: if isAuth()
-        && sameTenant(resource.data.tenantId)
-        && (
-          (
-            canBook()
-            && (
-              !request.resource.data.diff(resource.data).affectedKeys().hasAny(paymentFields())
-              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(bookingPaymentUpdateFields())
-            )
-          )
-          || (
-            role() == 'staff'
-            && request.auth.uid == resource.data.staffId
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              'status',
-              'updatedAt',
-            ])
-          )
-        );
-      allow delete: if isOwner() && sameTenant(resource.data.tenantId);
+      allow write: if false;
     }
 
     match /customers/{id} {
-      allow read: if isAuth() && sameTenant(resource.data.tenantId);
-      allow write: if isAuth() && canBook() && sameTenant(request.resource.data.tenantId);
+      allow read: if isAuth()
+        && sameTenant(resource.data.tenantId)
+        && hasPermission('customer.read');
+      allow create: if isAuth()
+        && hasPermission('customer.write')
+        && sameTenant(request.resource.data.tenantId);
+      allow update: if isAuth()
+        && hasPermission('customer.write')
+        && sameTenant(resource.data.tenantId)
+        && request.resource.data.tenantId == resource.data.tenantId;
+      allow delete: if isAuth()
+        && hasPermission('customer.write')
+        && sameTenant(resource.data.tenantId);
     }
 
     match /users/{userId} {
@@ -140,7 +129,14 @@ service cloud.firestore {
           || (isOwner() && sameTenant(request.resource.data.tenantId))
         );
       allow update: if (
-          isOwner() && sameTenant(request.resource.data.tenantId)
+          isOwner()
+          && sameTenant(request.resource.data.tenantId)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'tenantId',
+              'role',
+              'permissions',
+              'active',
+            ])
         ) || (
           isAuth()
           && request.auth.uid == userId
@@ -169,7 +165,29 @@ service cloud.firestore {
 
     match /services/{id} {
       allow read: if isAuth() && sameTenant(resource.data.tenantId);
-      allow write: if isOwner() && sameTenant(request.resource.data.tenantId);
+      allow create: if isOwner() && sameTenant(request.resource.data.tenantId);
+      allow update: if isOwner()
+        && sameTenant(resource.data.tenantId)
+        && request.resource.data.tenantId == resource.data.tenantId;
+      allow delete: if isOwner() && sameTenant(resource.data.tenantId);
+    }
+
+    match /products/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow create: if isOwner() && sameTenant(request.resource.data.tenantId);
+      allow update: if isOwner()
+        && sameTenant(resource.data.tenantId)
+        && request.resource.data.tenantId == resource.data.tenantId;
+      allow delete: if isOwner() && sameTenant(resource.data.tenantId);
+    }
+
+    match /equipment/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow create: if isOwner() && sameTenant(request.resource.data.tenantId);
+      allow update: if isOwner()
+        && sameTenant(resource.data.tenantId)
+        && request.resource.data.tenantId == resource.data.tenantId;
+      allow delete: if isOwner() && sameTenant(resource.data.tenantId);
     }
 
     match /slots/{id} {
@@ -183,8 +201,23 @@ service cloud.firestore {
     }
 
     match /notifications/{id} {
-      allow read: if isAuth() && sameTenant(resource.data.tenantId);
-      allow write: if false;
+      allow read: if isAuth()
+        && sameTenant(resource.data.tenantId)
+        && (
+          role() != 'staff'
+          || resource.data.recipientUserId == request.auth.uid
+        );
+      allow update: if isAuth()
+        && sameTenant(resource.data.tenantId)
+        && (
+          role() != 'staff'
+          || resource.data.recipientUserId == request.auth.uid
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'read',
+          'readAt',
+        ]);
+      allow create, delete: if false;
     }
 
     match /payments/{id} {
@@ -194,17 +227,41 @@ service cloud.firestore {
 
     match /tenantStatsDaily/{id} {
       allow read: if isAuth() && sameTenant(resource.data.tenantId);
-      allow write: if isAuth() && sameTenant(request.resource.data.tenantId);
+      allow write: if false;
     }
 
     match /staffStatsDaily/{id} {
       allow read: if isAuth() && sameTenant(resource.data.tenantId);
-      allow write: if isAuth() && sameTenant(request.resource.data.tenantId);
+      allow write: if false;
     }
 
     match /serviceStatsDaily/{id} {
       allow read: if isAuth() && sameTenant(resource.data.tenantId);
-      allow write: if isAuth() && sameTenant(request.resource.data.tenantId);
+      allow write: if false;
+    }
+
+    match /staffLeaves/{id} {
+      allow read: if isAuth() && sameTenant(resource.data.tenantId);
+      allow write: if false;
+    }
+
+    match /auditEvents/{id} {
+      allow read: if isOwner() && sameTenant(resource.data.tenantId);
+      allow write: if false;
+    }
+
+    match /campaigns/{id} {
+      allow read: if isAuth()
+        && sameTenant(resource.data.tenantId)
+        && hasPermission('report.read');
+      allow write: if false;
+    }
+
+    match /campaignDeliveries/{id} {
+      allow read: if isAuth()
+        && sameTenant(resource.data.tenantId)
+        && hasPermission('report.read');
+      allow write: if false;
     }
   }
 }

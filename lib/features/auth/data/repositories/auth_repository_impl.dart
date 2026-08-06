@@ -11,16 +11,18 @@ class AuthRepositoryImpl implements AuthRepository {
   final FirebaseAuthDataSource _dataSource;
 
   @override
-  Future<AppUser?> signIn({
-    required String email,
-    required String password,
-  }) {
+  Future<AppUser?> signIn({required String email, required String password}) {
     return _dataSource.signIn(email: email, password: password);
   }
 
   @override
   Future<AppUser?> signInWithGoogle() {
     return _dataSource.signInWithGoogle();
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) {
+    return _dataSource.sendPasswordResetEmail(email);
   }
 
   @override

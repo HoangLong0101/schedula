@@ -10,9 +10,12 @@ class ServiceModel extends ServiceItem {
     required super.duration,
     required super.category,
     super.resources,
+    super.resourceIds,
   });
 
-  factory ServiceModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory ServiceModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data() ?? {};
     return ServiceModel(
       id: doc.id,
@@ -22,6 +25,7 @@ class ServiceModel extends ServiceItem {
       duration: data['duration'] as int? ?? data['durationMin'] as int? ?? 30,
       category: data['category'] as String? ?? 'Khác',
       resources: List<String>.from(data['resources'] ?? []),
+      resourceIds: List<String>.from(data['resourceIds'] ?? []),
     );
   }
 
@@ -34,6 +38,7 @@ class ServiceModel extends ServiceItem {
       'durationMin': duration,
       'category': category,
       'resources': resources,
+      'resourceIds': resourceIds,
     };
   }
 }

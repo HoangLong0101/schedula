@@ -8,5 +8,6 @@ import '../repositories/account_repository.dart';
 class UpdateBusinessInfoUseCase {
   const UpdateBusinessInfoUseCase(this._repository);
   final AccountRepository _repository;
-  Future<Either<Failure, void>> call(String tenantId, BusinessInfo info) => _repository.updateBusinessInfo(tenantId, info);
+  Future<Either<Failure, void>> call(String tenantId, BusinessInfo info) =>
+      _repository.updateBusinessInfo(tenantId, info);
 }

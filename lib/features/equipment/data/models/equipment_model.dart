@@ -11,7 +11,9 @@ class EquipmentModel extends Equipment {
     super.quantity,
   });
 
-  factory EquipmentModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory EquipmentModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data() ?? const <String, dynamic>{};
 
     // Chuyển đổi Timestamp sang String (yyyy-MM-dd)
@@ -51,18 +53,24 @@ class EquipmentModel extends Equipment {
 
   static EquipmentStatus _statusFromString(String? val) {
     switch (val) {
-      case 'in_use': return EquipmentStatus.inUse;
-      case 'maintenance': return EquipmentStatus.maintenance;
+      case 'in_use':
+        return EquipmentStatus.inUse;
+      case 'maintenance':
+        return EquipmentStatus.maintenance;
       case 'available':
-      default: return EquipmentStatus.available;
+      default:
+        return EquipmentStatus.available;
     }
   }
 
   static String _statusToString(EquipmentStatus status) {
     switch (status) {
-      case EquipmentStatus.inUse: return 'in_use';
-      case EquipmentStatus.maintenance: return 'maintenance';
-      case EquipmentStatus.available: return 'available';
+      case EquipmentStatus.inUse:
+        return 'in_use';
+      case EquipmentStatus.maintenance:
+        return 'maintenance';
+      case EquipmentStatus.available:
+        return 'available';
     }
   }
 }

@@ -4,6 +4,7 @@ import 'package:dartz/dartz.dart';
 import 'package:schedula/features/dashboard/domain/entities/dashboard_stats.dart';
 import 'package:schedula/features/dashboard/domain/repositories/dashboard_repository.dart';
 import 'package:schedula/features/dashboard/domain/usecases/get_dashboard_stats_usecase.dart';
+import 'package:schedula/features/dashboard/domain/entities/operational_report.dart';
 import 'package:schedula/core/errors/failure.dart';
 
 class FakeDashboardRepository implements DashboardRepository {
@@ -21,6 +22,11 @@ class FakeDashboardRepository implements DashboardRepository {
     }
     return Right(toReturn ?? DashboardStats.empty);
   }
+
+  @override
+  Future<Either<Failure, List<ReportRecord>>> getOperationalReports(
+    String tenantId,
+  ) async => const Right([]);
 }
 
 void main() {
@@ -55,6 +61,7 @@ void main() {
           StaffAvailability(
             id: 's1',
             name: 'Nhân viên A',
+            status: 'in_session',
             inSession: true,
             bookingCount: 4,
           ),

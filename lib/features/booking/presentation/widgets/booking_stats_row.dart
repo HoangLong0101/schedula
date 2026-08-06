@@ -34,7 +34,7 @@ class BookingStatsRow extends StatelessWidget {
     return Row(
       children: [
         _StatCard(
-          label: 'Today',
+          label: 'Hôm nay',
           value: todayBookings.length.toString(),
           color: colorScheme.primary,
         ),
@@ -46,7 +46,7 @@ class BookingStatsRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         _StatCard(
-          label: 'Waiting',
+          label: 'Đang chờ',
           value: waiting.toString(),
           color: colorScheme.secondary,
         ),

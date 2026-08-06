@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -32,11 +34,36 @@ Future<void> main() async {
   };
 
   await _initializeFirebase(firebaseOptions);
+  await _activateAppCheck();
 
   await configureDependencies();
   getIt<AuthBloc>().add(const AuthStarted());
   runApp(const App());
   unawaited(NotificationService().initialize());
+}
+
+Future<void> _activateAppCheck() async {
+  if (kIsWeb) return;
+
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+      );
+    case TargetPlatform.iOS:
+    case TargetPlatform.macOS:
+      await FirebaseAppCheck.instance.activate(
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleDeviceCheckProvider(),
+      );
+    case TargetPlatform.fuchsia:
+    case TargetPlatform.linux:
+    case TargetPlatform.windows:
+      return;
+  }
 }
 
 Future<void> _initializeFirebase(FirebaseOptions options) async {

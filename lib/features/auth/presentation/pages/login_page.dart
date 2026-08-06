@@ -66,6 +66,22 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
+        if (state is AuthProfileSetupRequired) {
+          context.go(RegisterPage.googleSetupPath);
+          return;
+        }
+
+        if (state is AuthPasswordResetSent) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Đã gửi email đặt lại mật khẩu tới ${state.email}.',
+              ),
+            ),
+          );
+          return;
+        }
+
         if (state is AuthFailure) {
           setState(() {
             _errorMessage = state.message;
@@ -119,24 +135,7 @@ class _LoginPageState extends State<LoginPage> {
                                   onSubmitted: (_) => _submit(context),
                                 ),
                                 const SizedBox(height: 21),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const _FormLabel('Mật khẩu'),
-                                    GestureDetector(
-                                      onTap: () {},
-                                      child: const Text(
-                                        'Quên mật khẩu?',
-                                        style: TextStyle(
-                                          color: _LoginColors.tealDark,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                const _FormLabel('Mật khẩu'),
                                 const SizedBox(height: 9),
                                 _InputField(
                                   controller: _passwordController,
@@ -160,6 +159,13 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   ),
                                 ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () => _showPasswordResetDialog(),
+                                    child: const Text('Quên mật khẩu?'),
+                                  ),
+                                ),
                                 const SizedBox(height: 20),
                                 BlocBuilder<AuthBloc, AuthState>(
                                   builder: (context, state) {
@@ -179,63 +185,22 @@ class _LoginPageState extends State<LoginPage> {
                                   builder: (context, state) {
                                     final loading = state is AuthLoading;
 
-                                    return Row(
-                                      children: [
-                                        Expanded(
-                                          child: _SocialButton(
-                                            label: 'Google',
-                                            icon: const _GoogleIcon(),
-                                            loading: loading,
-                                            onPressed: loading
-                                                ? null
-                                                : () => _signInWithGoogle(
-                                                    context,
-                                                  ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 15),
-                                        Expanded(
-                                          child: _SocialButton(
-                                            label: 'Facebook',
-                                            icon: const _FacebookIcon(),
-                                            loading: loading,
-                                            onPressed: loading
-                                                ? null
-                                                : () {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Đăng nhập Facebook chưa được hỗ trợ.',
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
-                                          ),
-                                        ),
-                                      ],
+                                    return _SocialButton(
+                                      label: 'Google',
+                                      icon: const _GoogleIcon(),
+                                      loading: loading,
+                                      onPressed: loading
+                                          ? null
+                                          : () => _signInWithGoogle(context),
                                     );
                                   },
                                 ),
-                                const SizedBox(height: 42),
+                                const SizedBox(height: 36),
                                 _FooterLinkRow(
                                   prompt: 'Chưa có tài khoản?',
                                   actionLabel: 'Đăng ký ngay',
                                   onPressed: () =>
                                       context.go(RegisterPage.routePath),
-                                ),
-                                const SizedBox(height: 16),
-                                _AdminLoginButton(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Đăng nhập Admin chưa được triển khai.',
-                                        ),
-                                      ),
-                                    );
-                                  },
                                 ),
                                 const SizedBox(height: 18),
                                 const _HomeIndicator(),
@@ -252,6 +217,75 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _showPasswordResetDialog() async {
+    final email = await showDialog<String>(
+      context: context,
+      builder: (_) =>
+          _PasswordResetDialog(initialEmail: _emailController.text.trim()),
+    );
+    if (!mounted || email == null) return;
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _errorMessage = 'Vui lòng nhập địa chỉ email hợp lệ.');
+      return;
+    }
+    setState(() => _errorMessage = '');
+    context.read<AuthBloc>().add(AuthPasswordResetRequested(email));
+  }
+}
+
+class _PasswordResetDialog extends StatefulWidget {
+  const _PasswordResetDialog({required this.initialEmail});
+
+  final String initialEmail;
+
+  @override
+  State<_PasswordResetDialog> createState() => _PasswordResetDialogState();
+}
+
+class _PasswordResetDialogState extends State<_PasswordResetDialog> {
+  late final TextEditingController _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.pop(context, _emailController.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Đặt lại mật khẩu'),
+      content: TextField(
+        controller: _emailController,
+        autofocus: true,
+        keyboardType: TextInputType.emailAddress,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _submit(),
+        decoration: const InputDecoration(
+          labelText: 'Email',
+          hintText: 'email@example.com',
+          helperText:
+              'Chúng tôi sẽ gửi liên kết đặt lại mật khẩu tới email này.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Gửi liên kết')),
+      ],
     );
   }
 }
@@ -281,7 +315,7 @@ class _LoginHero extends StatelessWidget {
               ),
               const SizedBox(height: 38),
               Text(
-                'Chào mừng trở lại 👋',
+                'Chào mừng trở lại',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.bricolageGrotesque(
                   color: _LoginColors.title,
@@ -617,23 +651,6 @@ class _GoogleIcon extends StatelessWidget {
   }
 }
 
-class _FacebookIcon extends StatelessWidget {
-  const _FacebookIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Text(
-      'f',
-      style: TextStyle(
-        color: Color(0xFF1877F2),
-        fontSize: 25,
-        fontWeight: FontWeight.w900,
-        height: 1,
-      ),
-    );
-  }
-}
-
 class _FooterLinkRow extends StatelessWidget {
   const _FooterLinkRow({
     required this.prompt,
@@ -669,40 +686,6 @@ class _FooterLinkRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AdminLoginButton extends StatelessWidget {
-  const _AdminLoginButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: const Color(0x143AADC0),
-        side: const BorderSide(color: _LoginColors.inputBorder, width: 1.4),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.shield_outlined, size: 16, color: _LoginColors.tealDark),
-          SizedBox(width: 8),
-          Text(
-            'Đăng nhập Admin',
-            style: TextStyle(
-              fontSize: 13,
-              color: _LoginColors.tealDark,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

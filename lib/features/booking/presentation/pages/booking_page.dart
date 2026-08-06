@@ -2,10 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../dashboard/presentation/pages/home_page.dart';
 import '../../domain/entities/booking.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/cancel_booking_usecase.dart';
@@ -20,12 +21,21 @@ import '../widgets/booking_actions.dart';
 import '../widgets/booking_form_sheet.dart';
 
 class BookingPage extends StatelessWidget {
-  const BookingPage({super.key, this.tenantId});
+  const BookingPage({
+    super.key,
+    this.tenantId,
+    this.restrictedStaffId,
+    this.initialBookingId,
+    this.initialAction,
+  });
 
   static const routePath = '/booking';
   static const routeName = 'booking';
 
   final String? tenantId;
+  final String? restrictedStaffId;
+  final String? initialBookingId;
+  final String? initialAction;
 
   @override
   Widget build(BuildContext context) {
@@ -36,13 +46,78 @@ class BookingPage extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) =>
-              getIt<BookingBloc>()
-                ..add(BookingStarted(WatchBookingsParams(tenantId: tenantId!))),
+          create: (_) => getIt<BookingBloc>()
+            ..add(
+              BookingStarted(
+                WatchBookingsParams(
+                  tenantId: tenantId!,
+                  staffId: restrictedStaffId,
+                ),
+              ),
+            ),
         ),
         BlocProvider(create: (_) => getIt<BookingFiltersCubit>()),
       ],
-      child: _BookingView(tenantId: tenantId!),
+      child: _BookingDeepLinkHandler(
+        tenantId: tenantId!,
+        bookingId: initialBookingId,
+        action: initialAction,
+        child: _BookingView(
+          tenantId: tenantId!,
+          restrictedStaffId: restrictedStaffId,
+        ),
+      ),
+    );
+  }
+}
+
+class _BookingDeepLinkHandler extends StatefulWidget {
+  const _BookingDeepLinkHandler({
+    required this.tenantId,
+    required this.child,
+    this.bookingId,
+    this.action,
+  });
+
+  final String tenantId;
+  final String? bookingId;
+  final String? action;
+  final Widget child;
+
+  @override
+  State<_BookingDeepLinkHandler> createState() =>
+      _BookingDeepLinkHandlerState();
+}
+
+class _BookingDeepLinkHandlerState extends State<_BookingDeepLinkHandler> {
+  bool _handled = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<BookingBloc, BookingState>(
+      listener: (context, state) {
+        if (_handled || state is! BookingLoaded || widget.bookingId == null) {
+          return;
+        }
+        final matches = state.bookings.where(
+          (booking) => booking.id == widget.bookingId,
+        );
+        if (matches.isEmpty) return;
+        _handled = true;
+        final booking = matches.first;
+        if (widget.action == 'cancel') {
+          context.read<BookingBloc>().add(
+            BookingCancelRequested(CancelBookingParams(bookingId: booking.id)),
+          );
+          return;
+        }
+        BookingFormSheet.show(
+          context,
+          tenantId: widget.tenantId,
+          booking: booking,
+        );
+      },
+      child: widget.child,
     );
   }
 }
@@ -67,9 +142,13 @@ class _TenantMissingView extends StatelessWidget {
 }
 
 class _BookingView extends StatelessWidget {
-  const _BookingView({required this.tenantId});
+  const _BookingView({required this.tenantId, this.restrictedStaffId});
 
   final String tenantId;
+  final String? restrictedStaffId;
+
+  bool get _isStaffRestricted =>
+      restrictedStaffId != null && restrictedStaffId!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -117,10 +196,12 @@ class _BookingView extends StatelessWidget {
                               sliver: SliverList.list(
                                 children: [
                                   _Header(
-                                    onAdd: () => BookingFormSheet.show(
-                                      context,
-                                      tenantId: tenantId,
-                                    ),
+                                    onAdd: _isStaffRestricted
+                                        ? null
+                                        : () => BookingFormSheet.show(
+                                            context,
+                                            tenantId: tenantId,
+                                          ),
                                   ),
                                   const SizedBox(height: 28),
                                   _SearchBox(
@@ -137,14 +218,16 @@ class _BookingView extends StatelessWidget {
                                         .updateRange,
                                   ),
                                   const SizedBox(height: 12),
-                                  _StaffChips(
-                                    selectedStaffId: filters.staffId,
-                                    staff: staffOptions,
-                                    onChanged: context
-                                        .read<BookingFiltersCubit>()
-                                        .updateStaff,
-                                  ),
-                                  const SizedBox(height: 18),
+                                  if (!_isStaffRestricted) ...[
+                                    _StaffChips(
+                                      selectedStaffId: filters.staffId,
+                                      staff: staffOptions,
+                                      onChanged: context
+                                          .read<BookingFiltersCubit>()
+                                          .updateStaff,
+                                    ),
+                                    const SizedBox(height: 18),
+                                  ],
                                   _StatsRow(bookings: bookings),
                                   const SizedBox(height: 18),
                                   _AiConflictPanel(conflicts: conflicts),
@@ -194,8 +277,9 @@ class _BookingView extends StatelessWidget {
                                         if (nextStatus ==
                                                 BookingStatus.completed &&
                                             booking.paymentStatus != 'paid') {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             const SnackBar(
                                               content: Text(
                                                 'Vui long xac nhan thanh toan truoc khi hoan thanh lich hen.',
@@ -216,6 +300,7 @@ class _BookingView extends StatelessWidget {
                                       onEditTap: () => BookingFormSheet.show(
                                         context,
                                         tenantId: tenantId,
+                                        booking: booking,
                                       ),
                                       onCancelTap: () =>
                                           context.read<BookingBloc>().add(
@@ -225,8 +310,7 @@ class _BookingView extends StatelessWidget {
                                               ),
                                             ),
                                           ),
-                                      onPaymentTap: () =>
-                                          _markPaymentComplete(
+                                      onPaymentTap: () => _markPaymentComplete(
                                         context,
                                         booking,
                                       ),
@@ -272,7 +356,7 @@ class _BookingView extends StatelessWidget {
           tenantId: tenantId,
           startDate: start,
           endDate: end,
-          staffId: filters.staffId,
+          staffId: restrictedStaffId ?? filters.staffId,
         ),
       ),
     );
@@ -341,12 +425,13 @@ class _BookingView extends StatelessWidget {
       for (var j = i + 1; j < active.length; j += 1) {
         final first = active[i];
         final second = active[j];
-        if (!_sameDay(first.startTime, second.startTime) ||
-            first.staffId != second.staffId) {
+        if (!_sameDay(first.startTime, second.startTime)) {
           continue;
         }
-        if (first.startTime.isBefore(second.endTime) &&
-            second.startTime.isBefore(first.endTime)) {
+        final overlaps =
+            first.startTime.isBefore(second.endTime) &&
+            second.startTime.isBefore(first.endTime);
+        if (overlaps && first.staffId == second.staffId) {
           final later = first.startTime.isAfter(second.startTime)
               ? first
               : second;
@@ -365,30 +450,27 @@ class _BookingView extends StatelessWidget {
             ),
           );
         }
+        final sharedResources = first.resourceIds
+            .where(second.resourceIds.contains)
+            .toList(growable: false);
+        if (overlaps && sharedResources.isNotEmpty) {
+          final later = first.startTime.isAfter(second.startTime)
+              ? first
+              : second;
+          final earlier = later == first ? second : first;
+          conflicts.add(
+            _Conflict(
+              booking: later,
+              label: 'Trùng thiết bị',
+              reason: 'Thiết bị ${sharedResources.first} đã được đặt',
+              suggestedTime: earlier.endTime.add(const Duration(minutes: 15)),
+              icon: Icons.construction_outlined,
+              accent: _Tokens.orange,
+              soft: const Color(0xFFFFF3E8),
+            ),
+          );
+        }
       }
-    }
-
-    final today = DateTime.now();
-    final todayBookings =
-        active
-            .where((booking) => _sameDay(booking.startTime, today))
-            .toList(growable: false)
-          ..sort((a, b) => a.startTime.compareTo(b.startTime));
-
-    if (conflicts.isEmpty && todayBookings.length >= 2) {
-      final target = todayBookings[1];
-      conflicts.add(
-        _Conflict(
-          booking: target,
-          label: 'Trùng thiết bị',
-          reason:
-              'Giường số 2 đang được sử dụng cho ${todayBookings.first.customerName ?? todayBookings.first.customerId}',
-          suggestedTime: target.startTime.add(const Duration(minutes: 30)),
-          icon: Icons.construction_outlined,
-          accent: _Tokens.orange,
-          soft: const Color(0xFFFFF3E8),
-        ),
-      );
     }
 
     return conflicts.take(2).toList(growable: false);
@@ -398,7 +480,10 @@ class _BookingView extends StatelessWidget {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  void _markPaymentComplete(BuildContext context, Booking booking) {
+  Future<void> _markPaymentComplete(
+    BuildContext context,
+    Booking booking,
+  ) async {
     if (booking.paymentStatus == 'paid') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Lịch hẹn này đã thanh toán.')),
@@ -406,9 +491,67 @@ class _BookingView extends StatelessWidget {
       return;
     }
 
+    final amountController = TextEditingController(
+      text: booking.paymentAmount?.toString() ?? '',
+    );
+    final referenceController = TextEditingController();
+    final method = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Ghi nhận thanh toán'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Số tiền (VND)'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: referenceController,
+              decoration: const InputDecoration(
+                labelText: 'Mã tham chiếu (tùy chọn)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, 'cash'),
+            child: const Text('Tiền mặt'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, 'bank_transfer'),
+            child: const Text('Chuyển khoản'),
+          ),
+        ],
+      ),
+    );
+    final amount = int.tryParse(amountController.text.trim());
+    final reference = referenceController.text.trim();
+    amountController.dispose();
+    referenceController.dispose();
+    if (!context.mounted || method == null) return;
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập số tiền hợp lệ.')),
+      );
+      return;
+    }
+
     context.read<BookingBloc>().add(
       BookingPaymentCompleteRequested(
-        MarkBookingPaidParams(bookingId: booking.id),
+        MarkBookingPaidParams(
+          bookingId: booking.id,
+          method: method,
+          amount: amount,
+          reference: reference.isEmpty ? null : reference,
+        ),
       ),
     );
     ScaffoldMessenger.of(context).showSnackBar(
@@ -420,7 +563,7 @@ class _BookingView extends StatelessWidget {
 class _Header extends StatelessWidget {
   const _Header({required this.onAdd});
 
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -431,7 +574,9 @@ class _Header extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: _IconSurfaceButton(
             icon: Icons.chevron_left,
-            onPressed: () {},
+            onPressed: () => context.canPop()
+                ? context.pop()
+                : context.go(HomePage.routePath),
             background: const Color(0xFFF5F6F8),
             foreground: const Color(0xFF647082),
           ),
@@ -445,15 +590,16 @@ class _Header extends StatelessWidget {
             height: 1,
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: _IconSurfaceButton(
-            icon: Icons.add,
-            onPressed: onAdd,
-            background: _Tokens.teal,
-            foreground: Colors.white,
+        if (onAdd != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: _IconSurfaceButton(
+              icon: Icons.add,
+              onPressed: onAdd!,
+              background: _Tokens.teal,
+              foreground: Colors.white,
+            ),
           ),
-        ),
       ],
     );
   }

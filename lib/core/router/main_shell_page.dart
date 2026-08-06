@@ -1,30 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/booking/presentation/widgets/booking_form_sheet.dart';
+import '../../features/dashboard/presentation/pages/home_page.dart';
+import '../theme/app_theme.dart';
 
 class MainShellPage extends StatelessWidget {
   const MainShellPage({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
-  // Lấy mã màu từ DESIGN.md
-  static const Color tealBg = Color(0xFF58D8E3);
-  static const Color tealPlus = Color(0xFF22AFC2);
-
   void _onItemTapped(int index, BuildContext context) {
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
     );
+    if (index == 0) {
+      requestDashboardRefresh();
+    }
   }
 
   void _onAddPressed(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
+      if (!authState.user.canManageBookings) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bạn chỉ có quyền xem lịch được phân công.'),
+          ),
+        );
+        return;
+      }
       // Giả định state Authenticated chứa thông tin user
       // Nếu thuộc tính khác, bạn điều chỉnh lại biến .user.tenantId cho khớp nhé
       final tenantId = authState.user.tenantId;
@@ -40,121 +50,145 @@ class MainShellPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCFCFD),
-      body: navigationShell,
-      // CỐ ĐỊNH CHIỀU CAO TẠI ĐÂY, NGĂN ALIGN CHIẾM TOÀN MÀN HÌNH
-      bottomNavigationBar: SizedBox(
-        height: 84 + bottomPadding,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
-            child: Padding(
-              padding: EdgeInsets.only(bottom: bottomPadding),
-              child: SizedBox(
-                height: 84,
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Main Navbar Background
-                    Container(
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: tealBg,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(10),
-                          topRight: Radius.circular(10),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.digit1, alt: true): () =>
+            _onItemTapped(0, context),
+        const SingleActivator(LogicalKeyboardKey.digit2, alt: true): () =>
+            _onItemTapped(1, context),
+        const SingleActivator(LogicalKeyboardKey.digit3, alt: true): () =>
+            _onItemTapped(2, context),
+        const SingleActivator(LogicalKeyboardKey.digit4, alt: true): () =>
+            _onItemTapped(3, context),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: AppTheme.canvas,
+          body: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: navigationShell,
+            ),
+          ),
+          // CỐ ĐỊNH CHIỀU CAO TẠI ĐÂY, NGĂN ALIGN CHIẾM TOÀN MÀN HÌNH
+          bottomNavigationBar: SizedBox(
+            height: 84 + bottomPadding,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: SizedBox(
+                  height: 84 + bottomPadding,
+                  child: Stack(
+                    alignment: Alignment.bottomCenter,
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Main Navbar Background
+                      Container(
+                        height: 64 + bottomPadding,
+                        padding: EdgeInsets.only(bottom: bottomPadding),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.brandSoft,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(10),
+                            topRight: Radius.circular(10),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _NavBarItem(
+                                    icon: Icons.home_outlined,
+                                    label: 'Trang chủ',
+                                    isSelected:
+                                        navigationShell.currentIndex == 0,
+                                    onTap: () => _onItemTapped(0, context),
+                                  ),
+                                  _NavBarItem(
+                                    icon: Icons.calendar_month_outlined,
+                                    label: 'Lịch hẹn',
+                                    isSelected:
+                                        navigationShell.currentIndex == 1,
+                                    onTap: () => _onItemTapped(1, context),
+                                  ),
+                                  const SizedBox(
+                                    width: 80,
+                                  ), // Khoảng trống cho nút +
+                                  _NavBarItem(
+                                    icon: Icons.bar_chart_outlined,
+                                    label: 'Thống kê',
+                                    isSelected:
+                                        navigationShell.currentIndex == 2,
+                                    onTap: () => _onItemTapped(2, context),
+                                  ),
+                                  _NavBarItem(
+                                    icon: Icons.person_outline,
+                                    label: 'Tài khoản',
+                                    isSelected:
+                                        navigationShell.currentIndex == 3,
+                                    onTap: () => _onItemTapped(3, context),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // iPhone Home Indicator Spacer
+                            Container(
+                              height: 5,
+                              width: 134,
+                              margin: const EdgeInsets.only(bottom: 8, top: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _NavBarItem(
-                                  icon: Icons.home_outlined,
-                                  label: 'Trang chủ',
-                                  isSelected: navigationShell.currentIndex == 0,
-                                  onTap: () => _onItemTapped(0, context),
-                                ),
-                                _NavBarItem(
-                                  icon: Icons.calendar_month_outlined,
-                                  label: 'Lịch hẹn',
-                                  isSelected: navigationShell.currentIndex == 1,
-                                  onTap: () => _onItemTapped(1, context),
-                                ),
-                                const SizedBox(
-                                  width: 80,
-                                ), // Khoảng trống cho nút +
-                                _NavBarItem(
-                                  icon: Icons.bar_chart_outlined,
-                                  label: 'Thống kê',
-                                  isSelected: navigationShell.currentIndex == 2,
-                                  onTap: () => _onItemTapped(2, context),
-                                ),
-                                _NavBarItem(
-                                  icon: Icons.person_outline,
-                                  label: 'Tài khoản',
-                                  isSelected: navigationShell.currentIndex == 3,
-                                  onTap: () => _onItemTapped(3, context),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // iPhone Home Indicator Spacer
-                          Container(
-                            height: 5,
-                            width: 134,
-                            margin: const EdgeInsets.only(bottom: 8, top: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
 
-                    // Floating Add Button
-                    Positioned(
-                      top: -12, // Đẩy nút nổi lên trên bar
-                      child: GestureDetector(
-                        onTap: () => _onAddPressed(context),
-                        child: Container(
-                          width: 88,
-                          height: 88,
-                          decoration: const BoxDecoration(
-                            color: tealBg,
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
+                      // Floating Add Button
+                      Positioned(
+                        top: -12, // Đẩy nút nổi lên trên bar
+                        child: GestureDetector(
+                          onTap: () => _onAddPressed(context),
                           child: Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
+                            width: 88,
+                            height: 88,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.brandSoft,
                               shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
                             ),
-                            child: const Icon(
-                              Icons.add,
-                              color: tealPlus,
-                              size: 32,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                color: AppTheme.brand,
+                                size: 32,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

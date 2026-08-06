@@ -18,17 +18,17 @@ class BookingFilterTabs extends StatelessWidget {
       spacing: 8,
       children: [
         _FilterChip(
-          label: 'All',
+          label: 'Tất cả',
           selected: selected == BookingRangeFilter.all,
           onTap: () => onChanged(BookingRangeFilter.all),
         ),
         _FilterChip(
-          label: 'Today',
+          label: 'Hôm nay',
           selected: selected == BookingRangeFilter.today,
           onTap: () => onChanged(BookingRangeFilter.today),
         ),
         _FilterChip(
-          label: 'This week',
+          label: 'Tuần này',
           selected: selected == BookingRangeFilter.week,
           onTap: () => onChanged(BookingRangeFilter.week),
         ),

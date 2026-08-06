@@ -28,6 +28,11 @@ class BookingModel extends Booking {
     super.paymentOrderCode,
     super.paymentCheckoutUrl,
     super.paymentPaidAt,
+    super.resourceIds,
+    super.paymentMethod,
+    super.paymentRecordedBy,
+    super.paymentReference,
+    super.paymentRecordedAt,
   });
 
   factory BookingModel.fromFirestore(
@@ -62,6 +67,11 @@ class BookingModel extends Booking {
       paymentOrderCode: data['paymentOrderCode'] as int?,
       paymentCheckoutUrl: data['paymentCheckoutUrl'] as String?,
       paymentPaidAt: (data['paymentPaidAt'] as Timestamp?)?.toDate(),
+      resourceIds: List<String>.from(data['resourceIds'] as List? ?? const []),
+      paymentMethod: data['paymentMethod'] as String?,
+      paymentRecordedBy: data['paymentRecordedBy'] as String?,
+      paymentReference: data['paymentReference'] as String?,
+      paymentRecordedAt: (data['paymentRecordedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -89,5 +99,11 @@ class BookingModel extends Booking {
     if (paymentCheckoutUrl != null) 'paymentCheckoutUrl': paymentCheckoutUrl,
     if (paymentPaidAt != null)
       'paymentPaidAt': Timestamp.fromDate(paymentPaidAt!),
+    'resourceIds': resourceIds,
+    if (paymentMethod != null) 'paymentMethod': paymentMethod,
+    if (paymentRecordedBy != null) 'paymentRecordedBy': paymentRecordedBy,
+    if (paymentReference != null) 'paymentReference': paymentReference,
+    if (paymentRecordedAt != null)
+      'paymentRecordedAt': Timestamp.fromDate(paymentRecordedAt!),
   };
 }

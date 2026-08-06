@@ -26,8 +26,8 @@ class AppointmentExtraction extends Equatable {
 
   Map<String, dynamic> get _extracted =>
       fields['extracted_fields'] is Map<String, dynamic>
-          ? fields['extracted_fields'] as Map<String, dynamic>
-          : const <String, dynamic>{};
+      ? fields['extracted_fields'] as Map<String, dynamic>
+      : const <String, dynamic>{};
 
   String? get customerName => _string(_extracted['customer_name']);
 
@@ -57,8 +57,9 @@ class AppointmentExtraction extends Equatable {
   /// `appointment_time` parsed from `HH:mm`.
   ({int hour, int minute})? get appointmentTime {
     final raw = _string(_extracted['appointment_time']);
-    final match =
-        raw == null ? null : RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(raw);
+    final match = raw == null
+        ? null
+        : RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(raw);
     if (match == null) {
       return null;
     }

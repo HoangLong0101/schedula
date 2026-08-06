@@ -5,8 +5,14 @@ import '../../../../core/errors/failure.dart';
 import '../repositories/staff_repository.dart';
 
 class DeleteStaffParams {
-  const DeleteStaffParams({required this.staffId});
+  const DeleteStaffParams({
+    required this.staffId,
+    this.cancelFuture = false,
+    this.reassignTo,
+  });
   final String staffId;
+  final bool cancelFuture;
+  final String? reassignTo;
 }
 
 @injectable
@@ -19,6 +25,10 @@ class DeleteStaffUseCase {
     if (params.staffId.trim().isEmpty) {
       return Future.value(const Left(ValidationFailure('Thiếu mã nhân viên.')));
     }
-    return _repository.deleteStaff(params.staffId);
+    return _repository.deleteStaff(
+      params.staffId,
+      cancelFuture: params.cancelFuture,
+      reassignTo: params.reassignTo,
+    );
   }
 }

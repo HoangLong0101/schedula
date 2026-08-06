@@ -13,7 +13,9 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final router = getIt.isRegistered<GoRouter>() ? getIt<GoRouter>() : AppRouter.router;
+    final router = getIt.isRegistered<GoRouter>()
+        ? getIt<GoRouter>()
+        : AppRouter.router;
     final authBloc = getIt<AuthBloc>();
 
     return BlocProvider.value(

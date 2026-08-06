@@ -37,5 +37,11 @@ class CatalogState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [currentTab, services, products, showForm, editingItem];
+  List<Object?> get props => [
+    currentTab,
+    services,
+    products,
+    showForm,
+    editingItem,
+  ];
 }

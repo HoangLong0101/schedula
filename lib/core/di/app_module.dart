@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -17,14 +18,19 @@ abstract class AppModule {
   FirebaseFirestore get firestore => FirebaseFirestore.instance;
 
   @lazySingleton
+  FirebaseStorage get storage => FirebaseStorage.instance;
+
+  @lazySingleton
   FirebaseDatabase get realtimeDatabase => FirebaseDatabase.instance;
 
   @lazySingleton
   GoogleSignIn get googleSignIn => GoogleSignIn(
-        serverClientId:
-            const String.fromEnvironment('FIREBASE_ANDROID_WEB_CLIENT_ID'),
-        scopes: const <String>['email', 'profile'],
-      );
+    clientId: const String.fromEnvironment('FIREBASE_ANDROID_WEB_CLIENT_ID'),
+    serverClientId: const String.fromEnvironment(
+      'FIREBASE_ANDROID_WEB_CLIENT_ID',
+    ),
+    scopes: const <String>['email', 'profile'],
+  );
 
   @lazySingleton
   GoRouter get router => AppRouter.router;

@@ -9,6 +9,7 @@ import '../../domain/entities/slot.dart';
 import '../../domain/repositories/booking_repository.dart';
 import '../../domain/usecases/cancel_booking_usecase.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
+import '../../domain/usecases/update_booking_usecase.dart';
 import '../../domain/usecases/update_booking_status_usecase.dart';
 import '../../domain/usecases/watch_bookings_usecase.dart';
 import '../../domain/usecases/watch_slots_usecase.dart';
@@ -76,7 +77,26 @@ class BookingRepositoryImpl implements BookingRepository {
     } on BookingPaymentRequiredException catch (error) {
       return Left(ValidationFailure(error.message));
     } catch (_) {
-      return const Left(ServerFailure('Không thể cập nhật trạng thái lịch hẹn.'));
+      return const Left(
+        ServerFailure('Không thể cập nhật trạng thái lịch hẹn.'),
+      );
+    }
+  }
+
+  @override
+  Future<Either<Failure, Booking>> updateBooking(
+    UpdateBookingParams params,
+  ) async {
+    try {
+      return Right(await _dataSource.updateBooking(params));
+    } on BookingConflictException catch (error) {
+      return Left(ConflictFailure(error.message));
+    } on BookingNotFoundException catch (error) {
+      return Left(NotFoundFailure(error.message));
+    } on BookingPaymentRequiredException catch (error) {
+      return Left(ValidationFailure(error.message));
+    } catch (_) {
+      return const Left(ServerFailure('Không thể cập nhật lịch hẹn.'));
     }
   }
 

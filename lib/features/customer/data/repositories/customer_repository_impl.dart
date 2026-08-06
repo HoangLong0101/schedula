@@ -15,18 +15,23 @@ class CustomerRepositoryImpl implements CustomerRepository {
 
   @override
   Stream<Either<Failure, List<Customer>>> watchCustomers(String tenantId) {
-    return _dataSource.watchCustomers(tenantId).transform(
-      StreamTransformer.fromHandlers(
-        handleData: (data, sink) => sink.add(Right(data)),
-        handleError: (_, _, sink) {
-          sink.add(const Left(ServerFailure('Không thể tải khách hàng.')));
-        },
-      ),
-    );
+    return _dataSource
+        .watchCustomers(tenantId)
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleData: (data, sink) => sink.add(Right(data)),
+            handleError: (_, _, sink) {
+              sink.add(const Left(ServerFailure('Không thể tải khách hàng.')));
+            },
+          ),
+        );
   }
 
   @override
-  Future<Either<Failure, Customer>> createCustomer(String tenantId, Customer customer) async {
+  Future<Either<Failure, Customer>> createCustomer(
+    String tenantId,
+    Customer customer,
+  ) async {
     try {
       final model = await _dataSource.createCustomer(tenantId, customer);
       return Right(model);

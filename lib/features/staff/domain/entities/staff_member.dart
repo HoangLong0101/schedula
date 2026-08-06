@@ -1,12 +1,14 @@
 import 'package:equatable/equatable.dart';
 
 enum StaffStatus { available, inSession, absent }
+
 enum ShiftValue { morning, afternoon, full, off }
 
 class StaffMember extends Equatable {
   final String id;
   final String name;
   final String role;
+  final String accessRole;
   final StaffStatus status;
   final String color;
   final int appointments;
@@ -20,6 +22,7 @@ class StaffMember extends Equatable {
     required this.id,
     required this.name,
     required this.role,
+    this.accessRole = 'staff',
     required this.status,
     required this.color,
     this.appointments = 0,
@@ -33,6 +36,7 @@ class StaffMember extends Equatable {
   StaffMember copyWith({
     String? name,
     String? role,
+    String? accessRole,
     StaffStatus? status,
     String? color,
     int? appointments,
@@ -46,6 +50,7 @@ class StaffMember extends Equatable {
       id: id,
       name: name ?? this.name,
       role: role ?? this.role,
+      accessRole: accessRole ?? this.accessRole,
       status: status ?? this.status,
       color: color ?? this.color,
       appointments: appointments ?? this.appointments,
@@ -59,7 +64,17 @@ class StaffMember extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, name, role, status, color, appointments,
-    rating, phone, email, specialties, shift,
+    id,
+    name,
+    role,
+    accessRole,
+    status,
+    color,
+    appointments,
+    rating,
+    phone,
+    email,
+    specialties,
+    shift,
   ];
 }

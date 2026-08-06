@@ -11,7 +11,9 @@ class ProductModel extends ProductItem {
     required super.category,
   });
 
-  factory ProductModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory ProductModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data() ?? {};
     return ProductModel(
       id: doc.id,

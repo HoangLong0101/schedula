@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../domain/entities/dashboard_stats.dart';
 import '../cubit/dashboard_cubit.dart';
 import '../cubit/dashboard_state.dart';
+import 'home_page.dart';
+import '../widgets/operational_reports.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key, this.tenantId});
@@ -101,6 +104,11 @@ class _StatisticsViewState extends State<_StatisticsView> {
                       ),
                     ),
                   },
+                  const SizedBox(height: 28),
+                  OperationalReports(
+                    tenantId: widget.tenantId,
+                    rangeIndex: _rangeIndex,
+                  ),
                 ],
               );
             },
@@ -121,16 +129,16 @@ class _StatisticsHeader extends StatelessWidget {
       children: [
         Align(
           alignment: Alignment.centerLeft,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: _StatsShadow.soft,
-            ),
-            child: const SizedBox(
-              width: 48,
-              height: 48,
-              child: Icon(Icons.chevron_left, color: _StatsColors.ink),
+          child: IconButton(
+            onPressed: () => context.go(HomePage.routePath),
+            tooltip: 'Về trang chủ',
+            icon: const Icon(Icons.chevron_left),
+            color: _StatsColors.ink,
+            style: IconButton.styleFrom(
+              fixedSize: const Size.square(48),
+              backgroundColor: Colors.white,
+              shadowColor: _StatsColors.ink.withValues(alpha: 0.08),
+              elevation: 3,
             ),
           ),
         ),
@@ -350,12 +358,8 @@ class _ResourcesTab extends StatelessWidget {
           icon: Icons.bed_outlined,
           title: 'Giường sử dụng nhiều nhất',
           rows: [
-            _ProgressRow(rank: 1, label: 'Dang hoat dong', value: activeRate),
-            _ProgressRow(
-              rank: 2,
-              label: 'Da hoan thanh',
-              value: completedRate,
-            ),
+            _ProgressRow(rank: 1, label: 'Đang hoạt động', value: activeRate),
+            _ProgressRow(rank: 2, label: 'Đã hoàn thành', value: completedRate),
           ],
         ),
         const SizedBox(height: 20),
@@ -365,7 +369,7 @@ class _ResourcesTab extends StatelessWidget {
           title: 'Giường ít sử dụng',
           rows: [
             _ProgressRow(
-              label: 'Ty le huy',
+              label: 'Tỷ lệ hủy',
               value: cancelledRate,
               color: _StatsColors.orange,
             ),
@@ -947,9 +951,8 @@ class _TopStaffCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ranked = [...staff]..sort(
-      (a, b) => b.bookingCount.compareTo(a.bookingCount),
-    );
+    final ranked = [...staff]
+      ..sort((a, b) => b.bookingCount.compareTo(a.bookingCount));
     final topStaff = ranked.where((item) => item.bookingCount > 0).take(3);
     final names = topStaff.map((item) => item.name).toList();
     final values = topStaff.map((item) => item.bookingCount).toList();

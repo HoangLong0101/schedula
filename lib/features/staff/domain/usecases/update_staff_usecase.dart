@@ -21,10 +21,14 @@ class UpdateStaffUseCase {
       return Future.value(const Left(ValidationFailure('Thiếu mã nhân viên.')));
     }
     if (params.staff.name.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng nhập tên nhân viên.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng nhập tên nhân viên.')),
+      );
     }
     if (params.staff.role.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng chọn vai trò nhân viên.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng chọn vai trò nhân viên.')),
+      );
     }
     return _repository.updateStaff(params.staff);
   }

@@ -12,6 +12,7 @@ class BusinessInfo extends Equatable {
   final String planTier;
   final DateTime? planStartedAt;
   final DateTime? planExpiresAt;
+  final int staffReminderLeadMinutes;
 
   const BusinessInfo({
     required this.name,
@@ -25,6 +26,7 @@ class BusinessInfo extends Equatable {
     this.planTier = 'basic',
     this.planStartedAt,
     this.planExpiresAt,
+    this.staffReminderLeadMinutes = 60,
   });
 
   BusinessInfo copyWith({
@@ -39,6 +41,7 @@ class BusinessInfo extends Equatable {
     String? planTier,
     DateTime? planStartedAt,
     DateTime? planExpiresAt,
+    int? staffReminderLeadMinutes,
   }) {
     return BusinessInfo(
       name: name ?? this.name,
@@ -52,6 +55,8 @@ class BusinessInfo extends Equatable {
       planTier: planTier ?? this.planTier,
       planStartedAt: planStartedAt ?? this.planStartedAt,
       planExpiresAt: planExpiresAt ?? this.planExpiresAt,
+      staffReminderLeadMinutes:
+          staffReminderLeadMinutes ?? this.staffReminderLeadMinutes,
     );
   }
 
@@ -68,5 +73,6 @@ class BusinessInfo extends Equatable {
     planTier,
     planStartedAt,
     planExpiresAt,
+    staffReminderLeadMinutes,
   ];
 }

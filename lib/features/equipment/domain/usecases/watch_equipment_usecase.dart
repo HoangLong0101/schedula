@@ -8,5 +8,6 @@ import '../repositories/equipment_repository.dart';
 class WatchEquipmentUseCase {
   const WatchEquipmentUseCase(this._repository);
   final EquipmentRepository _repository;
-  Stream<Either<Failure, List<Equipment>>> call(String tenantId) => _repository.watchEquipment(tenantId);
+  Stream<Either<Failure, List<Equipment>>> call(String tenantId) =>
+      _repository.watchEquipment(tenantId);
 }

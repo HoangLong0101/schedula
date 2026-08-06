@@ -4,20 +4,29 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/string_utils.dart';
 import '../../../catalog/domain/entities/service_item.dart';
 import '../../../catalog/domain/repositories/catalog_repository.dart';
+import '../../../customer/domain/entities/customer.dart';
+import '../../../customer/domain/usecases/watch_customers_usecase.dart';
 import '../../../staff/domain/entities/staff_member.dart';
 import '../../../staff/domain/usecases/watch_staff_usecase.dart';
 import '../../domain/entities/appointment_image_upload.dart';
+import '../../domain/entities/booking.dart';
 import '../../domain/entities/booking_status.dart';
 import '../../domain/usecases/create_booking_usecase.dart';
 import '../../domain/usecases/scan_appointment_image_usecase.dart';
+import '../../domain/usecases/update_booking_usecase.dart';
 import '../../domain/usecases/watch_bookings_usecase.dart';
 import '../cubit/booking_form_cubit.dart';
 import '../cubit/booking_form_state.dart';
 
 class BookingFormSheet {
-  static Future<void> show(BuildContext context, {required String tenantId}) {
+  static Future<void> show(
+    BuildContext context, {
+    required String tenantId,
+    Booking? booking,
+  }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -29,9 +38,11 @@ class BookingFormSheet {
             getIt<ScanAppointmentImageUseCase>(),
             getIt<WatchStaffUseCase>(),
             getIt<WatchBookingsUseCase>(),
+            getIt<WatchCustomersUseCase>(),
             getIt<CatalogRepository>(),
+            booking,
           ),
-          child: _BookingFormContent(tenantId: tenantId),
+          child: _BookingFormContent(tenantId: tenantId, booking: booking),
         );
       },
     );
@@ -39,9 +50,10 @@ class BookingFormSheet {
 }
 
 class _BookingFormContent extends StatefulWidget {
-  const _BookingFormContent({required this.tenantId});
+  const _BookingFormContent({required this.tenantId, this.booking});
 
   final String tenantId;
+  final Booking? booking;
 
   @override
   State<_BookingFormContent> createState() => _BookingFormContentState();
@@ -50,11 +62,20 @@ class _BookingFormContent extends StatefulWidget {
 class _BookingFormContentState extends State<_BookingFormContent> {
   final _lookupController = TextEditingController();
   final _customerNameController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _customerNameController.text = widget.booking?.customerName ?? '';
+    _notesController.text = widget.booking?.notes ?? '';
+  }
 
   @override
   void dispose() {
     _lookupController.dispose();
     _customerNameController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -69,12 +90,17 @@ class _BookingFormContentState extends State<_BookingFormContent> {
         ),
         child: BlocConsumer<BookingFormCubit, BookingFormState>(
           listenWhen: (previous, current) =>
-              previous.extraction != current.extraction &&
-              current.extraction != null,
+              (previous.extraction != current.extraction &&
+                  current.extraction != null) ||
+              previous.customerId != current.customerId,
           listener: (context, state) {
             // Reflect AI-extracted values in the editable text fields.
-            _lookupController.text = state.customerLookup;
-            _customerNameController.text = state.customerName;
+            if (_lookupController.text != state.customerLookup) {
+              _lookupController.text = state.customerLookup;
+            }
+            if (_customerNameController.text != state.customerName) {
+              _customerNameController.text = state.customerName;
+            }
           },
           builder: (context, state) {
             return SingleChildScrollView(
@@ -100,9 +126,11 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                   const SizedBox(height: 24),
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Thêm lịch hẹn mới',
+                          widget.booking == null
+                              ? 'Thêm lịch hẹn mới'
+                              : 'Chỉnh sửa lịch hẹn',
                           style: TextStyle(
                             color: _Tokens.text,
                             fontSize: 24,
@@ -191,7 +219,7 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                         .updateStaffName,
                   ),
                   const SizedBox(height: 20),
-                  const _SectionLabel('Khách hàng'),
+                  const _SectionLabel('Số điện thoại'),
                   const SizedBox(height: 8),
                   _InputField(
                     controller: _lookupController,
@@ -205,19 +233,20 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                   const SizedBox(height: 16),
                   const _SectionLabel('Tên khách hàng'),
                   const SizedBox(height: 8),
-                  _InputField(
+                  _CustomerAutocompleteField(
                     controller: _customerNameController,
+                    customers: state.customers,
                     hintText: 'Nhập tên khách hàng',
-                    icon: Icons.person_outline,
-                    textInputAction: TextInputAction.next,
                     onChanged: context
                         .read<BookingFormCubit>()
                         .updateCustomerName,
+                    onSelected: context.read<BookingFormCubit>().selectCustomer,
                   ),
                   const SizedBox(height: 16),
                   const _SectionLabel('Ghi chú'),
                   const SizedBox(height: 8),
                   _InputField(
+                    controller: _notesController,
                     hintText: 'Ghi chú thêm (tùy chọn)',
                     icon: Icons.notes_outlined,
                     minLines: 2,
@@ -280,27 +309,39 @@ class _BookingFormContentState extends State<_BookingFormContent> {
 
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final result = await getIt<CreateBookingUseCase>()(
-      CreateBookingParams(
-        tenantId: widget.tenantId,
-        staffId: staffId,
-        customerId: lookup.isNotEmpty
-            ? _stableId('customer', lookup)
-            : _stableId('customer', customerName),
-        serviceId: serviceId,
-        startTime: state.startDateTime,
-        endTime: state.endDateTime,
-        status: BookingStatus.confirmed,
-        notes: state.notes.trim().isEmpty ? null : state.notes.trim(),
-        customerName: customerName,
-        staffName: staffName,
-        serviceName: serviceName,
-      ),
+    final selectedServices = state.services.where(
+      (service) => service.id == state.serviceId,
     );
+    final resourceIds = selectedServices.isEmpty
+        ? widget.booking?.resourceIds ?? const <String>[]
+        : selectedServices.first.resourceIds;
+    final params = CreateBookingParams(
+      tenantId: widget.tenantId,
+      staffId: staffId,
+      customerId: state.customerId.isNotEmpty
+          ? state.customerId
+          : lookup.isNotEmpty
+          ? _stableId('customer', lookup)
+          : _stableId('customer', customerName),
+      serviceId: serviceId,
+      startTime: state.startDateTime,
+      endTime: state.endDateTime,
+      status: widget.booking?.status ?? BookingStatus.confirmed,
+      notes: state.notes.trim().isEmpty ? null : state.notes.trim(),
+      customerName: customerName,
+      staffName: staffName,
+      serviceName: serviceName,
+      resourceIds: resourceIds,
+    );
+    final result = widget.booking == null
+        ? await getIt<CreateBookingUseCase>()(params)
+        : await getIt<UpdateBookingUseCase>()(
+            UpdateBookingParams(bookingId: widget.booking!.id, booking: params),
+          );
 
     result.fold(
       (failure) {
-        debugPrint('Create booking failed: ${failure.message}');
+        debugPrint('Save booking failed: ${failure.message}');
         messenger.showSnackBar(
           SnackBar(
             content: Text('Không lưu được lịch hẹn: ${failure.message}'),
@@ -309,7 +350,13 @@ class _BookingFormContentState extends State<_BookingFormContent> {
       },
       (_) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Đã lưu lịch hẹn.')),
+          SnackBar(
+            content: Text(
+              widget.booking == null
+                  ? 'Đã lưu lịch hẹn.'
+                  : 'Đã cập nhật lịch hẹn.',
+            ),
+          ),
         );
         navigator.pop();
       },
@@ -801,6 +848,8 @@ class _StaffOption extends StatelessWidget {
       subtitle: Text(
         [
           statusText,
+          if (recommendation.servedCustomerBefore)
+            'đã phục vụ ${recommendation.customerBookingCount} lần',
           if (recommendation.serviceMatch) 'hợp dịch vụ',
           '${staff.rating.toStringAsFixed(1)} sao',
           '${staff.appointments} lịch',
@@ -872,6 +921,155 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
+class _CustomerAutocompleteField extends StatefulWidget {
+  const _CustomerAutocompleteField({
+    required this.controller,
+    required this.customers,
+    required this.hintText,
+    required this.onChanged,
+    required this.onSelected,
+  });
+
+  final TextEditingController controller;
+  final List<Customer> customers;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<Customer> onSelected;
+
+  @override
+  State<_CustomerAutocompleteField> createState() =>
+      _CustomerAutocompleteFieldState();
+}
+
+class _CustomerAutocompleteFieldState
+    extends State<_CustomerAutocompleteField> {
+  final _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RawAutocomplete<Customer>(
+      textEditingController: widget.controller,
+      focusNode: _focusNode,
+      displayStringForOption: (customer) => customer.name,
+      optionsBuilder: (value) {
+        final query = StringUtilsX.normalizeForSearch(value.text);
+        final customers = [...widget.customers];
+        customers.sort((a, b) {
+          final visits = b.totalVisits.compareTo(a.totalVisits);
+          if (visits != 0) return visits;
+          return a.name.compareTo(b.name);
+        });
+
+        if (query.isEmpty) {
+          return customers.take(8);
+        }
+
+        return customers
+            .where((customer) {
+              final name = StringUtilsX.normalizeForSearch(customer.name);
+              final phone = StringUtilsX.normalizeForSearch(customer.phone);
+              return name.contains(query) || phone.contains(query);
+            })
+            .take(8);
+      },
+      onSelected: (customer) {
+        widget.controller.text = customer.name;
+        widget.onSelected(customer);
+      },
+      fieldViewBuilder:
+          (context, textEditingController, focusNode, onFieldSubmitted) {
+            return TextField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              onChanged: widget.onChanged,
+              textInputAction: TextInputAction.next,
+              style: const TextStyle(
+                color: _Tokens.text,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+                prefixIcon: const Icon(
+                  Icons.person_outline,
+                  color: Color(0xFF98A1B2),
+                  size: 20,
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF7F8FA),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: const BorderSide(color: _Tokens.teal, width: 1.2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 17,
+                ),
+              ),
+            );
+          },
+      optionsViewBuilder: (context, onSelected, options) {
+        final items = options.toList(growable: false);
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            color: Colors.white,
+            elevation: 8,
+            borderRadius: BorderRadius.circular(14),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280, maxWidth: 420),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shrinkWrap: true,
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final customer = items[index];
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.person_outline,
+                      color: _Tokens.teal,
+                    ),
+                    title: Text(
+                      customer.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      [
+                        if (customer.phone.isNotEmpty) customer.phone,
+                        '${customer.totalVisits} lượt',
+                      ].join(' - '),
+                    ),
+                    onTap: () => onSelected(customer),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _InputField extends StatelessWidget {
   const _InputField({
     required this.hintText,
@@ -879,7 +1077,6 @@ class _InputField extends StatelessWidget {
     required this.onChanged,
     this.controller,
     this.keyboardType,
-    this.textInputAction,
     this.minLines = 1,
     this.maxLines = 1,
   });
@@ -889,7 +1086,6 @@ class _InputField extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final TextEditingController? controller;
   final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
   final int minLines;
   final int maxLines;
 
@@ -899,7 +1095,6 @@ class _InputField extends StatelessWidget {
       controller: controller,
       onChanged: onChanged,
       keyboardType: keyboardType,
-      textInputAction: textInputAction,
       minLines: minLines,
       maxLines: maxLines,
       style: const TextStyle(

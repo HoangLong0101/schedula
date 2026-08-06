@@ -20,6 +20,7 @@ class CreateBookingParams {
     this.customerName,
     this.staffName,
     this.serviceName,
+    this.resourceIds = const [],
   });
 
   final String tenantId;
@@ -34,6 +35,7 @@ class CreateBookingParams {
   final String? customerName;
   final String? staffName;
   final String? serviceName;
+  final List<String> resourceIds;
 }
 
 @injectable
@@ -47,14 +49,20 @@ class CreateBookingUseCase {
       return Future.value(const Left(ValidationFailure('Thiếu mã cơ sở.')));
     }
     if (params.serviceId.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng chọn dịch vụ.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng chọn dịch vụ.')),
+      );
     }
     if (params.staffId.trim().isEmpty) {
-      return Future.value(const Left(ValidationFailure('Vui lòng chọn nhân viên phụ trách.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng chọn nhân viên phụ trách.')),
+      );
     }
     if (params.customerId.trim().isEmpty &&
         (params.customerName == null || params.customerName!.trim().isEmpty)) {
-      return Future.value(const Left(ValidationFailure('Vui lòng nhập khách hàng.')));
+      return Future.value(
+        const Left(ValidationFailure('Vui lòng nhập khách hàng.')),
+      );
     }
     if (!params.endTime.isAfter(params.startTime)) {
       return Future.value(

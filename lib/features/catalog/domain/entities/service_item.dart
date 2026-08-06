@@ -8,6 +8,7 @@ class ServiceItem extends Equatable {
   final int duration; // Số phút
   final String category;
   final List<String> resources;
+  final List<String> resourceIds;
 
   const ServiceItem({
     required this.id,
@@ -17,8 +18,18 @@ class ServiceItem extends Equatable {
     required this.duration,
     required this.category,
     this.resources = const [],
+    this.resourceIds = const [],
   });
 
   @override
-  List<Object?> get props => [id, tenantId, name, price, duration, category, resources];
+  List<Object?> get props => [
+    id,
+    tenantId,
+    name,
+    price,
+    duration,
+    category,
+    resources,
+    resourceIds,
+  ];
 }

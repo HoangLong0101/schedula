@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../booking/domain/entities/booking_status.dart';
 import '../models/dashboard_stats_model.dart';
+import '../../domain/entities/operational_report.dart';
 
 @lazySingleton
 class DashboardDataSource {
@@ -13,6 +14,11 @@ class DashboardDataSource {
 
   static const _heatmapWindow = Duration(days: 30);
   static const _followUpWindow = Duration(days: 30);
+  static const _activeBookingStatuses = [
+    BookingStatus.pending,
+    BookingStatus.confirmed,
+    BookingStatus.inProgress,
+  ];
 
   CollectionReference<Map<String, dynamic>> get _bookings =>
       _firestore.collection('bookings');
@@ -59,7 +65,17 @@ class DashboardDataSource {
       _safeCount(
         base.where('status', isEqualTo: BookingStatus.noShow.value).count(),
       ),
-      _safeCount(base.where('startTime', isGreaterThanOrEqualTo: now).count()),
+      _safeCount(
+        base
+            .where(
+              'status',
+              whereIn: _activeBookingStatuses
+                  .map((status) => status.value)
+                  .toList(),
+            )
+            .where('startTime', isGreaterThanOrEqualTo: now)
+            .count(),
+      ),
       _safeDocs(
         base
             .where('startTime', isGreaterThanOrEqualTo: heatmapStart)
@@ -69,12 +85,15 @@ class DashboardDataSource {
       _safeDocs(_tenantStatsDaily.where('tenantId', isEqualTo: tenantId)),
       _safeDocs(
         base
+            .where(
+              'status',
+              whereIn: _activeBookingStatuses
+                  .map((status) => status.value)
+                  .toList(),
+            )
             .where('startTime', isGreaterThanOrEqualTo: startOfToday)
             .where('startTime', isLessThan: startOfTomorrow)
             .orderBy('startTime'),
-      ),
-      _safeDocs(
-        base.where('status', isEqualTo: BookingStatus.inProgress.value),
       ),
       _safeDocs(_users.where('tenantId', isEqualTo: tenantId)),
       _safeCount(customersBase.count()),
@@ -98,15 +117,137 @@ class DashboardDataSource {
           results[6] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
       todayBookingDocs:
           results[7] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-      inProgressBookingDocs:
-          results[8] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
       staffDocs:
-          results[9] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
-      totalCustomers: results[10] as int,
-      returningCustomers: results[11] as int,
-      needsFollowUpCustomers: results[12] as int,
+          results[8] as List<QueryDocumentSnapshot<Map<String, dynamic>>>,
+      totalCustomers: results[9] as int,
+      returningCustomers: results[10] as int,
+      needsFollowUpCustomers: results[11] as int,
     );
   }
+
+  Future<List<ReportRecord>> fetchOperationalReports(String tenantId) async {
+    final queries = await Future.wait([
+      _firestore
+          .collection('bookings')
+          .where('tenantId', isEqualTo: tenantId)
+          .get(),
+      _firestore
+          .collection('payments')
+          .where('tenantId', isEqualTo: tenantId)
+          .get(),
+      _firestore
+          .collection('customers')
+          .where('tenantId', isEqualTo: tenantId)
+          .get(),
+      _firestore
+          .collection('campaigns')
+          .where('tenantId', isEqualTo: tenantId)
+          .get(),
+      _firestore
+          .collection('users')
+          .where('tenantId', isEqualTo: tenantId)
+          .get(),
+    ]);
+    final records = <ReportRecord>[];
+
+    for (final document in queries[0].docs) {
+      final data = document.data();
+      records.add(
+        ReportRecord(
+          id: document.id,
+          kind: ReportKind.bookings,
+          date: _date(data['startTime']),
+          title: data['customerName'] as String? ?? document.id,
+          subtitle: data['serviceName'] as String? ?? '',
+          staffId: data['staffId'] as String? ?? '',
+          serviceId: data['serviceId'] as String? ?? '',
+          status: data['status'] as String? ?? '',
+          paymentMethod: data['paymentMethod'] as String? ?? '',
+          bookingId: document.id,
+          amount: (data['paymentAmount'] as num?)?.round() ?? 0,
+        ),
+      );
+    }
+    for (final document in queries[1].docs) {
+      final data = document.data();
+      records.add(
+        ReportRecord(
+          id: document.id,
+          kind: ReportKind.payments,
+          date: _date(
+            data['recordedAt'] ?? data['paidAt'] ?? data['createdAt'],
+          ),
+          title: data['type'] == 'subscription'
+              ? data['planName'] as String? ?? 'Gói dịch vụ'
+              : 'Thanh toán lịch hẹn',
+          subtitle: data['reference'] as String? ?? '',
+          status: data['status'] as String? ?? '',
+          paymentMethod:
+              data['method'] as String? ??
+              (data['paymentLinkId'] == null ? '' : 'payos'),
+          bookingId: data['bookingId'] as String? ?? '',
+          amount: (data['amount'] as num?)?.round() ?? 0,
+          reconciliationStatus:
+              data['reconciliationStatus'] as String? ??
+              (data['status'] == 'paid' ? 'matched' : 'pending'),
+        ),
+      );
+    }
+    for (final document in queries[2].docs) {
+      final data = document.data();
+      records.add(
+        ReportRecord(
+          id: document.id,
+          kind: ReportKind.customers,
+          date: _date(data['lastVisit'] ?? data['createdAt']),
+          title: data['name'] as String? ?? '',
+          subtitle: data['email'] as String? ?? '',
+          status: data['emailOptedOut'] == true ? 'opted_out' : 'active',
+          amount:
+              (data['visitCount'] as num?)?.round() ??
+              (data['totalVisits'] as num?)?.round() ??
+              0,
+        ),
+      );
+    }
+    for (final document in queries[3].docs) {
+      final data = document.data();
+      records.add(
+        ReportRecord(
+          id: document.id,
+          kind: ReportKind.campaigns,
+          date: _date(data['createdAt']),
+          title: data['templateId'] as String? ?? '',
+          subtitle: 'Đã gửi ${data['sent'] ?? 0}, lỗi ${data['failed'] ?? 0}',
+          status: data['status'] as String? ?? '',
+          amount: (data['sent'] as num?)?.round() ?? 0,
+        ),
+      );
+    }
+    for (final document in queries[4].docs) {
+      final data = document.data();
+      final role = data['role'] as String? ?? '';
+      if (role != 'staff' && role != 'receptionist') continue;
+      records.add(
+        ReportRecord(
+          id: document.id,
+          kind: ReportKind.staff,
+          date: _date(data['createdAt']),
+          title: data['name'] as String? ?? data['email'] as String? ?? '',
+          subtitle: role,
+          staffId: document.id,
+          status: data['active'] == false ? 'inactive' : 'active',
+        ),
+      );
+    }
+    // ponytail: full tenant scan is intentional for small operators; move
+    // filtering to report Functions when a tenant exceeds 10,000 records.
+    return records;
+  }
+
+  DateTime _date(Object? value) => value is Timestamp
+      ? value.toDate()
+      : DateTime.fromMillisecondsSinceEpoch(0);
 
   Future<int> _safeCount(AggregateQuery query) async {
     try {

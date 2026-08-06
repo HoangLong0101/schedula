@@ -19,6 +19,18 @@ type CreatePayOSPaymentData = {
   amount: number;
 };
 
+type CreatePlanUpgradePaymentData = {
+  planTier: string;
+  billingPeriod?: string;
+};
+
+type SubscriptionPlan = {
+  tier: string;
+  name: string;
+  price: number;
+  periodMonths: number;
+};
+
 type PayOSCreatePaymentResponse = {
   code: string;
   desc: string;
@@ -34,6 +46,27 @@ type PayOSCreatePaymentResponse = {
 
 const db = admin.firestore();
 
+const fallbackSubscriptionPlans: Record<string, SubscriptionPlan> = {
+  pro: {
+    tier: 'pro',
+    name: 'Schedula Pro',
+    price: 699000,
+    periodMonths: 1,
+  },
+  premium: {
+    tier: 'premium',
+    name: 'Schedula Premium',
+    price: 1499000,
+    periodMonths: 1,
+  },
+  enterprise: {
+    tier: 'enterprise',
+    name: 'Schedula Enterprise',
+    price: 1499000,
+    periodMonths: 1,
+  },
+};
+
 export const createPayOSPayment = onCall(
   {
     region: 'asia-southeast1',
@@ -41,29 +74,29 @@ export const createPayOSPayment = onCall(
   },
   async (request) => {
     if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Authentication is required');
+      throw new HttpsError('unauthenticated', 'Vui lòng đăng nhập');
     }
 
     const role = request.auth.token.role;
     if (role !== 'owner' && role !== 'receptionist') {
-      throw new HttpsError('permission-denied', 'Owners and receptionists only');
+      throw new HttpsError('permission-denied', 'Chỉ chủ cơ sở và lễ tân được thực hiện');
     }
 
     const { bookingId, amount } = request.data as CreatePayOSPaymentData;
     if (!bookingId || !Number.isInteger(amount) || amount <= 0) {
-      throw new HttpsError('invalid-argument', 'Bad payment payload');
+      throw new HttpsError('invalid-argument', 'Thông tin thanh toán không hợp lệ');
     }
 
     const bookingRef = db.collection('bookings').doc(bookingId);
     const bookingSnap = await bookingRef.get();
     if (!bookingSnap.exists) {
-      throw new HttpsError('not-found', 'Booking not found');
+      throw new HttpsError('not-found', 'Không tìm thấy lịch hẹn');
     }
 
     const booking = bookingSnap.data() ?? {};
     const tenantId = booking.tenantId as string | undefined;
     if (!tenantId || tenantId !== request.auth.token.tenantId) {
-      throw new HttpsError('permission-denied', 'Booking is outside your tenant');
+      throw new HttpsError('permission-denied', 'Lịch hẹn không thuộc cơ sở này');
     }
 
     const existingPaymentSnap = await db
@@ -94,17 +127,17 @@ export const createPayOSPayment = onCall(
       cancelUrl: payosCancelUrl.value(),
       items: [
         {
-          name: String(booking.serviceName ?? booking.serviceId ?? 'Booking'),
+          name: String(booking.serviceName ?? booking.serviceId ?? 'Lịch hẹn'),
           quantity: 1,
           price: amount,
         },
       ],
     };
 
-    if (!payload.returnUrl || !payload.cancelUrl) {
+    if (!isValidWebUrl(payload.returnUrl) || !isValidWebUrl(payload.cancelUrl)) {
       throw new HttpsError(
         'failed-precondition',
-        'PAYOS_RETURN_URL and PAYOS_CANCEL_URL must be configured',
+        'PAYOS_RETURN_URL và PAYOS_CANCEL_URL phải là địa chỉ http(s) hợp lệ',
       );
     }
 
@@ -133,7 +166,7 @@ export const createPayOSPayment = onCall(
     if (!response.ok || result.code !== '00' || !result.data?.checkoutUrl) {
       throw new HttpsError(
         'internal',
-        result.desc || 'PayOS payment link creation failed',
+        result.desc || 'Không thể tạo liên kết thanh toán PayOS',
       );
     }
 
@@ -172,6 +205,159 @@ export const createPayOSPayment = onCall(
   },
 );
 
+export const createPayOSPlanUpgradePayment = onCall(
+  {
+    region: 'asia-southeast1',
+    secrets: [payosClientId, payosApiKey, payosChecksumKey],
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Vui lòng đăng nhập');
+    }
+
+    if (request.auth.token.role !== 'owner') {
+      throw new HttpsError('permission-denied', 'Chỉ chủ cơ sở được thực hiện');
+    }
+
+    const tenantId = request.auth.token.tenantId as string | undefined;
+    if (!tenantId) {
+      throw new HttpsError('failed-precondition', 'Phiên đăng nhập thiếu mã cơ sở');
+    }
+
+    const { planTier, billingPeriod } =
+      request.data as CreatePlanUpgradePaymentData;
+    const normalizedPlanTier = String(planTier ?? '').trim().toLowerCase();
+    if (!normalizedPlanTier || normalizedPlanTier === 'basic') {
+      throw new HttpsError('invalid-argument', 'Vui lòng chọn gói trả phí');
+    }
+
+    const plan = await resolveSubscriptionPlan(
+      normalizedPlanTier,
+      billingPeriod,
+    );
+    if (!plan) {
+      throw new HttpsError('invalid-argument', 'Gói dịch vụ không hợp lệ');
+    }
+
+    const tenantRef = db.collection('tenants').doc(tenantId);
+    const tenantSnap = await tenantRef.get();
+    if (!tenantSnap.exists) {
+      throw new HttpsError('not-found', 'Không tìm thấy cơ sở');
+    }
+    const planExpiresAt = Timestamp.fromDate(
+      subscriptionExpiryDate(tenantSnap.data()?.planExpiresAt, plan.periodMonths),
+    );
+
+    const stalePaymentSnap = await db
+      .collection('payments')
+      .where('tenantId', '==', tenantId)
+      .where('type', '==', 'subscription')
+      .where('planTier', '==', plan.tier)
+      .where('status', '==', 'pending')
+      .get();
+
+    if (!stalePaymentSnap.empty) {
+      const batch = db.batch();
+      for (const doc of stalePaymentSnap.docs) {
+        batch.update(doc.ref, {
+          status: 'superseded',
+          supersededAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    }
+
+    const orderCode = generateOrderCode();
+    const description = buildDescription(orderCode);
+    const returnUrl = payosReturnUrl.value();
+    const cancelUrl = payosCancelUrl.value();
+
+    if (!isValidWebUrl(returnUrl) || !isValidWebUrl(cancelUrl)) {
+      throw new HttpsError(
+        'failed-precondition',
+        'PAYOS_RETURN_URL và PAYOS_CANCEL_URL phải là địa chỉ http(s) hợp lệ',
+      );
+    }
+
+    const payload = {
+      orderCode,
+      amount: plan.price,
+      description,
+      returnUrl,
+      cancelUrl,
+      items: [
+        {
+          name: plan.name,
+          quantity: 1,
+          price: plan.price,
+        },
+      ],
+    };
+
+    const signature = signPayOSData(
+      {
+        amount: payload.amount,
+        cancelUrl: payload.cancelUrl,
+        description: payload.description,
+        orderCode: payload.orderCode,
+        returnUrl: payload.returnUrl,
+      },
+      payosChecksumKey.value(),
+    );
+
+    const response = await fetch(
+      'https://api-merchant.payos.vn/v2/payment-requests',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': payosClientId.value(),
+          'x-api-key': payosApiKey.value(),
+        },
+        body: JSON.stringify({ ...payload, signature }),
+      },
+    );
+
+    const result = (await response.json()) as PayOSCreatePaymentResponse;
+    if (!response.ok || result.code !== '00' || !result.data?.checkoutUrl) {
+      throw new HttpsError(
+        'internal',
+        result.desc || 'Không thể tạo liên kết nâng cấp gói PayOS',
+      );
+    }
+
+    const paymentRef = db.collection('payments').doc();
+    await paymentRef.set({
+      type: 'subscription',
+      tenantId,
+      planTier: plan.tier,
+      planName: plan.name,
+      billingPeriod: billingPeriod ?? 'monthly',
+      periodMonths: plan.periodMonths,
+      planExpiresAt,
+      orderCode,
+      amount: plan.price,
+      description,
+      status: 'pending',
+      paymentLinkId: result.data.paymentLinkId,
+      checkoutUrl: result.data.checkoutUrl,
+      qrCode: result.data.qrCode ?? null,
+      createdBy: request.auth.uid,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      paymentId: paymentRef.id,
+      checkoutUrl: result.data.checkoutUrl,
+      status: 'pending',
+      orderCode,
+      paymentLinkId: result.data.paymentLinkId,
+    };
+  },
+);
+
 export const payosWebhook = onRequest(
   {
     region: 'asia-southeast1',
@@ -197,7 +383,7 @@ export const payosWebhook = onRequest(
     }
 
     if (!verifyPayOSSignature(body.data, body.signature, payosChecksumKey.value())) {
-      response.status(401).send('Invalid signature');
+      response.status(401).send('Chữ ký không hợp lệ');
       return;
     }
 
@@ -214,7 +400,7 @@ export const payosWebhook = onRequest(
       .get();
 
     if (paymentSnap.empty) {
-      response.status(200).send('Payment not found');
+      response.status(200).send('Không tìm thấy thanh toán');
       return;
     }
 
@@ -240,11 +426,79 @@ export const payosWebhook = onRequest(
           updatedAt: FieldValue.serverTimestamp(),
         });
       }
+
+      if (
+        paid &&
+        payment.type === 'subscription' &&
+        payment.tenantId &&
+        payment.planTier
+      ) {
+        tx.update(db.collection('tenants').doc(String(payment.tenantId)), {
+          planTier: String(payment.planTier),
+          planStartedAt: FieldValue.serverTimestamp(),
+          planExpiresAt: Timestamp.fromDate(
+            subscriptionExpiryDate(
+              payment.planExpiresAt,
+              Number(payment.periodMonths) || 1,
+            ),
+          ),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     });
 
     response.status(200).send('OK');
   },
 );
+
+async function resolveSubscriptionPlan(
+  planTier: string,
+  billingPeriod?: string,
+): Promise<SubscriptionPlan | null> {
+  const planSnap = await db.collection('subscriptionPlans').doc(planTier).get();
+  if (planSnap.exists) {
+    const data = planSnap.data() ?? {};
+    const rawPrice =
+      billingPeriod === 'yearly' && typeof data.yearlyPrice === 'number'
+        ? data.yearlyPrice
+        : data.price;
+    const price = typeof rawPrice === 'number' ? Math.round(rawPrice) : 0;
+    if (price > 0) {
+      return {
+        tier: planTier,
+        name: String(data.name ?? `Schedula ${planTier.toUpperCase()}`),
+        price,
+        periodMonths: billingPeriod === 'yearly' ? 12 : 1,
+      };
+    }
+  }
+
+  return fallbackSubscriptionPlans[planTier] ?? null;
+}
+
+function subscriptionExpiryDate(currentValue: unknown, periodMonths: number): Date {
+  const now = new Date();
+  let base = now;
+  if (currentValue instanceof Timestamp) {
+    const current = currentValue.toDate();
+    if (current.getTime() > now.getTime()) {
+      base = current;
+    }
+  }
+
+  const expiry = new Date(base);
+  expiry.setMonth(expiry.getMonth() + Math.max(1, periodMonths));
+  return expiry;
+}
+
+function isValidWebUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch (_) {
+    return false;
+  }
+}
 
 function generateOrderCode(): number {
   return Math.floor(Date.now() / 1000) * 1000 + Math.floor(Math.random() * 1000);

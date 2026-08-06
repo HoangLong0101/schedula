@@ -18,6 +18,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthStarted>(_onStarted);
     on<AuthSignInRequested>(_onSignInRequested);
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
+    on<AuthPasswordResetRequested>(_onPasswordResetRequested);
+    on<AuthProfileCompleted>(_onProfileCompleted);
     on<AuthSignOutRequested>(_onSignOutRequested);
   }
 
@@ -26,7 +28,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignOutUseCase _signOutUseCase;
 
   Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
-    emit(const Unauthenticated());
+    emit(const AuthLoading());
+    try {
+      final user = await _signInUseCase.currentUser();
+      if (user == null || user.role.isEmpty || user.tenantId.isEmpty) {
+        await _signOutUseCase();
+        emit(const Unauthenticated());
+        return;
+      }
+      emit(Authenticated(user));
+    } catch (_) {
+      await _signOutUseCase();
+      emit(const Unauthenticated());
+    }
   }
 
   Future<void> _onSignInRequested(
@@ -67,10 +81,29 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       emit(Authenticated(user));
+    } on AuthProfileSetupRequiredException {
+      emit(const AuthProfileSetupRequired());
     } on AuthAccessDeniedException {
       emit(const AuthFailure('Tài khoản chưa được cấp quyền truy cập.'));
     } catch (_) {
       emit(const AuthFailure('Đăng nhập Google đã bị hủy hoặc thất bại.'));
+    }
+  }
+
+  Future<void> _onPasswordResetRequested(
+    AuthPasswordResetRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      await _signInUseCase.sendPasswordResetEmail(event.email);
+      emit(AuthPasswordResetSent(event.email));
+    } catch (_) {
+      emit(
+        const AuthFailure(
+          'Không thể gửi email đặt lại mật khẩu. Vui lòng kiểm tra địa chỉ email và thử lại.',
+        ),
+      );
     }
   }
 
@@ -81,5 +114,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(const AuthLoading());
     await _signOutUseCase();
     emit(const Unauthenticated());
+  }
+
+  void _onProfileCompleted(
+    AuthProfileCompleted event,
+    Emitter<AuthState> emit,
+  ) {
+    emit(Authenticated(event.user));
   }
 }

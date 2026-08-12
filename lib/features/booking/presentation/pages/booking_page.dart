@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/router/shell_layout.dart';
 import '../../../dashboard/presentation/pages/home_page.dart';
 import '../../domain/entities/booking.dart';
 import '../../domain/entities/booking_status.dart';
@@ -318,6 +319,13 @@ class _BookingView extends StatelessWidget {
                                   },
                                 ),
                               ),
+                            SliverToBoxAdapter(
+                              child: SizedBox(
+                                height: ShellLayout.bottomContentPadding(
+                                  context,
+                                ),
+                              ),
+                            ),
                           ],
                         );
                       },

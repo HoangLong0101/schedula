@@ -48,18 +48,33 @@ class FirebaseAuthDataSource {
     final token = await user?.getIdTokenResult(true);
     final claimsRole = token?.claims?['role'] as String?;
     final claimsTenantId = token?.claims?['tenantId'] as String?;
+    final claimsMustChangePassword =
+        token?.claims?['mustChangePassword'] as bool?;
     final profile =
-        user != null && (claimsRole == null || claimsTenantId == null)
+        user != null &&
+            (claimsRole == null ||
+                claimsTenantId == null ||
+                claimsMustChangePassword == null)
         ? await _readUserProfile(user.uid)
         : null;
     final role = claimsRole ?? profile?['role'] as String?;
     final tenantId = claimsTenantId ?? profile?['tenantId'] as String?;
+    final mustChangePassword =
+        claimsMustChangePassword ??
+        profile?['mustChangePassword'] as bool? ??
+        false;
 
     if (role == null || role.isEmpty || tenantId == null || tenantId.isEmpty) {
       throw const AuthProfileSetupRequiredException();
     }
 
-    return _mapUserAsync(userCredential.user);
+    return UserModel(
+      id: user!.uid,
+      email: user.email ?? '',
+      role: role,
+      tenantId: tenantId,
+      mustChangePassword: mustChangePassword,
+    );
   }
 
   Future<void> sendPasswordResetEmail(String email) async {
@@ -82,17 +97,27 @@ class FirebaseAuthDataSource {
     final token = await user.getIdTokenResult(false);
     final claimsRole = token.claims?['role'] as String?;
     final claimsTenantId = token.claims?['tenantId'] as String?;
-    final profile = claimsRole == null || claimsTenantId == null
+    final claimsMustChangePassword =
+        token.claims?['mustChangePassword'] as bool?;
+    final profile =
+        claimsRole == null ||
+            claimsTenantId == null ||
+            claimsMustChangePassword == null
         ? await _readUserProfile(user.uid)
         : null;
     final role = claimsRole ?? profile?['role'] as String? ?? '';
     final tenantId = claimsTenantId ?? profile?['tenantId'] as String? ?? '';
+    final mustChangePassword =
+        claimsMustChangePassword ??
+        profile?['mustChangePassword'] as bool? ??
+        false;
 
     return UserModel(
       id: user.uid,
       email: user.email ?? '',
       role: role,
       tenantId: tenantId,
+      mustChangePassword: mustChangePassword,
     );
   }
 

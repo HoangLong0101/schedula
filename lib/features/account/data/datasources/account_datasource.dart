@@ -125,6 +125,7 @@ class AccountDataSource {
     await user.reauthenticateWithCredential(credential);
     await user.updatePassword(newPassword);
     await _functions.httpsCallable('recordPasswordChange').call();
+    await user.getIdTokenResult(true);
   }
 
   Stream<List<AuditEvent>> watchAuditEvents(String tenantId) {

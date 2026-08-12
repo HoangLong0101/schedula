@@ -3,15 +3,12 @@ import { randomBytes } from 'node:crypto';
 import * as admin from 'firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import { defineSecret, defineString } from 'firebase-functions/params';
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
 
 const db = admin.firestore();
-const resendApiKey = defineSecret('RESEND_API_KEY');
-const mailFrom = defineString('REMINDER_MAIL_FROM');
 
 type CreateStaffData = {
   name?: string;
@@ -53,11 +50,13 @@ export const createStaffAccount = onCall(
         role: 'staff',
         tenantId,
         permissions: ['booking.status.own', 'customer.read'],
+        mustChangePassword: true,
       });
       await db.collection('users').doc(uid).set({
         tenantId,
         role: 'staff',
         permissions: ['booking.status.own', 'customer.read'],
+        mustChangePassword: true,
         role_title: data.roleTitle?.trim() ?? '',
         name,
         email,
@@ -81,6 +80,58 @@ export const createStaffAccount = onCall(
       }
       throw error;
     }
+  },
+);
+
+export const rotateStaffTemporaryPassword = onCall(
+  { region: 'asia-southeast1' },
+  async (request) => {
+    const tenantId = ownerTenantId(request.auth?.token);
+    const uid = (request.data as { uid?: string }).uid;
+    if (!uid) {
+      throw new HttpsError('invalid-argument', 'Thiếu mã nhân viên');
+    }
+
+    const staffSnapshot = await db.collection('users').doc(uid).get();
+    if (
+      !staffSnapshot.exists ||
+      staffSnapshot.data()?.tenantId !== tenantId ||
+      !isStaffRole(staffSnapshot.data()?.role)
+    ) {
+      throw new HttpsError('not-found', 'Không tìm thấy tài khoản nhân viên');
+    }
+
+    const user = await admin.auth().getUser(uid);
+    const temporaryPassword = `Sc!${randomBytes(9).toString('base64url')}`;
+    await admin.auth().updateUser(uid, {
+      password: temporaryPassword,
+      disabled: false,
+    });
+    await admin.auth().setCustomUserClaims(uid, {
+      ...(user.customClaims ?? {}),
+      role: staffSnapshot.data()!.role,
+      tenantId,
+      permissions: staffSnapshot.data()!.permissions ?? [],
+      mustChangePassword: true,
+    });
+    await admin.auth().revokeRefreshTokens(uid);
+
+    const batch = db.batch();
+    batch.update(staffSnapshot.ref, {
+      mustChangePassword: true,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    batch.set(db.collection('auditEvents').doc(), {
+      tenantId,
+      actorId: request.auth!.uid,
+      actorRole: 'owner',
+      entityType: 'user',
+      entityId: uid,
+      action: 'staff.temporary_password_rotated',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+    return { temporaryPassword };
   },
 );
 
@@ -265,58 +316,6 @@ export const archiveStaffAccount = onCall(
       cancelledBookings: data.reassignTo ? 0 : futureBookings.length,
       reassignedBookings: data.reassignTo ? futureBookings.length : 0,
     };
-  },
-);
-
-export const sendStaffPasswordReset = onCall(
-  {
-    region: 'asia-southeast1',
-    secrets: [resendApiKey],
-  },
-  async (request) => {
-    const tenantId = ownerTenantId(request.auth?.token);
-    const uid = (request.data as { uid?: string }).uid;
-    if (!uid) {
-      throw new HttpsError('invalid-argument', 'Thiếu mã nhân viên');
-    }
-    const staffSnapshot = await db.collection('users').doc(uid).get();
-    if (
-      !staffSnapshot.exists ||
-      staffSnapshot.data()?.tenantId !== tenantId ||
-      !isStaffRole(staffSnapshot.data()?.role)
-    ) {
-      throw new HttpsError('not-found', 'Không tìm thấy tài khoản nhân viên');
-    }
-    const user = await admin.auth().getUser(uid);
-    if (!user.email) {
-      throw new HttpsError('failed-precondition', 'Nhân viên chưa có email');
-    }
-    const apiKey = resendApiKey.value();
-    const from = mailFrom.value();
-    if (!apiKey || !from) {
-      throw new HttpsError('failed-precondition', 'Email chưa được cấu hình');
-    }
-    const link = await admin.auth().generatePasswordResetLink(user.email);
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from,
-        to: [user.email],
-        subject: 'Đặt lại mật khẩu Schedula',
-        text: `Mở liên kết sau để đặt lại mật khẩu Schedula: ${link}`,
-      }),
-    });
-    if (!response.ok) {
-      throw new HttpsError(
-        'internal',
-        'Không thể gửi email đặt lại mật khẩu',
-      );
-    }
-    return { sent: true };
   },
 );
 

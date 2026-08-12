@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/di/injection.dart';
 import '../../features/account/presentation/pages/account_info_page.dart';
 import '../../features/account/presentation/pages/account_page.dart';
+import '../../features/account/presentation/pages/first_password_change_page.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -59,6 +60,17 @@ class AppRouter {
             : RegisterPage.googleSetupPath;
       }
 
+      if (authState is Authenticated && authState.user.mustChangePassword) {
+        return location == FirstPasswordChangePage.routePath
+            ? null
+            : FirstPasswordChangePage.routePath;
+      }
+
+      if (authState is Authenticated &&
+          location == FirstPasswordChangePage.routePath) {
+        return HomePage.routePath;
+      }
+
       if ((authState is AuthInitial ||
               authState is Unauthenticated ||
               authState is AuthFailure) &&
@@ -78,6 +90,17 @@ class AppRouter {
           CatalogPage.routePath,
         };
         if (staffBlockedRoutes.contains(location)) {
+          return BookingPage.routePath;
+        }
+      }
+
+      if (authState is Authenticated && !authState.user.canManageTenant) {
+        final ownerOnlyRoutes = <String>{
+          StaffPage.routePath,
+          EquipmentPage.routePath,
+          CatalogPage.routePath,
+        };
+        if (ownerOnlyRoutes.contains(location)) {
           return BookingPage.routePath;
         }
       }
@@ -104,6 +127,10 @@ class AppRouter {
         path: RegisterPage.googleSetupPath,
         name: RegisterPage.googleSetupRouteName,
         builder: (_, _) => const RegisterPage(googleSetup: true),
+      ),
+      GoRoute(
+        path: FirstPasswordChangePage.routePath,
+        builder: (_, _) => const FirstPasswordChangePage(),
       ),
       GoRoute(
         path: PaymentResultPage.successRoutePath,

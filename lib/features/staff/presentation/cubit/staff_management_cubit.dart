@@ -22,7 +22,7 @@ class StaffManagementCubit extends Cubit<List<StaffMember>> {
     this._updateStaff,
     this._deleteStaff,
     this._addLeave,
-    this._sendPasswordReset,
+    this._resetPassword,
     this._setAccessRole,
   ) : super(const []);
 
@@ -31,7 +31,7 @@ class StaffManagementCubit extends Cubit<List<StaffMember>> {
   final UpdateStaffUseCase _updateStaff;
   final DeleteStaffUseCase _deleteStaff;
   final AddStaffLeaveUseCase _addLeave;
-  final SendStaffPasswordResetUseCase _sendPasswordReset;
+  final ResetStaffPasswordUseCase _resetPassword;
   final SetStaffAccessRoleUseCase _setAccessRole;
 
   StreamSubscription? _subscription;
@@ -62,11 +62,12 @@ class StaffManagementCubit extends Cubit<List<StaffMember>> {
     );
   }
 
-  Future<void> updateStaff(StaffMember staff) async {
-    await _updateStaff(UpdateStaffParams(staff: staff));
+  Future<String?> updateStaff(StaffMember staff) async {
+    final result = await _updateStaff(UpdateStaffParams(staff: staff));
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
-  Future<bool> deleteStaff(
+  Future<String?> deleteStaff(
     String id, {
     required bool cancelFuture,
     String? reassignTo,
@@ -78,7 +79,7 @@ class StaffManagementCubit extends Cubit<List<StaffMember>> {
         reassignTo: reassignTo,
       ),
     );
-    return result.isRight();
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
   Future<bool> addLeave(String staffId, DateTime start, DateTime end) async {
@@ -91,9 +92,14 @@ class StaffManagementCubit extends Cubit<List<StaffMember>> {
     return result.isRight();
   }
 
-  Future<bool> sendPasswordReset(String staffId) async {
-    final result = await _sendPasswordReset(staffId);
-    return result.isRight();
+  Future<({String? password, String? error})> resetPassword(
+    String staffId,
+  ) async {
+    final result = await _resetPassword(staffId);
+    return result.fold(
+      (failure) => (password: null, error: failure.message),
+      (password) => (password: password, error: null),
+    );
   }
 
   Future<bool> setAccessRole(String staffId, String role) async {

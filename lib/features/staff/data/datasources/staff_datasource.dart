@@ -100,10 +100,12 @@ class StaffDataSource {
     });
   }
 
-  Future<void> sendPasswordReset(String id) async {
-    await FirebaseFunctions.instanceFor(region: 'asia-southeast1')
-        .httpsCallable('sendStaffPasswordReset')
-        .call<Map<String, dynamic>>({'uid': id});
+  Future<String> resetPassword(String id) async {
+    final result =
+        await FirebaseFunctions.instanceFor(region: 'asia-southeast1')
+            .httpsCallable('rotateStaffTemporaryPassword')
+            .call<Map<String, dynamic>>({'uid': id});
+    return result.data['temporaryPassword'] as String;
   }
 
   Future<void> setAccessRole(String id, String role) async {

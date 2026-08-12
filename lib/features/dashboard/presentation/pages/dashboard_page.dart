@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/router/shell_layout.dart';
 import '../../domain/entities/dashboard_stats.dart';
 import '../cubit/dashboard_cubit.dart';
 import '../cubit/dashboard_state.dart';
@@ -68,7 +69,12 @@ class _StatisticsViewState extends State<_StatisticsView> {
             builder: (context, state) {
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 34),
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  12,
+                  24,
+                  ShellLayout.bottomContentPadding(context),
+                ),
                 children: [
                   const _StatisticsHeader(),
                   const SizedBox(height: 20),

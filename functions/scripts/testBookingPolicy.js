@@ -11,5 +11,9 @@ assert.deepEqual(__testing.parseHours(null, null, '08:30 - 18:00'), {
 });
 assert.doesNotThrow(() => __testing.assertTransition('pending', 'confirmed'));
 assert.throws(() => __testing.assertTransition('cancelled', 'confirmed'));
+assert.deepEqual(
+  __testing.mergeResourceIds(['required-1'], ['optional-1', 'required-1']),
+  ['required-1', 'optional-1'],
+);
 
 console.log('Booking policy validation passed');

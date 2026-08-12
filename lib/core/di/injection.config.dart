@@ -13,7 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' as _i974;
 import 'package:dio/dio.dart' as _i361;
 import 'package:firebase_auth/firebase_auth.dart' as _i59;
 import 'package:firebase_database/firebase_database.dart' as _i345;
-import 'package:firebase_storage/firebase_storage.dart' as _i1110;
+import 'package:firebase_storage/firebase_storage.dart' as _i457;
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:go_router/go_router.dart' as _i583;
 import 'package:google_sign_in/google_sign_in.dart' as _i116;
@@ -25,20 +25,22 @@ import 'package:schedula/features/account/data/repositories/account_repository_i
     as _i411;
 import 'package:schedula/features/account/domain/repositories/account_repository.dart'
     as _i244;
+import 'package:schedula/features/account/domain/usecases/change_password_usecase.dart'
+    as _i187;
 import 'package:schedula/features/account/domain/usecases/update_business_info_usecase.dart'
     as _i648;
+import 'package:schedula/features/account/domain/usecases/update_user_profile_usecase.dart'
+    as _i747;
+import 'package:schedula/features/account/domain/usecases/upload_avatar_usecase.dart'
+    as _i668;
 import 'package:schedula/features/account/domain/usecases/watch_business_info_usecase.dart'
     as _i901;
-import 'package:schedula/features/account/domain/usecases/change_password_usecase.dart'
-    as _i1101;
-import 'package:schedula/features/account/domain/usecases/update_user_profile_usecase.dart'
-    as _i1102;
-import 'package:schedula/features/account/domain/usecases/upload_avatar_usecase.dart'
-    as _i1103;
 import 'package:schedula/features/account/domain/usecases/watch_user_profile_usecase.dart'
-    as _i1104;
+    as _i136;
 import 'package:schedula/features/account/presentation/cubit/account_cubit.dart'
     as _i702;
+import 'package:schedula/features/account/presentation/cubit/first_password_change_cubit.dart'
+    as _i668;
 import 'package:schedula/features/auth/data/datasources/firebase_auth_data_source.dart'
     as _i677;
 import 'package:schedula/features/auth/data/repositories/auth_repository_impl.dart'
@@ -78,7 +80,7 @@ import 'package:schedula/features/booking/domain/usecases/scan_appointment_image
 import 'package:schedula/features/booking/domain/usecases/update_booking_status_usecase.dart'
     as _i271;
 import 'package:schedula/features/booking/domain/usecases/update_booking_usecase.dart'
-    as _i1105;
+    as _i1013;
 import 'package:schedula/features/booking/domain/usecases/watch_bookings_usecase.dart'
     as _i59;
 import 'package:schedula/features/booking/domain/usecases/watch_slots_usecase.dart'
@@ -120,7 +122,7 @@ import 'package:schedula/features/dashboard/domain/repositories/dashboard_reposi
 import 'package:schedula/features/dashboard/domain/usecases/get_dashboard_stats_usecase.dart'
     as _i184;
 import 'package:schedula/features/dashboard/domain/usecases/get_operational_reports_usecase.dart'
-    as _i1106;
+    as _i942;
 import 'package:schedula/features/dashboard/presentation/cubit/dashboard_cubit.dart'
     as _i658;
 import 'package:schedula/features/equipment/data/datasources/equipment_datasource.dart'
@@ -139,42 +141,42 @@ import 'package:schedula/features/equipment/domain/usecases/watch_equipment_usec
     as _i13;
 import 'package:schedula/features/equipment/presentation/cubit/equipment_management_cubit.dart'
     as _i324;
+import 'package:schedula/features/notification/data/datasources/notification_datasource.dart'
+    as _i77;
+import 'package:schedula/features/notification/data/repositories/notification_repository_impl.dart'
+    as _i693;
+import 'package:schedula/features/notification/domain/repositories/notification_repository.dart'
+    as _i624;
+import 'package:schedula/features/notification/domain/usecases/mark_all_notifications_read_usecase.dart'
+    as _i457;
+import 'package:schedula/features/notification/domain/usecases/mark_notification_read_usecase.dart'
+    as _i63;
+import 'package:schedula/features/notification/domain/usecases/watch_notifications_usecase.dart'
+    as _i616;
+import 'package:schedula/features/notification/presentation/cubit/notification_cubit.dart'
+    as _i501;
 import 'package:schedula/features/staff/data/datasources/staff_datasource.dart'
     as _i821;
 import 'package:schedula/features/staff/data/repositories/staff_repository_impl.dart'
     as _i1062;
 import 'package:schedula/features/staff/domain/repositories/staff_repository.dart'
     as _i332;
+import 'package:schedula/features/staff/domain/usecases/add_staff_leave_usecase.dart'
+    as _i196;
 import 'package:schedula/features/staff/domain/usecases/create_staff_usecase.dart'
     as _i1050;
 import 'package:schedula/features/staff/domain/usecases/delete_staff_usecase.dart'
     as _i599;
+import 'package:schedula/features/staff/domain/usecases/send_staff_password_reset_usecase.dart'
+    as _i949;
+import 'package:schedula/features/staff/domain/usecases/set_staff_access_role_usecase.dart'
+    as _i843;
 import 'package:schedula/features/staff/domain/usecases/update_staff_usecase.dart'
     as _i122;
 import 'package:schedula/features/staff/domain/usecases/watch_staff_usecase.dart'
     as _i4;
-import 'package:schedula/features/staff/domain/usecases/add_staff_leave_usecase.dart'
-    as _i1107;
-import 'package:schedula/features/staff/domain/usecases/send_staff_password_reset_usecase.dart'
-    as _i1108;
-import 'package:schedula/features/staff/domain/usecases/set_staff_access_role_usecase.dart'
-    as _i1109;
 import 'package:schedula/features/staff/presentation/cubit/staff_management_cubit.dart'
     as _i23;
-import 'package:schedula/features/notification/data/datasources/notification_datasource.dart'
-    as _i1111;
-import 'package:schedula/features/notification/data/repositories/notification_repository_impl.dart'
-    as _i1112;
-import 'package:schedula/features/notification/domain/repositories/notification_repository.dart'
-    as _i1113;
-import 'package:schedula/features/notification/domain/usecases/mark_all_notifications_read_usecase.dart'
-    as _i1114;
-import 'package:schedula/features/notification/domain/usecases/mark_notification_read_usecase.dart'
-    as _i1115;
-import 'package:schedula/features/notification/domain/usecases/watch_notifications_usecase.dart'
-    as _i1116;
-import 'package:schedula/features/notification/presentation/cubit/notification_cubit.dart'
-    as _i1117;
 
 extension GetItInjectableX on _i174.GetIt {
   // initializes the registration of main-scope dependencies inside of GetIt
@@ -187,7 +189,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i6.BookingFiltersCubit>(() => _i6.BookingFiltersCubit());
     gh.lazySingleton<_i59.FirebaseAuth>(() => appModule.firebaseAuth);
     gh.lazySingleton<_i974.FirebaseFirestore>(() => appModule.firestore);
-    gh.lazySingleton<_i1110.FirebaseStorage>(() => appModule.storage);
+    gh.lazySingleton<_i457.FirebaseStorage>(() => appModule.storage);
     gh.lazySingleton<_i345.FirebaseDatabase>(() => appModule.realtimeDatabase);
     gh.lazySingleton<_i116.GoogleSignIn>(() => appModule.googleSignIn);
     gh.lazySingleton<_i583.GoRouter>(() => appModule.router);
@@ -195,6 +197,13 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<String>(
       () => appModule.bookingCascadeBaseUrl,
       instanceName: 'bookingCascadeBaseUrl',
+    );
+    gh.lazySingleton<_i707.AccountDataSource>(
+      () => _i707.AccountDataSource(
+        gh<_i974.FirebaseFirestore>(),
+        gh<_i59.FirebaseAuth>(),
+        gh<_i457.FirebaseStorage>(),
+      ),
     );
     gh.lazySingleton<_i24.BookingRealtimeDataSource>(
       () => _i24.BookingRealtimeDataSource(gh<_i345.FirebaseDatabase>()),
@@ -205,17 +214,31 @@ extension GetItInjectableX on _i174.GetIt {
         gh<String>(instanceName: 'bookingCascadeBaseUrl'),
       ),
     );
+    gh.lazySingleton<_i244.AccountRepository>(
+      () => _i411.AccountRepositoryImpl(gh<_i707.AccountDataSource>()),
+    );
+    gh.factory<_i187.ChangePasswordUseCase>(
+      () => _i187.ChangePasswordUseCase(gh<_i244.AccountRepository>()),
+    );
+    gh.factory<_i648.UpdateBusinessInfoUseCase>(
+      () => _i648.UpdateBusinessInfoUseCase(gh<_i244.AccountRepository>()),
+    );
+    gh.factory<_i747.UpdateUserProfileUseCase>(
+      () => _i747.UpdateUserProfileUseCase(gh<_i244.AccountRepository>()),
+    );
+    gh.factory<_i668.UploadAvatarUseCase>(
+      () => _i668.UploadAvatarUseCase(gh<_i244.AccountRepository>()),
+    );
+    gh.factory<_i901.WatchBusinessInfoUseCase>(
+      () => _i901.WatchBusinessInfoUseCase(gh<_i244.AccountRepository>()),
+    );
+    gh.factory<_i136.WatchUserProfileUseCase>(
+      () => _i136.WatchUserProfileUseCase(gh<_i244.AccountRepository>()),
+    );
     gh.lazySingleton<_i677.FirebaseAuthDataSource>(
       () => _i677.FirebaseAuthDataSource(
         gh<_i59.FirebaseAuth>(),
         gh<_i116.GoogleSignIn>(),
-      ),
-    );
-    gh.lazySingleton<_i707.AccountDataSource>(
-      () => _i707.AccountDataSource(
-        gh<_i974.FirebaseFirestore>(),
-        gh<_i59.FirebaseAuth>(),
-        gh<_i1110.FirebaseStorage>(),
       ),
     );
     gh.lazySingleton<_i1019.BookingDataSource>(
@@ -233,11 +256,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i514.EquipmentDataSource>(
       () => _i514.EquipmentDataSource(gh<_i974.FirebaseFirestore>()),
     );
+    gh.lazySingleton<_i77.NotificationDataSource>(
+      () => _i77.NotificationDataSource(gh<_i974.FirebaseFirestore>()),
+    );
     gh.lazySingleton<_i821.StaffDataSource>(
       () => _i821.StaffDataSource(gh<_i974.FirebaseFirestore>()),
-    );
-    gh.lazySingleton<_i1111.NotificationDataSource>(
-      () => _i1111.NotificationDataSource(gh<_i974.FirebaseFirestore>()),
     );
     gh.lazySingleton<_i332.StaffRepository>(
       () => _i1062.StaffRepositoryImpl(gh<_i821.StaffDataSource>()),
@@ -248,11 +271,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i220.DashboardRepository>(
       () => _i393.DashboardRepositoryImpl(gh<_i390.DashboardDataSource>()),
     );
-    gh.lazySingleton<_i1113.NotificationRepository>(
-      () => _i1112.NotificationRepositoryImpl(
-        gh<_i1111.NotificationDataSource>(),
-      ),
-    );
     gh.lazySingleton<_i625.CatalogRepository>(
       () => _i80.CatalogRepositoryImpl(gh<_i955.CatalogDataSource>()),
     );
@@ -261,8 +279,14 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i641.BookingCascadeApiDataSource>(),
       ),
     );
+    gh.factory<_i668.FirstPasswordChangeCubit>(
+      () => _i668.FirstPasswordChangeCubit(gh<_i187.ChangePasswordUseCase>()),
+    );
     gh.lazySingleton<_i797.AuthRepository>(
       () => _i472.AuthRepositoryImpl(gh<_i677.FirebaseAuthDataSource>()),
+    );
+    gh.factory<_i196.AddStaffLeaveUseCase>(
+      () => _i196.AddStaffLeaveUseCase(gh<_i332.StaffRepository>()),
     );
     gh.factory<_i1050.CreateStaffUseCase>(
       () => _i1050.CreateStaffUseCase(gh<_i332.StaffRepository>()),
@@ -270,27 +294,23 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i599.DeleteStaffUseCase>(
       () => _i599.DeleteStaffUseCase(gh<_i332.StaffRepository>()),
     );
+    gh.factory<_i949.ResetStaffPasswordUseCase>(
+      () => _i949.ResetStaffPasswordUseCase(gh<_i332.StaffRepository>()),
+    );
+    gh.factory<_i843.SetStaffAccessRoleUseCase>(
+      () => _i843.SetStaffAccessRoleUseCase(gh<_i332.StaffRepository>()),
+    );
     gh.factory<_i122.UpdateStaffUseCase>(
       () => _i122.UpdateStaffUseCase(gh<_i332.StaffRepository>()),
     );
     gh.factory<_i4.WatchStaffUseCase>(
       () => _i4.WatchStaffUseCase(gh<_i332.StaffRepository>()),
     );
-    gh.factory<_i1107.AddStaffLeaveUseCase>(
-      () => _i1107.AddStaffLeaveUseCase(gh<_i332.StaffRepository>()),
-    );
-    gh.factory<_i1108.SendStaffPasswordResetUseCase>(
-      () => _i1108.SendStaffPasswordResetUseCase(gh<_i332.StaffRepository>()),
-    );
-    gh.factory<_i1109.SetStaffAccessRoleUseCase>(
-      () => _i1109.SetStaffAccessRoleUseCase(gh<_i332.StaffRepository>()),
-    );
     gh.factory<_i184.GetDashboardStatsUseCase>(
       () => _i184.GetDashboardStatsUseCase(gh<_i220.DashboardRepository>()),
     );
-    gh.factory<_i1106.GetOperationalReportsUseCase>(
-      () =>
-          _i1106.GetOperationalReportsUseCase(gh<_i220.DashboardRepository>()),
+    gh.factory<_i942.GetOperationalReportsUseCase>(
+      () => _i942.GetOperationalReportsUseCase(gh<_i220.DashboardRepository>()),
     );
     gh.factory<_i967.CatalogCubit>(
       () => _i967.CatalogCubit(gh<_i625.CatalogRepository>()),
@@ -304,14 +324,17 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i652.SignOutUseCase>(
       () => _i652.SignOutUseCase(gh<_i797.AuthRepository>()),
     );
+    gh.factory<_i702.AccountCubit>(
+      () => _i702.AccountCubit(
+        gh<_i901.WatchBusinessInfoUseCase>(),
+        gh<_i648.UpdateBusinessInfoUseCase>(),
+      ),
+    );
     gh.factory<_i1018.CancelBookingUseCase>(
       () => _i1018.CancelBookingUseCase(gh<_i262.BookingRepository>()),
     );
     gh.factory<_i480.CreateBookingUseCase>(
       () => _i480.CreateBookingUseCase(gh<_i262.BookingRepository>()),
-    );
-    gh.factory<_i1105.UpdateBookingUseCase>(
-      () => _i1105.UpdateBookingUseCase(gh<_i262.BookingRepository>()),
     );
     gh.factory<_i271.UpdateBookingStatusUseCase>(
       () => _i271.UpdateBookingStatusUseCase(gh<_i262.BookingRepository>()),
@@ -319,49 +342,29 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i271.MarkBookingPaidUseCase>(
       () => _i271.MarkBookingPaidUseCase(gh<_i262.BookingRepository>()),
     );
+    gh.factory<_i1013.UpdateBookingUseCase>(
+      () => _i1013.UpdateBookingUseCase(gh<_i262.BookingRepository>()),
+    );
     gh.factory<_i59.WatchBookingsUseCase>(
       () => _i59.WatchBookingsUseCase(gh<_i262.BookingRepository>()),
     );
     gh.factory<_i436.WatchSlotsUseCase>(
       () => _i436.WatchSlotsUseCase(gh<_i262.BookingRepository>()),
     );
-    gh.lazySingleton<_i244.AccountRepository>(
-      () => _i411.AccountRepositoryImpl(gh<_i707.AccountDataSource>()),
-    );
-    gh.factory<_i648.UpdateBusinessInfoUseCase>(
-      () => _i648.UpdateBusinessInfoUseCase(gh<_i244.AccountRepository>()),
-    );
-    gh.factory<_i901.WatchBusinessInfoUseCase>(
-      () => _i901.WatchBusinessInfoUseCase(gh<_i244.AccountRepository>()),
-    );
-    gh.factory<_i1101.ChangePasswordUseCase>(
-      () => _i1101.ChangePasswordUseCase(gh<_i244.AccountRepository>()),
-    );
-    gh.factory<_i1102.UpdateUserProfileUseCase>(
-      () => _i1102.UpdateUserProfileUseCase(gh<_i244.AccountRepository>()),
-    );
-    gh.factory<_i1103.UploadAvatarUseCase>(
-      () => _i1103.UploadAvatarUseCase(gh<_i244.AccountRepository>()),
-    );
-    gh.factory<_i1104.WatchUserProfileUseCase>(
-      () => _i1104.WatchUserProfileUseCase(gh<_i244.AccountRepository>()),
-    );
-    gh.factory<_i1114.MarkAllNotificationsReadUseCase>(
-      () => _i1114.MarkAllNotificationsReadUseCase(
-        gh<_i1113.NotificationRepository>(),
-      ),
-    );
-    gh.factory<_i1115.MarkNotificationReadUseCase>(
-      () => _i1115.MarkNotificationReadUseCase(
-        gh<_i1113.NotificationRepository>(),
-      ),
-    );
-    gh.factory<_i1116.WatchNotificationsUseCase>(
-      () =>
-          _i1116.WatchNotificationsUseCase(gh<_i1113.NotificationRepository>()),
+    gh.lazySingleton<_i624.NotificationRepository>(
+      () => _i693.NotificationRepositoryImpl(gh<_i77.NotificationDataSource>()),
     );
     gh.lazySingleton<_i71.EquipmentRepository>(
       () => _i378.EquipmentRepositoryImpl(gh<_i514.EquipmentDataSource>()),
+    );
+    gh.factory<_i455.BookingBloc>(
+      () => _i455.BookingBloc(
+        gh<_i59.WatchBookingsUseCase>(),
+        gh<_i480.CreateBookingUseCase>(),
+        gh<_i271.UpdateBookingStatusUseCase>(),
+        gh<_i271.MarkBookingPaidUseCase>(),
+        gh<_i1018.CancelBookingUseCase>(),
+      ),
     );
     gh.lazySingleton<_i489.CustomerRepository>(
       () => _i847.CustomerRepositoryImpl(gh<_i478.CustomerDataSource>()),
@@ -395,15 +398,6 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i652.SignOutUseCase>(),
       ),
     );
-    gh.factory<_i455.BookingBloc>(
-      () => _i455.BookingBloc(
-        gh<_i59.WatchBookingsUseCase>(),
-        gh<_i480.CreateBookingUseCase>(),
-        gh<_i271.UpdateBookingStatusUseCase>(),
-        gh<_i271.MarkBookingPaidUseCase>(),
-        gh<_i1018.CancelBookingUseCase>(),
-      ),
-    );
     gh.factory<_i324.EquipmentManagementCubit>(
       () => _i324.EquipmentManagementCubit(
         gh<_i13.WatchEquipmentUseCase>(),
@@ -412,31 +406,37 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i459.DeleteEquipmentUseCase>(),
       ),
     );
+    gh.factory<_i457.MarkAllNotificationsReadUseCase>(
+      () => _i457.MarkAllNotificationsReadUseCase(
+        gh<_i624.NotificationRepository>(),
+      ),
+    );
+    gh.factory<_i63.MarkNotificationReadUseCase>(
+      () =>
+          _i63.MarkNotificationReadUseCase(gh<_i624.NotificationRepository>()),
+    );
+    gh.factory<_i616.WatchNotificationsUseCase>(
+      () => _i616.WatchNotificationsUseCase(gh<_i624.NotificationRepository>()),
+    );
     gh.factory<_i23.StaffManagementCubit>(
       () => _i23.StaffManagementCubit(
         gh<_i4.WatchStaffUseCase>(),
         gh<_i1050.CreateStaffUseCase>(),
         gh<_i122.UpdateStaffUseCase>(),
         gh<_i599.DeleteStaffUseCase>(),
-        gh<_i1107.AddStaffLeaveUseCase>(),
-        gh<_i1108.SendStaffPasswordResetUseCase>(),
-        gh<_i1109.SetStaffAccessRoleUseCase>(),
-      ),
-    );
-    gh.factory<_i1117.NotificationCubit>(
-      () => _i1117.NotificationCubit(
-        gh<_i1116.WatchNotificationsUseCase>(),
-        gh<_i1115.MarkNotificationReadUseCase>(),
-        gh<_i1114.MarkAllNotificationsReadUseCase>(),
+        gh<_i196.AddStaffLeaveUseCase>(),
+        gh<_i949.ResetStaffPasswordUseCase>(),
+        gh<_i843.SetStaffAccessRoleUseCase>(),
       ),
     );
     gh.factory<_i658.DashboardCubit>(
       () => _i658.DashboardCubit(gh<_i184.GetDashboardStatsUseCase>()),
     );
-    gh.factory<_i702.AccountCubit>(
-      () => _i702.AccountCubit(
-        gh<_i901.WatchBusinessInfoUseCase>(),
-        gh<_i648.UpdateBusinessInfoUseCase>(),
+    gh.factory<_i501.NotificationCubit>(
+      () => _i501.NotificationCubit(
+        gh<_i616.WatchNotificationsUseCase>(),
+        gh<_i63.MarkNotificationReadUseCase>(),
+        gh<_i457.MarkAllNotificationsReadUseCase>(),
       ),
     );
     gh.factory<_i178.CreateCustomerUseCase>(

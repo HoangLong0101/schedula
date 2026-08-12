@@ -127,49 +127,54 @@ class DashboardDataSource {
 
   Future<List<ReportRecord>> fetchOperationalReports(String tenantId) async {
     final queries = await Future.wait([
-      _firestore
-          .collection('bookings')
-          .where('tenantId', isEqualTo: tenantId)
-          .get(),
-      _firestore
-          .collection('payments')
-          .where('tenantId', isEqualTo: tenantId)
-          .get(),
-      _firestore
-          .collection('customers')
-          .where('tenantId', isEqualTo: tenantId)
-          .get(),
-      _firestore
-          .collection('campaigns')
-          .where('tenantId', isEqualTo: tenantId)
-          .get(),
-      _firestore
-          .collection('users')
-          .where('tenantId', isEqualTo: tenantId)
-          .get(),
+      _safeReportDocs(
+        _firestore
+            .collection('bookings')
+            .where('tenantId', isEqualTo: tenantId),
+      ),
+      _safeReportDocs(
+        _firestore
+            .collection('payments')
+            .where('tenantId', isEqualTo: tenantId),
+      ),
+      _safeReportDocs(
+        _firestore
+            .collection('customers')
+            .where('tenantId', isEqualTo: tenantId),
+      ),
+      _safeReportDocs(
+        _firestore
+            .collection('campaigns')
+            .where('tenantId', isEqualTo: tenantId),
+      ),
+      _safeReportDocs(
+        _firestore.collection('users').where('tenantId', isEqualTo: tenantId),
+      ),
     ]);
     final records = <ReportRecord>[];
 
-    for (final document in queries[0].docs) {
+    for (final document in queries[0]) {
       final data = document.data();
       records.add(
         ReportRecord(
           id: document.id,
           kind: ReportKind.bookings,
           date: _date(data['startTime']),
-          title: data['customerName'] as String? ?? document.id,
-          subtitle: data['serviceName'] as String? ?? '',
-          staffId: data['staffId'] as String? ?? '',
-          serviceId: data['serviceId'] as String? ?? '',
-          status: data['status'] as String? ?? '',
-          paymentMethod: data['paymentMethod'] as String? ?? '',
+          title: _text(data['customerName'], fallback: document.id),
+          subtitle: _text(data['serviceName']),
+          staffId: _text(data['staffId']),
+          serviceId: _text(data['serviceId']),
+          status: _text(data['status']),
+          paymentMethod: _text(data['paymentMethod']),
           bookingId: document.id,
-          amount: (data['paymentAmount'] as num?)?.round() ?? 0,
+          amount: _integer(data['paymentAmount']),
         ),
       );
     }
-    for (final document in queries[1].docs) {
+    for (final document in queries[1]) {
       final data = document.data();
+      final paymentMethod = _text(data['method']);
+      final reconciliationStatus = _text(data['reconciliationStatus']);
       records.add(
         ReportRecord(
           id: document.id,
@@ -178,62 +183,61 @@ class DashboardDataSource {
             data['recordedAt'] ?? data['paidAt'] ?? data['createdAt'],
           ),
           title: data['type'] == 'subscription'
-              ? data['planName'] as String? ?? 'Gói dịch vụ'
+              ? _text(data['planName'], fallback: 'Gói dịch vụ')
               : 'Thanh toán lịch hẹn',
-          subtitle: data['reference'] as String? ?? '',
-          status: data['status'] as String? ?? '',
-          paymentMethod:
-              data['method'] as String? ??
-              (data['paymentLinkId'] == null ? '' : 'payos'),
-          bookingId: data['bookingId'] as String? ?? '',
-          amount: (data['amount'] as num?)?.round() ?? 0,
-          reconciliationStatus:
-              data['reconciliationStatus'] as String? ??
-              (data['status'] == 'paid' ? 'matched' : 'pending'),
+          subtitle: _text(data['reference']),
+          status: _text(data['status']),
+          paymentMethod: paymentMethod.isNotEmpty
+              ? paymentMethod
+              : (data['paymentLinkId'] == null ? '' : 'payos'),
+          bookingId: _text(data['bookingId']),
+          amount: _integer(data['amount']),
+          reconciliationStatus: reconciliationStatus.isNotEmpty
+              ? reconciliationStatus
+              : (data['status'] == 'paid' ? 'matched' : 'pending'),
         ),
       );
     }
-    for (final document in queries[2].docs) {
+    for (final document in queries[2]) {
       final data = document.data();
+      final visitCount = _integer(data['visitCount']);
       records.add(
         ReportRecord(
           id: document.id,
           kind: ReportKind.customers,
           date: _date(data['lastVisit'] ?? data['createdAt']),
-          title: data['name'] as String? ?? '',
-          subtitle: data['email'] as String? ?? '',
+          title: _text(data['name']),
+          subtitle: _text(data['email']),
           status: data['emailOptedOut'] == true ? 'opted_out' : 'active',
-          amount:
-              (data['visitCount'] as num?)?.round() ??
-              (data['totalVisits'] as num?)?.round() ??
-              0,
+          amount: visitCount != 0 ? visitCount : _integer(data['totalVisits']),
         ),
       );
     }
-    for (final document in queries[3].docs) {
+    for (final document in queries[3]) {
       final data = document.data();
       records.add(
         ReportRecord(
           id: document.id,
           kind: ReportKind.campaigns,
           date: _date(data['createdAt']),
-          title: data['templateId'] as String? ?? '',
+          title: _text(data['templateId']),
           subtitle: 'Đã gửi ${data['sent'] ?? 0}, lỗi ${data['failed'] ?? 0}',
-          status: data['status'] as String? ?? '',
-          amount: (data['sent'] as num?)?.round() ?? 0,
+          status: _text(data['status']),
+          amount: _integer(data['sent']),
         ),
       );
     }
-    for (final document in queries[4].docs) {
+    for (final document in queries[4]) {
       final data = document.data();
-      final role = data['role'] as String? ?? '';
+      final role = _text(data['role']);
       if (role != 'staff' && role != 'receptionist') continue;
+      final name = _text(data['name']);
       records.add(
         ReportRecord(
           id: document.id,
           kind: ReportKind.staff,
           date: _date(data['createdAt']),
-          title: data['name'] as String? ?? data['email'] as String? ?? '',
+          title: name.isNotEmpty ? name : _text(data['email']),
           subtitle: role,
           staffId: document.id,
           status: data['active'] == false ? 'inactive' : 'active',
@@ -247,7 +251,15 @@ class DashboardDataSource {
 
   DateTime _date(Object? value) => value is Timestamp
       ? value.toDate()
+      : value is DateTime
+      ? value
       : DateTime.fromMillisecondsSinceEpoch(0);
+
+  String _text(Object? value, {String fallback = ''}) =>
+      value is String && value.isNotEmpty ? value : fallback;
+
+  int _integer(Object? value) =>
+      value is num ? value.round() : int.tryParse(value?.toString() ?? '') ?? 0;
 
   Future<int> _safeCount(AggregateQuery query) async {
     try {
@@ -272,6 +284,18 @@ class DashboardDataSource {
         return const [];
       }
       rethrow;
+    }
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _safeReportDocs(
+    Query<Map<String, dynamic>> query,
+  ) async {
+    try {
+      return (await query.get()).docs;
+    } on FirebaseException {
+      return const [];
+    } on PlatformException {
+      return const [];
     }
   }
 

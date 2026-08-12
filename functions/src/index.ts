@@ -4,7 +4,7 @@ export {
   createStaffAccount,
   deleteStaffAccount,
   archiveStaffAccount,
-  sendStaffPasswordReset,
+  rotateStaffTemporaryPassword,
   manageStaffLeave,
 } from './auth/manageStaffAccount';
 export { sendReminders } from './notifications/reminders';

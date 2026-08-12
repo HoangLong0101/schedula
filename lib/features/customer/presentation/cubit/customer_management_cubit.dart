@@ -40,18 +40,23 @@ class CustomerManagementCubit extends Cubit<List<Customer>> {
         });
   }
 
-  Future<void> addCustomer(Customer customer) async {
-    await _createCustomer(
+  Future<String?> addCustomer(Customer customer) async {
+    final result = await _createCustomer(
       CreateCustomerParams(tenantId: _currentTenantId, customer: customer),
     );
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
-  Future<void> updateCustomer(Customer customer) async {
-    await _updateCustomer(UpdateCustomerParams(customer: customer));
+  Future<String?> updateCustomer(Customer customer) async {
+    final result = await _updateCustomer(
+      UpdateCustomerParams(customer: customer),
+    );
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
-  Future<void> deleteCustomer(String id) async {
-    await _deleteCustomer(DeleteCustomerParams(customerId: id));
+  Future<String?> deleteCustomer(String id) async {
+    final result = await _deleteCustomer(DeleteCustomerParams(customerId: id));
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
   @override

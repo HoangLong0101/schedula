@@ -60,6 +60,48 @@ class _EquipmentViewState extends State<_EquipmentView> {
     );
   }
 
+  Future<void> _deleteEquipment(
+    BuildContext context,
+    Equipment equipment,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xóa thiết bị?'),
+        content: Text('${equipment.name} sẽ bị xóa khỏi cơ sở.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final error = await context
+        .read<EquipmentManagementCubit>()
+        .deleteEquipment(equipment.id);
+    if (!context.mounted || error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+  }
+
+  Future<void> _updateStatus(
+    BuildContext context,
+    Equipment equipment,
+    EquipmentStatus status,
+  ) async {
+    final error = await context.read<EquipmentManagementCubit>().updateStatus(
+      equipment.id,
+      status,
+    );
+    if (!context.mounted || error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -211,12 +253,9 @@ class _EquipmentViewState extends State<_EquipmentView> {
                             child: _EquipmentCard(
                               equip: e,
                               onEdit: () => _showForm(context, equip: e),
-                              onDelete: () => context
-                                  .read<EquipmentManagementCubit>()
-                                  .deleteEquipment(e.id),
-                              onChangeStatus: (newStatus) => context
-                                  .read<EquipmentManagementCubit>()
-                                  .updateStatus(e.id, newStatus),
+                              onDelete: () => _deleteEquipment(context, e),
+                              onChangeStatus: (newStatus) =>
+                                  _updateStatus(context, e, newStatus),
                             ),
                           ),
                         ),

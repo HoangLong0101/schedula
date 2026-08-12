@@ -6,12 +6,14 @@ class AppUser extends Equatable {
     required this.email,
     required this.role,
     required this.tenantId,
+    this.mustChangePassword = false,
   });
 
   final String id;
   final String email;
   final String role;
   final String tenantId;
+  final bool mustChangePassword;
 
   String get normalizedRole => role.trim().toLowerCase();
 
@@ -43,5 +45,5 @@ class AppUser extends Equatable {
   bool hasPermission(String permission) => permissions.contains(permission);
 
   @override
-  List<Object?> get props => [id, email, role, tenantId];
+  List<Object?> get props => [id, email, role, tenantId, mustChangePassword];
 }

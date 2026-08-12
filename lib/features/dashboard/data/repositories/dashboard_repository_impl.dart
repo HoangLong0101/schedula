@@ -13,13 +13,36 @@ class DashboardRepositoryImpl implements DashboardRepository {
   DashboardRepositoryImpl(this._dataSource);
 
   final DashboardDataSource _dataSource;
+  final Map<String, DashboardStats> _statsCache = {};
+  final Map<String, Future<Either<Failure, DashboardStats>>> _statsRequests =
+      {};
 
   @override
   Future<Either<Failure, DashboardStats>> getDashboardStats(
     GetDashboardStatsParams params,
-  ) async {
+  ) {
+    final cached = _statsCache[params.tenantId];
+    if (!params.forceRefresh && cached != null) {
+      return Future.value(Right(cached));
+    }
+
+    final pending = _statsRequests[params.tenantId];
+    if (pending != null) return pending;
+
+    final request = _fetchStats(params.tenantId);
+    _statsRequests[params.tenantId] = request;
+    request.whenComplete(() {
+      if (identical(_statsRequests[params.tenantId], request)) {
+        _statsRequests.remove(params.tenantId);
+      }
+    });
+    return request;
+  }
+
+  Future<Either<Failure, DashboardStats>> _fetchStats(String tenantId) async {
     try {
-      final stats = await _dataSource.fetchStats(params.tenantId);
+      final stats = await _dataSource.fetchStats(tenantId);
+      _statsCache[tenantId] = stats;
       return Right(stats);
     } catch (_) {
       return const Left(ServerFailure('Không thể tải dữ liệu thống kê.'));

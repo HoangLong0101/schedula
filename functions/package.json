@@ -16,6 +16,7 @@
     "test:rules": "firebase emulators:exec --config ../firebase.json --only firestore \"node scripts/testFirestoreRules.js\"",
     "test:booking": "npm run build && node scripts/testBookingPolicy.js",
     "test:campaign": "npm run build && node scripts/testCampaignContent.js",
+    "admin:grant": "npm run build && node scripts/setPlatformAdmin.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

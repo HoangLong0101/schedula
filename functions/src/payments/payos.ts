@@ -174,6 +174,8 @@ export const createPayOSPayment = onCall(
     await paymentRef.set({
       tenantId,
       bookingId,
+      provider: 'payos',
+      method: 'bank_transfer',
       orderCode,
       amount,
       description,
@@ -331,6 +333,8 @@ export const createPayOSPlanUpgradePayment = onCall(
     await paymentRef.set({
       type: 'subscription',
       tenantId,
+      provider: 'payos',
+      method: 'bank_transfer',
       planTier: plan.tier,
       planName: plan.name,
       billingPeriod: billingPeriod ?? 'monthly',
@@ -377,12 +381,24 @@ export const payosWebhook = onRequest(
       signature?: string;
     };
 
+    const webhookEventRef = db.collection('paymentWebhookEvents').doc();
     if (!body.data || !body.signature) {
+      await webhookEventRef.set({
+        provider: 'payos',
+        status: 'invalid_payload',
+        createdAt: FieldValue.serverTimestamp(),
+      });
       response.status(400).send('Bad Request');
       return;
     }
 
     if (!verifyPayOSSignature(body.data, body.signature, payosChecksumKey.value())) {
+      await webhookEventRef.set({
+        provider: 'payos',
+        status: 'invalid_signature',
+        orderCode: Number(body.data.orderCode) || null,
+        createdAt: FieldValue.serverTimestamp(),
+      });
       response.status(401).send('Chữ ký không hợp lệ');
       return;
     }
@@ -400,23 +416,78 @@ export const payosWebhook = onRequest(
       .get();
 
     if (paymentSnap.empty) {
+      await webhookEventRef.set({
+        provider: 'payos',
+        status: 'unmatched',
+        orderCode,
+        providerCode: body.code ?? null,
+        providerDescription: body.desc ?? null,
+        createdAt: FieldValue.serverTimestamp(),
+      });
       response.status(200).send('Không tìm thấy thanh toán');
       return;
     }
 
     const paymentDoc = paymentSnap.docs[0];
     const payment = paymentDoc.data();
+    const webhookAmount = Number(body.data.amount);
+    const expectedAmount = Number(payment.amount);
+    if (
+      !Number.isSafeInteger(webhookAmount) ||
+      !Number.isSafeInteger(expectedAmount) ||
+      webhookAmount !== expectedAmount
+    ) {
+      const batch = db.batch();
+      batch.update(paymentDoc.ref, {
+        reconciliationStatus: 'mismatch',
+        providerStatus: String(body.data.code ?? ''),
+        providerCheckedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      batch.set(webhookEventRef, {
+        provider: 'payos',
+        status: 'amount_mismatch',
+        paymentId: paymentDoc.id,
+        tenantId: payment.tenantId ?? null,
+        orderCode,
+        expectedAmount,
+        receivedAmount: Number.isFinite(webhookAmount) ? webhookAmount : null,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+      response.status(409).send('Số tiền không khớp');
+      return;
+    }
     const paid = body.success === true && body.code === '00';
     const status = paid ? 'paid' : 'failed';
 
     await db.runTransaction(async (tx) => {
       tx.update(paymentDoc.ref, {
+        provider: 'payos',
         status,
+        providerStatus: String(body.data?.code ?? ''),
+        providerReference: body.data?.reference ?? null,
+        reconciliationStatus: 'verified',
+        providerCheckedAt: FieldValue.serverTimestamp(),
         webhookCode: body.code ?? null,
         webhookDesc: body.desc ?? null,
         payosData: body.data,
         paidAt: paid ? parsePayOSDate(body.data?.transactionDateTime) : null,
         updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      tx.set(webhookEventRef, {
+        provider: 'payos',
+        status: 'verified',
+        paymentId: paymentDoc.id,
+        tenantId: payment.tenantId ?? null,
+        orderCode,
+        paymentStatus: status,
+        providerCode: body.code ?? null,
+        providerDescription: body.desc ?? null,
+        providerReference: body.data?.reference ?? null,
+        transactionDateTime: body.data?.transactionDateTime ?? null,
+        createdAt: FieldValue.serverTimestamp(),
       });
 
       if (payment.bookingId) {

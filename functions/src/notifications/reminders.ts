@@ -10,8 +10,6 @@ if (admin.apps.length === 0) {
 
 const resendApiKey = defineSecret('RESEND_API_KEY');
 const mailFrom = defineString('REMINDER_MAIL_FROM');
-const zaloZnsAccessToken = defineSecret('ZALO_ZNS_ACCESS_TOKEN');
-const zaloZnsTemplateId = defineString('ZALO_ZNS_TEMPLATE_ID');
 
 const db = admin.firestore();
 const minute = 60 * 1000;
@@ -51,7 +49,7 @@ export const sendReminders = onSchedule(
   {
     schedule: 'every 15 minutes',
     region: 'asia-southeast1',
-    secrets: [resendApiKey, zaloZnsAccessToken],
+    secrets: [resendApiKey],
   },
   async () => {
     await Promise.all([
@@ -71,10 +69,7 @@ async function sendCustomer24hReminders(): Promise<void> {
     }
 
     const customer = await contact('customers', booking.customerId);
-    const results = await Promise.all([
-      sendCustomerEmail(booking, customer),
-      sendCustomerZalo(booking, customer),
-    ]);
+    const results = [await sendCustomerEmail(booking, customer)];
 
     await writeNotification(doc.id, booking, {
       type: 'customer_24h',
@@ -269,59 +264,6 @@ async function sendCustomerEmail(
   }
 }
 
-async function sendCustomerZalo(
-  booking: BookingData,
-  customer: ContactData | null,
-): Promise<SendResult> {
-  const phone = normalizeVietnamPhone(customer?.phone);
-  if (!phone) {
-    return { channel: 'zalo_zns', status: 'skipped', reason: 'missing_phone' };
-  }
-
-  const accessToken = safeSecretValue(zaloZnsAccessToken);
-  const templateId = safeStringValue(zaloZnsTemplateId);
-  if (!accessToken || !templateId) {
-    return { channel: 'zalo_zns', status: 'skipped', reason: 'zalo_not_configured' };
-  }
-
-  try {
-    const response = await fetch(
-      `https://business.openapi.zalo.me/message/template?access_token=${encodeURIComponent(accessToken)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone,
-          template_id: templateId,
-          template_data: {
-            customer_name: displayName(customer, booking.customerName),
-            appointment_time: formatAppointmentTime(booking.startTime),
-            service_name: booking.serviceName ?? '',
-            staff_name: booking.staffName ?? '',
-          },
-          tracking_id: `booking_${booking.tenantId ?? 'unknown'}_${Date.now()}`,
-        }),
-      },
-    );
-    const body = await response.json().catch(() => ({})) as {
-      error?: number;
-      message?: string;
-      data?: { msg_id?: string };
-    };
-    if (!response.ok || (body.error !== undefined && body.error !== 0)) {
-      return {
-        channel: 'zalo_zns',
-        status: 'failed',
-        reason: body.message ?? `zalo_${response.status}`,
-      };
-    }
-    return { channel: 'zalo_zns', status: 'sent', providerId: body.data?.msg_id };
-  } catch (error) {
-    logger.error('Customer reminder Zalo ZNS failed', { booking, error });
-    return { channel: 'zalo_zns', status: 'failed', reason: errorMessage(error) };
-  }
-}
-
 async function writeNotification(
   bookingId: string,
   booking: BookingData,
@@ -386,24 +328,6 @@ function formatAppointmentTime(value: Timestamp | undefined): string {
     month: '2-digit',
     year: 'numeric',
   }).format(value.toDate());
-}
-
-function normalizeVietnamPhone(value: string | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const digits = value.replace(/\D/g, '');
-  if (digits.length < 9) {
-    return null;
-  }
-  if (digits.startsWith('84')) {
-    return digits;
-  }
-  if (digits.startsWith('0')) {
-    return `84${digits.slice(1)}`;
-  }
-  return digits;
 }
 
 function safeSecretValue(secret: { value: () => string }): string {

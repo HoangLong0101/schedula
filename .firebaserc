@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "schedula-543b1"
-  }
+  },
+  "targets": {
+    "schedula-543b1": {
+      "hosting": {
+        "admin": [
+          "schedula-admin-543b1"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

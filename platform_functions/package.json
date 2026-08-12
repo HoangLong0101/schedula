@@ -1,0 +1,19 @@
+{
+  "name": "schedula-platform-functions",
+  "private": true,
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node scripts/testPlatformDashboard.js"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^7.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

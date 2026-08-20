@@ -8,6 +8,7 @@ class AuditEvent extends Equatable {
     required this.entityId,
     required this.action,
     required this.createdAt,
+    this.status = 'succeeded',
     this.before,
     this.after,
   });
@@ -18,6 +19,7 @@ class AuditEvent extends Equatable {
   final String entityId;
   final String action;
   final DateTime createdAt;
+  final String status;
   final Map<String, dynamic>? before;
   final Map<String, dynamic>? after;
 
@@ -29,6 +31,7 @@ class AuditEvent extends Equatable {
     entityId,
     action,
     createdAt,
+    status,
     before,
     after,
   ];

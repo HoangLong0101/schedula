@@ -16,7 +16,7 @@ abstract class StaffRepository {
     required bool cancelFuture,
     String? reassignTo,
   });
-  Future<Either<Failure, void>> sendPasswordReset(String id);
+  Future<Either<Failure, String>> resetPassword(String id);
   Future<Either<Failure, void>> setAccessRole(String id, String role);
   Future<Either<Failure, void>> addLeave({
     required String tenantId,

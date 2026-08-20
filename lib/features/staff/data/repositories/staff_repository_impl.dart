@@ -68,12 +68,11 @@ class StaffRepositoryImpl implements StaffRepository {
   }
 
   @override
-  Future<Either<Failure, void>> sendPasswordReset(String id) async {
+  Future<Either<Failure, String>> resetPassword(String id) async {
     try {
-      await _dataSource.sendPasswordReset(id);
-      return const Right(null);
+      return Right(await _dataSource.resetPassword(id));
     } catch (_) {
-      return const Left(ServerFailure('Không thể gửi email đặt lại mật khẩu.'));
+      return const Left(ServerFailure('Không thể tạo mật khẩu tạm mới.'));
     }
   }
 

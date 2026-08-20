@@ -125,6 +125,7 @@ class AccountDataSource {
     await user.reauthenticateWithCredential(credential);
     await user.updatePassword(newPassword);
     await _functions.httpsCallable('recordPasswordChange').call();
+    await user.getIdTokenResult(true);
   }
 
   Stream<List<AuditEvent>> watchAuditEvents(String tenantId) {
@@ -147,6 +148,7 @@ class AccountDataSource {
                   createdAt:
                       (data['createdAt'] as Timestamp?)?.toDate() ??
                       DateTime.fromMillisecondsSinceEpoch(0),
+                  status: data['status'] as String? ?? 'succeeded',
                   before: (data['before'] as Map?)?.cast<String, dynamic>(),
                   after: (data['after'] as Map?)?.cast<String, dynamic>(),
                 );

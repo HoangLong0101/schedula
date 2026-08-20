@@ -268,13 +268,12 @@ dart run build_runner watch --delete-conflicting-outputs
 The scheduled `sendReminders` function sends:
 
 - Staff reminder: FCM push + in-app notification 1 hour before a confirmed booking.
-- Customer reminder: email via Resend + Zalo ZNS message 24 hours before a confirmed booking.
+- Customer reminder: email via Resend 24 hours before a confirmed booking.
 
 Configure these before deploying notification delivery:
 
 ```bash
 firebase functions:secrets:set RESEND_API_KEY
-firebase functions:secrets:set ZALO_ZNS_ACCESS_TOKEN
 ```
 
 Set non-secret parameters in the functions environment, for example
@@ -282,11 +281,7 @@ Set non-secret parameters in the functions environment, for example
 
 ```bash
 REMINDER_MAIL_FROM="Schedula <no-reply@example.com>"
-ZALO_ZNS_TEMPLATE_ID="your_zns_template_id"
 ```
-
-The Zalo ZNS template must contain variables named `customer_name`,
-`appointment_time`, `service_name`, and `staff_name`.
 
 ### Multi-tenancy
 

@@ -36,6 +36,7 @@ class FakeBookingRepository implements BookingRepository {
             startTime: params.startTime,
             endTime: params.endTime,
             status: params.status,
+            resourceIds: params.resourceIds,
           ),
     );
   }
@@ -107,6 +108,7 @@ void main() {
         startTime: DateTime.now(),
         endTime: DateTime.now().add(const Duration(hours: 1)),
         status: BookingStatus.pending,
+        resourceIds: const ['equipment-1'],
       );
 
       final result = await usecase(params);
@@ -114,6 +116,7 @@ void main() {
       result.fold((l) => fail('expected right'), (booking) {
         expect(booking.tenantId, 't1');
         expect(booking.staffId, 's1');
+        expect(booking.resourceIds, const ['equipment-1']);
       });
     });
 

@@ -1,0 +1,106 @@
+{
+  "projectId": "schedula-543b1",
+  "exportedAt": "2026-08-18T11:34:06.963Z",
+  "records": [
+    {
+      "collection": "tenants",
+      "id": "wV1dCKBYE9A1kcflDnWi",
+      "data": {
+        "tenantId": "wV1dCKBYE9A1kcflDnWi",
+        "name": "Spa của Minh",
+        "type": "Massage & Thư giãn",
+        "address": "Sô 3 Quận 1",
+        "phone": "0989200259",
+        "website": "",
+        "hoursWeekday": "08:00 - 20:00",
+        "hoursWeekend": "09:00 - 18:00",
+        "description": "",
+        "ownerUid": "ah5e916vG9bncRkwTJ7iXEDN9X42",
+        "planStartedAt": {
+          "_seconds": 1786611432,
+          "_nanoseconds": 415000000
+        },
+        "planExpiresAt": {
+          "_seconds": 1789203432,
+          "_nanoseconds": 415000000
+        },
+        "createdAt": {
+          "_seconds": 1786611438,
+          "_nanoseconds": 157000000
+        },
+        "planTier": "enterprise",
+        "plan": "enterprise",
+        "status": "suspended",
+        "subscriptionStatus": "cancelled",
+        "updatedAt": {
+          "_seconds": 1787046492,
+          "_nanoseconds": 829000000
+        }
+      }
+    },
+    {
+      "collection": "users",
+      "id": "ah5e916vG9bncRkwTJ7iXEDN9X42",
+      "data": {
+        "tenantId": "wV1dCKBYE9A1kcflDnWi",
+        "role": "owner",
+        "name": "minh bình",
+        "email": "minhbinh2510@gmail.com",
+        "createdAt": {
+          "_seconds": 1786611438,
+          "_nanoseconds": 157000000
+        },
+        "updatedAt": {
+          "_seconds": 1786611438,
+          "_nanoseconds": 157000000
+        }
+      }
+    },
+    {
+      "collection": "tenants",
+      "id": "49T78xceyH20e4z9gB9g",
+      "data": {
+        "website": "none",
+        "address": "5b, pho quang",
+        "phone": "0987878787",
+        "hoursWeekday": "08:00 - 20:00",
+        "hoursWeekend": "09:00 - 18:00",
+        "tenantId": "49T78xceyH20e4z9gB9g",
+        "name": "vindy",
+        "description": "bla",
+        "type": "Spa & Làm đẹp",
+        "ownerUid": "nAyD2qkJYnXC8WRBYp8k5FODyai1",
+        "createdAt": {
+          "_seconds": 1781330269,
+          "_nanoseconds": 581000000
+        },
+        "status": "suspended",
+        "subscriptionStatus": "cancelled",
+        "planTier": "enterprise",
+        "plan": "enterprise",
+        "updatedAt": {
+          "_seconds": 1786623898,
+          "_nanoseconds": 437000000
+        }
+      }
+    },
+    {
+      "collection": "users",
+      "id": "nAyD2qkJYnXC8WRBYp8k5FODyai1",
+      "data": {
+        "role": "owner",
+        "tenantId": "49T78xceyH20e4z9gB9g",
+        "name": "do tien vinh",
+        "email": "tienvinh@gmail.com",
+        "createdAt": {
+          "_seconds": 1781330269,
+          "_nanoseconds": 581000000
+        },
+        "updatedAt": {
+          "_seconds": 1781330269,
+          "_nanoseconds": 581000000
+        }
+      }
+    }
+  ]
+}

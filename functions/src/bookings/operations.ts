@@ -95,6 +95,15 @@ export const mutateBooking = onCall(
             'Phải ghi nhận thanh toán trước khi hoàn thành lịch hẹn',
           );
         }
+        const releasedEquipment = ['completed', 'cancelled', 'no_show']
+          .includes(nextStatus)
+          ? await releasableEquipment(
+            tx,
+            auth.tenantId,
+            bookingRef.id,
+            stringArray(existing.resourceIds),
+          )
+          : [];
         const update = {
           status: nextStatus,
           ifCancelledReason: action === 'cancel'
@@ -120,6 +129,7 @@ export const mutateBooking = onCall(
             updatedAt: FieldValue.serverTimestamp(),
           });
         }
+        releaseEquipment(tx, releasedEquipment);
         if (nextStatus === 'completed') {
           incrementBookingAggregates(tx, existing);
         }
@@ -136,6 +146,13 @@ export const mutateBooking = onCall(
         bookingRef.id,
         candidate,
         auth.tenantId,
+      );
+      const previousResourceIds = stringArray(existing.resourceIds);
+      const releasedEquipment = await releasableEquipment(
+        tx,
+        auth.tenantId,
+        bookingRef.id,
+        previousResourceIds.filter((id) => !candidate.resourceIds.includes(id)),
       );
 
       const now = FieldValue.serverTimestamp();
@@ -166,6 +183,8 @@ export const mutateBooking = onCall(
       } else {
         tx.update(bookingRef, data);
       }
+      claimEquipment(tx, candidate.resourceIds);
+      releaseEquipment(tx, releasedEquipment);
       writeAudit(
         tx,
         auth,
@@ -396,7 +415,10 @@ async function validateSchedule(
       'Thiết bị của dịch vụ phải được ánh xạ trước khi đặt lịch',
     );
   }
-  booking.resourceIds = canonicalResourceIds;
+  booking.resourceIds = mergeResourceIds(
+    canonicalResourceIds,
+    booking.resourceIds,
+  );
   booking.staffName = String(
     staffSnapshot.data()?.name ?? staffSnapshot.data()?.email ?? booking.staffName,
   );
@@ -479,6 +501,73 @@ async function validateSchedule(
     }
   }
   return resourceSnapshot;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter(
+      (item): item is string => typeof item === 'string' && item.length > 0,
+    )
+    : [];
+}
+
+function mergeResourceIds(required: string[], selected: string[]): string[] {
+  return [...new Set([...required, ...selected])];
+}
+
+async function releasableEquipment(
+  tx: FirebaseFirestore.Transaction,
+  tenantId: string,
+  bookingId: string,
+  resourceIds: string[],
+): Promise<FirebaseFirestore.DocumentReference[]> {
+  const releasable = [];
+  for (const resourceId of new Set(resourceIds)) {
+    const equipmentRef = db.collection('equipment').doc(resourceId);
+    const equipmentSnapshot = await tx.get(equipmentRef);
+    if (
+      !equipmentSnapshot.exists ||
+      equipmentSnapshot.data()?.tenantId !== tenantId ||
+      equipmentSnapshot.data()?.status !== 'in_use'
+    ) {
+      continue;
+    }
+    const bookings = await tx.get(
+      db.collection('bookings').where('resourceIds', 'array-contains', resourceId),
+    );
+    const stillAssigned = bookings.docs.some((doc) => {
+      const booking = doc.data();
+      return doc.id !== bookingId &&
+        booking.tenantId === tenantId &&
+        activeStatuses.has(String(booking.status));
+    });
+    if (!stillAssigned) releasable.push(equipmentRef);
+  }
+  return releasable;
+}
+
+function claimEquipment(
+  tx: FirebaseFirestore.Transaction,
+  resourceIds: string[],
+): void {
+  for (const resourceId of new Set(resourceIds)) {
+    tx.update(db.collection('equipment').doc(resourceId), {
+      status: 'in_use',
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+}
+
+function releaseEquipment(
+  tx: FirebaseFirestore.Transaction,
+  equipment: FirebaseFirestore.DocumentReference[],
+): void {
+  for (const equipmentRef of equipment) {
+    tx.update(equipmentRef, {
+      status: 'available',
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
 }
 
 function validateBusinessHours(
@@ -609,6 +698,9 @@ function writeAudit(
     after: auditValue(after),
     createdAt: FieldValue.serverTimestamp(),
   });
+  tx.set(db.collection('tenants').doc(auth.tenantId), {
+    lastActiveAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
 }
 
 function incrementBookingAggregates(
@@ -681,4 +773,5 @@ function auditValue(value: unknown): unknown {
 export const __testing = {
   parseHours,
   assertTransition,
+  mergeResourceIds,
 };

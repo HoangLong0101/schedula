@@ -61,16 +61,40 @@ class _CustomerViewState extends State<_CustomerView> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _CustomerFormSheet(
         initialCustomer: customer,
-        onSave: (newCustomer) {
+        onSave: (newCustomer) async {
           if (customer == null) {
-            cubit.addCustomer(newCustomer);
-          } else {
-            cubit.updateCustomer(newCustomer);
+            return cubit.addCustomer(newCustomer);
           }
-          Navigator.pop(ctx);
+          return cubit.updateCustomer(newCustomer);
         },
       ),
     );
+  }
+
+  Future<void> _deleteCustomer(BuildContext context, Customer customer) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xóa khách hàng?'),
+        content: Text('Hồ sơ ${customer.name} sẽ bị xóa khỏi cơ sở.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final error = await context.read<CustomerManagementCubit>().deleteCustomer(
+      customer.id,
+    );
+    if (!context.mounted || error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
   }
 
   @override
@@ -122,7 +146,10 @@ class _CustomerViewState extends State<_CustomerView> {
                     final matchFilter =
                         _filter == null || c.derivedStatus == _filter;
                     return matchSearch && matchFilter;
-                  }).toList();
+                  }).toList()..sort((a, b) {
+                    if (a.isVip != b.isVip) return a.isVip ? -1 : 1;
+                    return b.totalVisits.compareTo(a.totalVisits);
+                  });
 
                   // Thống kê
                   final countAll = customers.length;
@@ -282,9 +309,7 @@ class _CustomerViewState extends State<_CustomerView> {
                             child: _CustomerCard(
                               customer: c,
                               onEdit: () => _showForm(context, customer: c),
-                              onDelete: () => context
-                                  .read<CustomerManagementCubit>()
-                                  .deleteCustomer(c.id),
+                              onDelete: () => _deleteCustomer(context, c),
                             ),
                           ),
                         ),
@@ -327,8 +352,11 @@ class _CustomerCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: customer.isVip ? const Color(0xFFFFFBEB) : Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: customer.isVip
+            ? Border.all(color: const Color(0xFFF59E0B), width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8),
         ],
@@ -365,15 +393,35 @@ class _CustomerCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
-                          child: Text(
-                            customer.name,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  customer.name,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (customer.isVip) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B),
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                  child: const Text(
+                                    'VIP',
+                                    style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         Container(
@@ -750,7 +798,7 @@ class _CustomerCard extends StatelessWidget {
 // --- BOTTOM SHEET FORM THÊM/SỬA KHÁCH HÀNG ---
 class _CustomerFormSheet extends StatefulWidget {
   final Customer? initialCustomer;
-  final Function(Customer) onSave;
+  final Future<String?> Function(Customer) onSave;
 
   const _CustomerFormSheet({this.initialCustomer, required this.onSave});
 
@@ -766,6 +814,7 @@ class _CustomerFormSheetState extends State<_CustomerFormSheet> {
   final _allergiesCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   bool _emailMarketingConsent = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -879,45 +928,79 @@ class _CustomerFormSheetState extends State<_CustomerFormSheet> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: () {
-                  if (_nameCtrl.text.trim().isEmpty ||
-                      _phoneCtrl.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vui lòng nhập tên và số điện thoại.'),
-                      ),
-                    );
-                    return;
-                  }
-                  widget.onSave(
-                    Customer(
-                      id:
-                          widget.initialCustomer?.id ??
-                          DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: _nameCtrl.text.trim(),
-                      phone: _phoneCtrl.text.trim(),
-                      email: _emailCtrl.text.trim(),
-                      birthday: _bdCtrl.text,
-                      allergies: _allergiesCtrl.text,
-                      notes: _notesCtrl.text,
-                      lastVisit: DateTime.now().toIso8601String().split('T')[0],
-                      avatar: _nameCtrl.text.isNotEmpty
-                          ? _nameCtrl.text[0].toUpperCase()
-                          : 'U',
-                      color: '#22AFC2',
-                      emailMarketingConsent: _emailMarketingConsent,
-                      emailConsentAt: _emailMarketingConsent
-                          ? widget.initialCustomer?.emailConsentAt ??
-                                DateTime.now()
-                          : null,
-                      emailOptedOut:
-                          !_emailMarketingConsent &&
-                          ((widget.initialCustomer?.emailMarketingConsent ??
-                                  false) ||
-                              (widget.initialCustomer?.emailOptedOut ?? false)),
-                    ),
-                  );
-                },
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        if (_nameCtrl.text.trim().isEmpty ||
+                            _phoneCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Vui lòng nhập tên và số điện thoại.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() => _saving = true);
+                        final initial = widget.initialCustomer;
+                        final error = await widget.onSave(
+                          Customer(
+                            id:
+                                widget.initialCustomer?.id ??
+                                DateTime.now().millisecondsSinceEpoch
+                                    .toString(),
+                            name: _nameCtrl.text.trim(),
+                            phone: _phoneCtrl.text.trim(),
+                            email: _emailCtrl.text.trim(),
+                            birthday: _bdCtrl.text,
+                            allergies: _allergiesCtrl.text,
+                            isVip: initial?.isVip ?? false,
+                            notes: _notesCtrl.text,
+                            lastVisit:
+                                initial?.lastVisit ??
+                                DateTime.now().toIso8601String().split('T')[0],
+                            totalVisits: initial?.totalVisits ?? 0,
+                            avatar:
+                                initial?.avatar ??
+                                (_nameCtrl.text.isNotEmpty
+                                    ? _nameCtrl.text[0].toUpperCase()
+                                    : 'U'),
+                            color: initial?.color ?? '#22AFC2',
+                            emailMarketingConsent: _emailMarketingConsent,
+                            emailConsentAt: _emailMarketingConsent
+                                ? widget.initialCustomer?.emailConsentAt ??
+                                      DateTime.now()
+                                : null,
+                            emailOptedOut:
+                                !_emailMarketingConsent &&
+                                ((widget
+                                            .initialCustomer
+                                            ?.emailMarketingConsent ??
+                                        false) ||
+                                    (widget.initialCustomer?.emailOptedOut ??
+                                        false)),
+                            derivedStatus:
+                                initial?.derivedStatus ??
+                                CustomerStatus.newCustomer,
+                            futureCount: initial?.futureCount ?? 0,
+                            recent30Count: initial?.recent30Count ?? 0,
+                            daysSinceLast: initial?.daysSinceLast ?? 0,
+                            birthdayInDays: initial?.birthdayInDays,
+                            age: initial?.age,
+                            nextApptDate: initial?.nextApptDate,
+                          ),
+                        );
+                        if (!context.mounted) return;
+                        setState(() => _saving = false);
+                        if (error != null) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(error)));
+                          return;
+                        }
+                        Navigator.pop(context);
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF22AFC2),
                   shape: RoundedRectangleBorder(

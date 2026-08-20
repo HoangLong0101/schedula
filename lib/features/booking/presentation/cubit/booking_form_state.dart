@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../catalog/domain/entities/service_item.dart';
 import '../../../customer/domain/entities/customer.dart';
+import '../../../equipment/domain/entities/equipment.dart';
 import '../../../staff/domain/entities/staff_member.dart';
 import '../../domain/entities/booking.dart';
 import '../../domain/entities/appointment_extraction.dart';
@@ -20,6 +21,9 @@ class BookingFormState extends Equatable {
     this.services = const [],
     this.staff = const [],
     this.customers = const [],
+    this.equipment = const [],
+    this.equipmentId = '',
+    this.equipmentName = '',
     this.bookingsForDay = const [],
     this.customerBookings = const [],
     DateTime? date,
@@ -45,6 +49,9 @@ class BookingFormState extends Equatable {
   final List<ServiceItem> services;
   final List<StaffMember> staff;
   final List<Customer> customers;
+  final List<Equipment> equipment;
+  final String equipmentId;
+  final String equipmentName;
   final List<Booking> bookingsForDay;
   final List<Booking> customerBookings;
   final DateTime date;
@@ -68,6 +75,9 @@ class BookingFormState extends Equatable {
     List<ServiceItem>? services,
     List<StaffMember>? staff,
     List<Customer>? customers,
+    List<Equipment>? equipment,
+    String? equipmentId,
+    String? equipmentName,
     List<Booking>? bookingsForDay,
     List<Booking>? customerBookings,
     DateTime? date,
@@ -92,6 +102,9 @@ class BookingFormState extends Equatable {
       services: services ?? this.services,
       staff: staff ?? this.staff,
       customers: customers ?? this.customers,
+      equipment: equipment ?? this.equipment,
+      equipmentId: equipmentId ?? this.equipmentId,
+      equipmentName: equipmentName ?? this.equipmentName,
       bookingsForDay: bookingsForDay ?? this.bookingsForDay,
       customerBookings: customerBookings ?? this.customerBookings,
       date: date ?? this.date,
@@ -145,6 +158,9 @@ class BookingFormState extends Equatable {
     services,
     staff,
     customers,
+    equipment,
+    equipmentId,
+    equipmentName,
     bookingsForDay,
     customerBookings,
     date,

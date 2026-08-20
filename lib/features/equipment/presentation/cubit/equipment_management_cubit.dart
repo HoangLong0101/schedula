@@ -43,13 +43,15 @@ class EquipmentManagementCubit extends Cubit<List<Equipment>> {
     return result.fold((failure) => failure.message, (_) => null);
   }
 
-  Future<void> deleteEquipment(String id) async {
-    await _deleteEquipment(id);
+  Future<String?> deleteEquipment(String id) async {
+    final result = await _deleteEquipment(id);
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
-  Future<void> updateStatus(String id, EquipmentStatus newStatus) async {
+  Future<String?> updateStatus(String id, EquipmentStatus newStatus) async {
     final equip = state.firstWhere((e) => e.id == id);
-    await _updateEquipment(equip.copyWith(status: newStatus));
+    final result = await _updateEquipment(equip.copyWith(status: newStatus));
+    return result.fold((failure) => failure.message, (_) => null);
   }
 
   @override

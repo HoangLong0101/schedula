@@ -8,6 +8,7 @@ import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/booking/presentation/widgets/booking_form_sheet.dart';
 import '../../features/dashboard/presentation/pages/home_page.dart';
 import '../theme/app_theme.dart';
+import 'shell_layout.dart';
 
 class MainShellPage extends StatelessWidget {
   const MainShellPage({super.key, required this.navigationShell});
@@ -64,6 +65,7 @@ class MainShellPage extends StatelessWidget {
       child: Focus(
         autofocus: true,
         child: Scaffold(
+          extendBody: true,
           backgroundColor: AppTheme.canvas,
           body: Align(
             alignment: Alignment.topCenter,
@@ -74,13 +76,13 @@ class MainShellPage extends StatelessWidget {
           ),
           // CỐ ĐỊNH CHIỀU CAO TẠI ĐÂY, NGĂN ALIGN CHIẾM TOÀN MÀN HÌNH
           bottomNavigationBar: SizedBox(
-            height: 84 + bottomPadding,
+            height: ShellLayout.navigationHeight + bottomPadding,
             child: Align(
               alignment: Alignment.bottomCenter,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 430),
                 child: SizedBox(
-                  height: 84 + bottomPadding,
+                  height: ShellLayout.navigationHeight + bottomPadding,
                   child: Stack(
                     alignment: Alignment.bottomCenter,
                     clipBehavior: Clip.none,

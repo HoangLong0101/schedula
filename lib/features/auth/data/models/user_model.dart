@@ -6,6 +6,7 @@ class UserModel extends AppUser {
     required super.email,
     required super.role,
     required super.tenantId,
+    super.mustChangePassword,
   });
 
   factory UserModel.fromAppUser(AppUser user) {
@@ -14,6 +15,7 @@ class UserModel extends AppUser {
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      mustChangePassword: user.mustChangePassword,
     );
   }
 
@@ -23,6 +25,7 @@ class UserModel extends AppUser {
       email: json['email'] as String? ?? '',
       role: json['role'] as String? ?? '',
       tenantId: json['tenantId'] as String? ?? '',
+      mustChangePassword: json['mustChangePassword'] as bool? ?? false,
     );
   }
 
@@ -32,6 +35,7 @@ class UserModel extends AppUser {
       'email': email,
       'role': role,
       'tenantId': tenantId,
+      'mustChangePassword': mustChangePassword,
     };
   }
 }

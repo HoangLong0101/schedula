@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/router/shell_layout.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -78,7 +79,12 @@ class _StaffAccountView extends StatelessWidget {
       backgroundColor: const Color(0xFFFCFCFD),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            ShellLayout.bottomContentPadding(context),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -238,8 +244,8 @@ class _AccountView extends StatelessWidget {
   static String _planLabel(String planTier) {
     return switch (planTier.toLowerCase()) {
       'basic' => 'Gói Cơ bản',
-      'professional' || 'pro' => 'Gói Chuyên Nghiệp',
-      'premium' => 'Gói Cao cấp',
+      'professional' || 'pro' => 'Gói Chuyên nghiệp',
+      'premium' || 'enterprise' => 'Gói Doanh nghiệp',
       _ => 'Gói ${planTier.toUpperCase()}',
     };
   }
@@ -287,9 +293,9 @@ class _AccountView extends StatelessWidget {
       backgroundColor: const Color(0xFFFCFCFD), // Nền chuẩn của app
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(
-            bottom: 120,
-          ), // Tránh bị lấp bởi Global Navbar
+          padding: EdgeInsets.only(
+            bottom: ShellLayout.bottomContentPadding(context),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -742,12 +748,6 @@ class _AccountView extends StatelessWidget {
                               onTap: () =>
                                   showAuditHistorySheet(context, tenantId),
                             ),
-                            _MenuItem(
-                              icon: Icons.mark_email_read_outlined,
-                              label: 'Chăm sóc khách hàng qua email',
-                              color: const Color(0xFF22AFC2),
-                              onTap: () => showCampaignSheet(context, tenantId),
-                            ),
                           ],
                         ),
                         _MenuSection(
@@ -923,7 +923,7 @@ class _PlanUpgradeSheetState extends State<_PlanUpgradeSheet> {
     const plans = [
       _PlanOptionData(
         tier: 'pro',
-        name: 'Schedula Pro',
+        name: 'Chuyên nghiệp',
         price: 699000,
         description:
             'Không giới hạn lịch hẹn, 10 nhân viên, thống kê nâng cao.',
@@ -931,7 +931,7 @@ class _PlanUpgradeSheetState extends State<_PlanUpgradeSheet> {
       ),
       _PlanOptionData(
         tier: 'premium',
-        name: 'Schedula Premium',
+        name: 'Doanh nghiệp',
         price: 1499000,
         description:
             'Không giới hạn nhân viên, báo cáo đầy đủ và hỗ trợ ưu tiên.',

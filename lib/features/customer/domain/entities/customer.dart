@@ -10,6 +10,7 @@ class Customer extends Equatable {
   final String birthday;
   final String notes;
   final String allergies;
+  final bool isVip;
   final String lastVisit;
   final int totalVisits;
   final String avatar;
@@ -35,6 +36,7 @@ class Customer extends Equatable {
     this.birthday = '',
     this.notes = '',
     this.allergies = '',
+    this.isVip = false,
     required this.lastVisit,
     this.totalVisits = 0,
     required this.avatar,
@@ -58,6 +60,7 @@ class Customer extends Equatable {
     String? birthday,
     String? notes,
     String? allergies,
+    bool? isVip,
     String? lastVisit,
     int? totalVisits,
     String? avatar,
@@ -81,6 +84,7 @@ class Customer extends Equatable {
       birthday: birthday ?? this.birthday,
       notes: notes ?? this.notes,
       allergies: allergies ?? this.allergies,
+      isVip: isVip ?? this.isVip,
       lastVisit: lastVisit ?? this.lastVisit,
       totalVisits: totalVisits ?? this.totalVisits,
       avatar: avatar ?? this.avatar,
@@ -108,6 +112,7 @@ class Customer extends Equatable {
     birthday,
     notes,
     allergies,
+    isVip,
     lastVisit,
     totalVisits,
     avatar,

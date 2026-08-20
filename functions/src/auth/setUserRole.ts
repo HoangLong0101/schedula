@@ -10,7 +10,7 @@ type SetUserRoleData = {
   role: 'owner' | 'receptionist' | 'staff';
 };
 
-export const setUserRole = onCall(async (request) => {
+export const setUserRole = onCall({ region: 'asia-southeast1' }, async (request) => {
   if (request.auth?.token?.role !== 'owner') {
     throw new HttpsError('permission-denied', 'Chỉ chủ cơ sở được thực hiện');
   }
@@ -39,10 +39,15 @@ export const setUserRole = onCall(async (request) => {
       'report.read',
     ]
     : ['booking.status.own', 'customer.read'];
+  const authUser = await admin.auth().getUser(uid);
   await admin.auth().setCustomUserClaims(uid, {
+    ...(authUser.customClaims ?? {}),
     role,
     tenantId,
     permissions,
+    mustChangePassword:
+      snapshot.data()?.mustChangePassword === true ||
+      authUser.customClaims?.mustChangePassword === true,
   });
   const batch = admin.firestore().batch();
   batch.update(userRef, {

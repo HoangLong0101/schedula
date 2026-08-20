@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/router/shell_layout.dart';
 import '../../../booking/presentation/pages/booking_page.dart';
 import '../../../customer/presentation/pages/customer_page.dart';
 import '../../../notification/presentation/pages/notification_page.dart';
@@ -185,7 +186,12 @@ class _HomeContent extends StatelessWidget {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(22, 18, 22, 34),
+      padding: EdgeInsets.fromLTRB(
+        22,
+        18,
+        22,
+        ShellLayout.bottomContentPadding(context),
+      ),
       children: [
         const _HomeHeader(),
         const SizedBox(height: 26),

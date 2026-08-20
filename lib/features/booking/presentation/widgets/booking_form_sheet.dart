@@ -9,6 +9,8 @@ import '../../../catalog/domain/entities/service_item.dart';
 import '../../../catalog/domain/repositories/catalog_repository.dart';
 import '../../../customer/domain/entities/customer.dart';
 import '../../../customer/domain/usecases/watch_customers_usecase.dart';
+import '../../../equipment/domain/entities/equipment.dart';
+import '../../../equipment/domain/usecases/watch_equipment_usecase.dart';
 import '../../../staff/domain/entities/staff_member.dart';
 import '../../../staff/domain/usecases/watch_staff_usecase.dart';
 import '../../domain/entities/appointment_image_upload.dart';
@@ -39,6 +41,7 @@ class BookingFormSheet {
             getIt<WatchStaffUseCase>(),
             getIt<WatchBookingsUseCase>(),
             getIt<WatchCustomersUseCase>(),
+            getIt<WatchEquipmentUseCase>(),
             getIt<CatalogRepository>(),
             booking,
           ),
@@ -218,6 +221,14 @@ class _BookingFormContentState extends State<_BookingFormContent> {
                         .read<BookingFormCubit>()
                         .updateStaffName,
                   ),
+                  const SizedBox(height: 16),
+                  _EquipmentSelectField(
+                    equipment: state.equipment,
+                    selectedEquipmentName: state.equipmentName,
+                    onSelected: context
+                        .read<BookingFormCubit>()
+                        .updateEquipment,
+                  ),
                   const SizedBox(height: 20),
                   const _SectionLabel('Số điện thoại'),
                   const SizedBox(height: 8),
@@ -312,9 +323,13 @@ class _BookingFormContentState extends State<_BookingFormContent> {
     final selectedServices = state.services.where(
       (service) => service.id == state.serviceId,
     );
-    final resourceIds = selectedServices.isEmpty
-        ? widget.booking?.resourceIds ?? const <String>[]
-        : selectedServices.first.resourceIds;
+    final resourceIds = <String>{
+      if (selectedServices.isEmpty)
+        ...?widget.booking?.resourceIds
+      else
+        ...selectedServices.first.resourceIds,
+      if (state.equipmentId.isNotEmpty) state.equipmentId,
+    }.toList(growable: false);
     final params = CreateBookingParams(
       tenantId: widget.tenantId,
       staffId: staffId,
@@ -717,6 +732,75 @@ class _StaffSelectField extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _EquipmentSelectField extends StatelessWidget {
+  const _EquipmentSelectField({
+    required this.equipment,
+    required this.selectedEquipmentName,
+    required this.onSelected,
+  });
+
+  final List<Equipment> equipment;
+  final String selectedEquipmentName;
+  final ValueChanged<Equipment?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PickerGroup(
+      label: 'Thiết bị (tùy chọn)',
+      child: _SelectButton(
+        icon: Icons.precision_manufacturing_outlined,
+        label: selectedEquipmentName.isEmpty
+            ? 'Không chọn thiết bị'
+            : selectedEquipmentName,
+        onPressed: () => _showPicker(context),
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    final choices = equipment
+        .where((item) => item.status != EquipmentStatus.maintenance)
+        .toList(growable: false);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          children: [
+            const _SheetTitle('Chọn thiết bị'),
+            ListTile(
+              leading: const Icon(Icons.block_outlined),
+              title: const Text('Không sử dụng thiết bị'),
+              onTap: () {
+                onSelected(null);
+                Navigator.of(sheetContext).pop();
+              },
+            ),
+            for (final item in choices)
+              ListTile(
+                leading: const Icon(Icons.precision_manufacturing_outlined),
+                title: Text(item.name),
+                subtitle: item.location.isEmpty ? null : Text(item.location),
+                trailing: item.status == EquipmentStatus.inUse
+                    ? const Text('Đang sử dụng')
+                    : null,
+                onTap: () {
+                  onSelected(item);
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

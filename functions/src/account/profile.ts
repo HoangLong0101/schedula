@@ -56,7 +56,17 @@ export const recordPasswordChange = onCall(
     if (!uid || typeof tenantId !== 'string') {
       throw new HttpsError('unauthenticated', 'Vui lòng đăng nhập');
     }
-    await db.collection('auditEvents').add({
+    const user = await admin.auth().getUser(uid);
+    await admin.auth().setCustomUserClaims(uid, {
+      ...(user.customClaims ?? {}),
+      mustChangePassword: false,
+    });
+    const batch = db.batch();
+    batch.update(db.collection('users').doc(uid), {
+      mustChangePassword: false,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    batch.set(db.collection('auditEvents').doc(), {
       tenantId,
       actorId: uid,
       actorRole: request.auth!.token.role ?? 'staff',
@@ -65,6 +75,7 @@ export const recordPasswordChange = onCall(
       action: 'account.password_changed',
       createdAt: FieldValue.serverTimestamp(),
     });
+    await batch.commit();
     return { success: true };
   },
 );

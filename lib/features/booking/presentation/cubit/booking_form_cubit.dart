@@ -10,6 +10,8 @@ import '../../../catalog/domain/entities/service_item.dart';
 import '../../../catalog/domain/repositories/catalog_repository.dart';
 import '../../../customer/domain/entities/customer.dart';
 import '../../../customer/domain/usecases/watch_customers_usecase.dart';
+import '../../../equipment/domain/entities/equipment.dart';
+import '../../../equipment/domain/usecases/watch_equipment_usecase.dart';
 import '../../../staff/domain/entities/staff_member.dart';
 import '../../../staff/domain/usecases/watch_staff_usecase.dart';
 import '../../domain/entities/appointment_extraction.dart';
@@ -27,6 +29,7 @@ class BookingFormCubit extends Cubit<BookingFormState> {
     this._watchStaff,
     this._watchBookings,
     this._watchCustomers,
+    this._watchEquipment,
     this._catalogRepository, [
     Booking? initialBooking,
   ]) : super(
@@ -43,6 +46,7 @@ class BookingFormCubit extends Cubit<BookingFormState> {
                  startTime: TimeOfDay.fromDateTime(initialBooking.startTime),
                  endTime: TimeOfDay.fromDateTime(initialBooking.endTime),
                  notes: initialBooking.notes ?? '',
+                 equipmentId: initialBooking.resourceIds.firstOrNull ?? '',
                ),
        ) {
     _watchOptions();
@@ -54,10 +58,12 @@ class BookingFormCubit extends Cubit<BookingFormState> {
   final WatchStaffUseCase _watchStaff;
   final WatchBookingsUseCase _watchBookings;
   final WatchCustomersUseCase _watchCustomers;
+  final WatchEquipmentUseCase _watchEquipment;
   final CatalogRepository _catalogRepository;
   StreamSubscription<Either<Failure, List<StaffMember>>>? _staffSubscription;
   StreamSubscription<Either<Failure, List<Customer>>>? _customersSubscription;
   StreamSubscription<Either<Failure, List<ServiceItem>>>? _servicesSubscription;
+  StreamSubscription<Either<Failure, List<Equipment>>>? _equipmentSubscription;
   StreamSubscription<Either<Failure, List<Booking>>>? _bookingsSubscription;
   StreamSubscription<Either<Failure, List<Booking>>>?
   _customerBookingsSubscription;
@@ -149,6 +155,15 @@ class BookingFormCubit extends Cubit<BookingFormState> {
 
   void updateNotes(String value) {
     emit(state.copyWith(notes: value));
+  }
+
+  void updateEquipment(Equipment? equipment) {
+    emit(
+      state.copyWith(
+        equipmentId: equipment?.id ?? '',
+        equipmentName: equipment?.name ?? '',
+      ),
+    );
   }
 
   void updateMode({required bool aiMode}) {
@@ -356,6 +371,20 @@ class BookingFormCubit extends Cubit<BookingFormState> {
             (customers) => emit(state.copyWith(customers: customers)),
           );
         });
+
+    _equipmentSubscription = _watchEquipment(_tenantId).listen((result) {
+      result.fold((_) {}, (equipment) {
+        var equipmentName = state.equipmentName;
+        if (state.equipmentId.isNotEmpty) {
+          for (final item in equipment) {
+            if (item.id == state.equipmentId) equipmentName = item.name;
+          }
+        }
+        emit(
+          state.copyWith(equipment: equipment, equipmentName: equipmentName),
+        );
+      });
+    });
   }
 
   void _watchBookingsForSelectedDay() {
@@ -534,6 +563,7 @@ class BookingFormCubit extends Cubit<BookingFormState> {
     _staffSubscription?.cancel();
     _customersSubscription?.cancel();
     _servicesSubscription?.cancel();
+    _equipmentSubscription?.cancel();
     _bookingsSubscription?.cancel();
     _customerBookingsSubscription?.cancel();
     return super.close();

@@ -1,0 +1,27 @@
+name: schedula_admin
+description: Schedula platform administration portal
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^4.9.0
+  firebase_auth: ^6.5.1
+  cloud_functions: ^6.3.1
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.1.0
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/Icon.png

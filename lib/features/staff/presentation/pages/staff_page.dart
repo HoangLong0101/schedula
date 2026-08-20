@@ -85,8 +85,15 @@ class _StaffView extends StatelessWidget {
               password: result.password!,
             );
           } else {
-            await cubit.updateStaff(newStaff);
-            if (sheetContext.mounted) Navigator.pop(sheetContext);
+            final error = await cubit.updateStaff(newStaff);
+            if (!sheetContext.mounted) return;
+            if (error != null) {
+              ScaffoldMessenger.of(
+                sheetContext,
+              ).showSnackBar(SnackBar(content: Text(error)));
+              return;
+            }
+            Navigator.pop(sheetContext);
           }
         },
       ),
@@ -226,19 +233,17 @@ class _StaffView extends StatelessWidget {
                 Expanded(
                   child: TextButton(
                     onPressed: () async {
-                      final success = await cubit.deleteStaff(
+                      final error = await cubit.deleteStaff(
                         id,
                         cancelFuture: cancelFuture,
                         reassignTo: reassignTo,
                       );
                       if (!ctx.mounted) return;
                       Navigator.pop(ctx);
-                      if (!success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Không thể lưu trữ nhân viên.'),
-                          ),
-                        );
+                      if (error != null && context.mounted) {
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(error)));
                       }
                     },
                     style: TextButton.styleFrom(
@@ -305,22 +310,21 @@ class _StaffView extends StatelessWidget {
     );
   }
 
-  Future<void> _sendPasswordReset(
-    BuildContext context,
-    StaffMember staff,
-  ) async {
-    final success = await context
-        .read<StaffManagementCubit>()
-        .sendPasswordReset(staff.id);
+  Future<void> _resetPassword(BuildContext context, StaffMember staff) async {
+    final result = await context.read<StaffManagementCubit>().resetPassword(
+      staff.id,
+    );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Đã gửi email đặt lại mật khẩu.'
-              : 'Không thể gửi email đặt lại mật khẩu.',
-        ),
-      ),
+    if (result.password == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'Không thể tạo mật khẩu tạm.')),
+      );
+      return;
+    }
+    await _showTemporaryPassword(
+      context,
+      email: staff.email,
+      password: result.password!,
     );
   }
 
@@ -594,7 +598,7 @@ class _StaffView extends StatelessWidget {
                                     _confirmDelete(context, staff.id),
                                 onLeave: () => _addLeave(context, staff),
                                 onPasswordReset: () =>
-                                    _sendPasswordReset(context, staff),
+                                    _resetPassword(context, staff),
                                 onAccessRole: () =>
                                     _setAccessRole(context, staff),
                                 onAppointmentsTap: () =>
@@ -1522,6 +1526,11 @@ class _StaffFormSheetState extends State<_StaffFormSheet> {
                                     .toString(),
                             name: _nameCtrl.text.trim(),
                             role: _role,
+                            accessRole:
+                                widget.initialStaff?.accessRole ?? 'staff',
+                            appointments:
+                                widget.initialStaff?.appointments ?? 0,
+                            rating: widget.initialStaff?.rating ?? 5,
                             phone: _phoneCtrl.text.trim(),
                             email: _emailCtrl.text.trim(),
                             status: _status,

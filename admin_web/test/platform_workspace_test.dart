@@ -31,9 +31,7 @@ void main() {
       'plans': const [],
       'analytics': const {},
       'auditEvents': const [],
-      'webhookEvents': const [],
       'admins': const [],
-      'limits': const {},
     });
 
     expect(workspace.actor.can('transaction.reconcile'), isTrue);

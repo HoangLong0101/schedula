@@ -61,23 +61,27 @@ class AdminApi {
     );
   }
 
-  Future<Map<Object?, Object?>> getBusinessDetail(String tenantId) async {
+  Future<Map<Object?, Object?>> getBusinessDetail(
+    String tenantId, {
+    int activityDays = 30,
+  }) async {
     final result = await _functions
         .httpsCallable('getPlatformBusinessDetail')
-        .call({'tenantId': tenantId});
+        .call({'tenantId': tenantId, 'activityDays': activityDays});
     return Map<Object?, Object?>.from(result.data as Map);
   }
 
-  Future<void> performAction({
+  Future<Map<Object?, Object?>> performAction({
     required String action,
     required String resourceId,
     Map<String, Object?> payload = const {},
   }) async {
-    await _functions.httpsCallable('platformAdminAction').call({
+    final result = await _functions.httpsCallable('platformAdminAction').call({
       'action': action,
       'resourceId': resourceId,
       'payload': payload,
     });
+    return Map<Object?, Object?>.from(result.data as Map);
   }
 
   Future<void> reconcileTransaction(String paymentId) async {

@@ -148,6 +148,7 @@ class AccountDataSource {
                   createdAt:
                       (data['createdAt'] as Timestamp?)?.toDate() ??
                       DateTime.fromMillisecondsSinceEpoch(0),
+                  status: data['status'] as String? ?? 'succeeded',
                   before: (data['before'] as Map?)?.cast<String, dynamic>(),
                   after: (data['after'] as Map?)?.cast<String, dynamic>(),
                 );

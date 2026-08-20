@@ -9,6 +9,72 @@ import '../../domain/usecases/governance_usecase.dart';
 GovernanceUseCase _governance() =>
     GovernanceUseCase(getIt<AccountRepository>());
 
+class TenantActivityHistory extends StatelessWidget {
+  const TenantActivityHistory({
+    required this.tenantId,
+    required this.rangeIndex,
+    super.key,
+  });
+
+  final String tenantId;
+  final int rangeIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+      stream: _governance().watchAudit(tenantId),
+      builder: (context, snapshot) {
+        final either = snapshot.data;
+        if (either == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return either.fold((failure) => Text(failure.message), (allEvents) {
+          final start = _activityStart(DateTime.now(), rangeIndex);
+          final events = allEvents
+              .where((event) => !event.createdAt.isBefore(start))
+              .toList(growable: false);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Hoạt động với hệ thống',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  Text(
+                    '${events.length} hoạt động',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (events.isEmpty)
+                const _EmptyState(
+                  icon: Icons.history_toggle_off_outlined,
+                  title: 'Chưa có hoạt động trong kỳ',
+                  message:
+                      'Các thao tác thêm, chỉnh sửa và xóa sẽ xuất hiện tại đây.',
+                )
+              else
+                ...events.map((event) => _AuditTile(event: event)),
+            ],
+          );
+        });
+      },
+    );
+  }
+}
+
+DateTime _activityStart(DateTime now, int rangeIndex) => switch (rangeIndex) {
+  0 => DateTime(now.year, now.month, now.day),
+  1 => DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6)),
+  2 => DateTime(now.year, now.month),
+  _ => DateTime(now.year),
+};
+
 void showAuditHistorySheet(BuildContext context, String tenantId) {
   showModalBottomSheet<void>(
     context: context,
@@ -179,40 +245,48 @@ class _AuditTile extends StatelessWidget {
     final date = event.createdAt;
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(_auditAction(event.action)),
-      subtitle: Text(
-        'Người thực hiện: ${event.actorId}\n'
-        '${_entityName(event.entityType)}: ${event.entityId}\n'
-        '${event.before ?? const {}} → ${event.after ?? const {}}',
-        maxLines: 4,
-        overflow: TextOverflow.ellipsis,
+      leading: Icon(_auditIcon(event.action), color: const Color(0xFF148A9C)),
+      title: Text(
+        '${_auditAction(event.action)} · ${_entityName(event.entityType)}',
       ),
-      trailing: Text(
-        '${date.day}/${date.month}\n'
+      subtitle: Text(
         '${date.hour.toString().padLeft(2, '0')}:'
-        '${date.minute.toString().padLeft(2, '0')}',
-        textAlign: TextAlign.right,
+        '${date.minute.toString().padLeft(2, '0')} '
+        '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/${date.year}',
+      ),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: event.status == 'failed'
+              ? const Color(0xFFFFE4E6)
+              : const Color(0xFFE7F6F0),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          event.status == 'failed' ? 'Thất bại' : 'Thành công',
+          style: TextStyle(
+            color: event.status == 'failed'
+                ? const Color(0xFFE11D48)
+                : const Color(0xFF07885E),
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }
 
-  String _auditAction(String action) => switch (action) {
-    'booking.create' => 'Đã tạo lịch hẹn',
-    'booking.update' => 'Đã cập nhật lịch hẹn',
-    'booking.cancel' => 'Đã hủy lịch hẹn',
-    'booking.status' => 'Đã đổi trạng thái lịch hẹn',
-    'booking.payment_recorded' => 'Đã ghi nhận thanh toán',
-    'booking.reassigned' => 'Đã chuyển lịch hẹn cho nhân viên khác',
-    'booking.cancelled_for_staff_archive' =>
-      'Đã hủy lịch hẹn khi lưu trữ nhân viên',
-    'staff.deleted' => 'Đã xóa nhân viên',
-    'staff.archived' => 'Đã lưu trữ nhân viên',
-    'staff.leave.created' => 'Đã tạo ngày nghỉ nhân viên',
-    'permission.changed' => 'Đã thay đổi phân quyền',
-    'account.updated' => 'Đã cập nhật hồ sơ',
-    'account.password_changed' => 'Đã đổi mật khẩu',
-    'campaign.sent' => 'Đã gửi chiến dịch email',
-    _ => action,
+  String _auditAction(String action) {
+    final value = action.toLowerCase();
+    if (value.contains('delete') || value.contains('archive')) return 'Xóa';
+    if (value.contains('create') || value.contains('add')) return 'Thêm';
+    return 'Chỉnh sửa';
+  }
+
+  IconData _auditIcon(String action) => switch (_auditAction(action)) {
+    'Thêm' => Icons.add_circle_outline,
+    'Xóa' => Icons.delete_outline,
+    _ => Icons.edit_outlined,
   };
 
   String _entityName(String entity) => switch (entity) {
@@ -220,8 +294,12 @@ class _AuditTile extends StatelessWidget {
     'payment' => 'Thanh toán',
     'staff' => 'Nhân viên',
     'user' => 'Người dùng',
-    'campaign' => 'Chiến dịch',
-    _ => 'Đối tượng',
+    'customer' => 'Khách hàng',
+    'service' => 'Dịch vụ',
+    'product' => 'Sản phẩm',
+    'equipment' => 'Thiết bị',
+    'tenant' => 'Doanh nghiệp',
+    _ => 'Hệ thống',
   };
 }
 

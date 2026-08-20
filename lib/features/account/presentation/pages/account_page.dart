@@ -244,8 +244,8 @@ class _AccountView extends StatelessWidget {
   static String _planLabel(String planTier) {
     return switch (planTier.toLowerCase()) {
       'basic' => 'Gói Cơ bản',
-      'professional' || 'pro' => 'Gói Chuyên Nghiệp',
-      'premium' => 'Gói Cao cấp',
+      'professional' || 'pro' => 'Gói Chuyên nghiệp',
+      'premium' || 'enterprise' => 'Gói Doanh nghiệp',
       _ => 'Gói ${planTier.toUpperCase()}',
     };
   }
@@ -748,12 +748,6 @@ class _AccountView extends StatelessWidget {
                               onTap: () =>
                                   showAuditHistorySheet(context, tenantId),
                             ),
-                            _MenuItem(
-                              icon: Icons.mark_email_read_outlined,
-                              label: 'Chăm sóc khách hàng qua email',
-                              color: const Color(0xFF22AFC2),
-                              onTap: () => showCampaignSheet(context, tenantId),
-                            ),
                           ],
                         ),
                         _MenuSection(
@@ -929,7 +923,7 @@ class _PlanUpgradeSheetState extends State<_PlanUpgradeSheet> {
     const plans = [
       _PlanOptionData(
         tier: 'pro',
-        name: 'Schedula Pro',
+        name: 'Chuyên nghiệp',
         price: 699000,
         description:
             'Không giới hạn lịch hẹn, 10 nhân viên, thống kê nâng cao.',
@@ -937,7 +931,7 @@ class _PlanUpgradeSheetState extends State<_PlanUpgradeSheet> {
       ),
       _PlanOptionData(
         tier: 'premium',
-        name: 'Schedula Premium',
+        name: 'Doanh nghiệp',
         price: 1499000,
         description:
             'Không giới hạn nhân viên, báo cáo đầy đủ và hỗ trợ ưu tiên.',

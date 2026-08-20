@@ -6,7 +6,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node scripts/testPlatformDashboard.js"
+    "test": "npm run build && node scripts/testPlatformDashboard.js",
+    "verify:activity": "node scripts/verifyPlatformActivity.js"
   },
   "main": "lib/index.js",
   "dependencies": {

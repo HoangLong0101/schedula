@@ -8,7 +8,6 @@ import '../../domain/entities/dashboard_stats.dart';
 import '../cubit/dashboard_cubit.dart';
 import '../cubit/dashboard_state.dart';
 import 'home_page.dart';
-import '../widgets/operational_reports.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key, this.tenantId});
@@ -110,11 +109,6 @@ class _StatisticsViewState extends State<_StatisticsView> {
                       ),
                     ),
                   },
-                  const SizedBox(height: 28),
-                  OperationalReports(
-                    tenantId: widget.tenantId,
-                    rangeIndex: _rangeIndex,
-                  ),
                 ],
               );
             },

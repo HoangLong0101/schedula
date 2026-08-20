@@ -146,7 +146,10 @@ class _CustomerViewState extends State<_CustomerView> {
                     final matchFilter =
                         _filter == null || c.derivedStatus == _filter;
                     return matchSearch && matchFilter;
-                  }).toList();
+                  }).toList()..sort((a, b) {
+                    if (a.isVip != b.isVip) return a.isVip ? -1 : 1;
+                    return b.totalVisits.compareTo(a.totalVisits);
+                  });
 
                   // Thống kê
                   final countAll = customers.length;
@@ -349,8 +352,11 @@ class _CustomerCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: customer.isVip ? const Color(0xFFFFFBEB) : Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: customer.isVip
+            ? Border.all(color: const Color(0xFFF59E0B), width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8),
         ],
@@ -387,15 +393,35 @@ class _CustomerCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
-                          child: Text(
-                            customer.name,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  customer.name,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (customer.isVip) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B),
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                  child: const Text(
+                                    'VIP',
+                                    style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         Container(
@@ -929,6 +955,7 @@ class _CustomerFormSheetState extends State<_CustomerFormSheet> {
                             email: _emailCtrl.text.trim(),
                             birthday: _bdCtrl.text,
                             allergies: _allergiesCtrl.text,
+                            isVip: initial?.isVip ?? false,
                             notes: _notesCtrl.text,
                             lastVisit:
                                 initial?.lastVisit ??

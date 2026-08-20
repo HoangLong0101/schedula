@@ -13,9 +13,14 @@ class WorkspaceFilter {
   });
 
   factory WorkspaceFilter.last30Days() {
-    final end = DateTime.now();
+    final now = DateTime.now();
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
     return WorkspaceFilter(
-      start: end.subtract(const Duration(days: 29)),
+      start: DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(const Duration(days: 29)),
       end: end,
     );
   }
@@ -71,14 +76,10 @@ class PlatformWorkspace {
     required this.plans,
     required this.analytics,
     required this.auditEvents,
-    required this.webhookEvents,
     required this.admins,
-    required this.businessesTruncated,
-    required this.transactionsTruncated,
   });
 
   factory PlatformWorkspace.fromMap(JsonMap data) {
-    final limits = _map(data['limits']);
     return PlatformWorkspace(
       generatedAt: _date(data['generatedAt']) ?? DateTime.now(),
       actor: PlatformActor.fromMap(_map(data['actor'])),
@@ -88,10 +89,7 @@ class PlatformWorkspace {
       plans: _list(data['plans'], PlatformPlan.fromMap),
       analytics: PlatformAnalytics.fromMap(_map(data['analytics'])),
       auditEvents: _list(data['auditEvents'], PlatformEvent.fromMap),
-      webhookEvents: _list(data['webhookEvents'], PlatformEvent.fromMap),
       admins: _list(data['admins'], PlatformAdminRecord.fromMap),
-      businessesTruncated: limits['businessesTruncated'] == true,
-      transactionsTruncated: limits['transactionsTruncated'] == true,
     );
   }
 
@@ -103,10 +101,7 @@ class PlatformWorkspace {
   final List<PlatformPlan> plans;
   final PlatformAnalytics analytics;
   final List<PlatformEvent> auditEvents;
-  final List<PlatformEvent> webhookEvents;
   final List<PlatformAdminRecord> admins;
-  final bool businessesTruncated;
-  final bool transactionsTruncated;
 }
 
 class PlatformActor {
@@ -152,8 +147,9 @@ class PlatformSaasMetrics {
     required this.failedPayments,
     required this.failedPaymentAmount,
     required this.churnedBusinesses,
+    required this.activeBusinesses30d,
+    required this.usageRate30d,
     required this.transactionSuccessRate,
-    required this.topProvince,
   });
 
   factory PlatformSaasMetrics.fromMap(JsonMap data) => PlatformSaasMetrics(
@@ -170,8 +166,9 @@ class PlatformSaasMetrics {
     failedPayments: _int(data['failedPayments']),
     failedPaymentAmount: _int(data['failedPaymentAmount']),
     churnedBusinesses: _int(data['churnedBusinesses']),
+    activeBusinesses30d: _int(data['activeBusinesses30d']),
+    usageRate30d: _double(data['usageRate30d']),
     transactionSuccessRate: _double(data['transactionSuccessRate']),
-    topProvince: _string(data['topProvince']),
   );
 
   final int totalRevenue;
@@ -187,8 +184,9 @@ class PlatformSaasMetrics {
   final int failedPayments;
   final int failedPaymentAmount;
   final int churnedBusinesses;
+  final int activeBusinesses30d;
+  final double usageRate30d;
   final double transactionSuccessRate;
-  final String topProvince;
 }
 
 class PlatformBusinessRecord {
@@ -348,30 +346,33 @@ class PlatformAnalytics {
   const PlatformAnalytics({
     required this.revenueByDay,
     required this.revenueByPlan,
-    required this.revenueByProvince,
     required this.revenueByBusinessType,
     required this.transactionStatus,
     required this.subscriptionStatus,
-    required this.businessesByProvince,
+    required this.usageRateByDay,
+    required this.newBusinessesByDay,
+    required this.churnedBusinessesByDay,
   });
 
   factory PlatformAnalytics.fromMap(JsonMap data) => PlatformAnalytics(
     revenueByDay: _numberMap(data['revenueByDay']),
     revenueByPlan: _numberMap(data['revenueByPlan']),
-    revenueByProvince: _numberMap(data['revenueByProvince']),
     revenueByBusinessType: _numberMap(data['revenueByBusinessType']),
     transactionStatus: _numberMap(data['transactionStatus']),
     subscriptionStatus: _numberMap(data['subscriptionStatus']),
-    businessesByProvince: _numberMap(data['businessesByProvince']),
+    usageRateByDay: _numberMap(data['usageRateByDay']),
+    newBusinessesByDay: _numberMap(data['newBusinessesByDay']),
+    churnedBusinessesByDay: _numberMap(data['churnedBusinessesByDay']),
   );
 
   final Map<String, num> revenueByDay;
   final Map<String, num> revenueByPlan;
-  final Map<String, num> revenueByProvince;
   final Map<String, num> revenueByBusinessType;
   final Map<String, num> transactionStatus;
   final Map<String, num> subscriptionStatus;
-  final Map<String, num> businessesByProvince;
+  final Map<String, num> usageRateByDay;
+  final Map<String, num> newBusinessesByDay;
+  final Map<String, num> churnedBusinessesByDay;
 }
 
 class PlatformEvent {

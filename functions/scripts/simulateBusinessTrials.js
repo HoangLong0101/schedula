@@ -1,16 +1,22 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const admin = require('firebase-admin');
+const { tenantAdminEmail, tenantIdFor } = require('./simulationTenantEmails');
 
 const projectId = process.env.FIREBASE_PROJECT_ID || 'schedula-543b1';
 const batchId = 'outreach-trials-2026-08';
-const asOf = process.env.SIMULATION_AS_OF || '2026-08-12';
+const asOf = process.env.SIMULATION_AS_OF || new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date());
 const args = process.argv.slice(2);
 const mode = args.includes('--write') ? 'write' : args.includes('--verify') ? 'verify' : 'dry-run';
 const workbookPath = valueAfter('--workbook');
 const credentialsPath = valueAfter('--credentials');
+const credentialsSourcePath = valueAfter('--credentials-source') || credentialsPath;
+const selectedTenants = new Set((valueAfter('--tenants') || '').split(',').map((value) => value.trim()).filter(Boolean));
 
 if (!workbookPath) throw new Error('Pass --workbook PATH');
 if (mode === 'write' && !credentialsPath) {
@@ -46,6 +52,30 @@ const roleTitles = [
   ['Kỹ thuật viên da liễu', ['Điều trị mụn', 'Điều trị sắc tố']],
   ['Chuyên viên facial', ['Soi da', 'Chăm sóc da chuyên sâu']],
 ];
+const mobilePrefixes = [
+  '032', '033', '034', '035', '036', '037', '038', '039',
+  '052', '056', '058', '070', '076', '077', '078', '079',
+  '081', '082', '083', '084', '085', '086', '088', '089',
+  '090', '091', '093', '094', '096', '097', '098', '099',
+];
+const vipPreferences = [
+  {
+    care: 'ưu tiên massage thư giãn, lực vừa và không gian yên tĩnh',
+    treatment: 'giữ đúng kỹ thuật viên quen, xác nhận lực massage và nhiệt độ phòng trước khi bắt đầu',
+  },
+  {
+    care: 'quan tâm cấp ẩm và phục hồi hàng rào bảo vệ da',
+    treatment: 'soi da trước buổi, tránh tẩy mạnh và hướng dẫn dưỡng ẩm sau liệu trình',
+  },
+  {
+    care: 'quan tâm mụn và tình trạng da nhạy cảm',
+    treatment: 'ưu tiên sản phẩm dịu nhẹ, hỏi phản ứng sau buổi trước và nhắc chống nắng',
+  },
+  {
+    care: 'ưu tiên massage đá nóng để giảm căng cơ vai gáy',
+    treatment: 'kiểm tra nhiệt độ đá, tập trung vai gáy và dành thêm thời gian thả lỏng cuối buổi',
+  },
+];
 
 function valueAfter(flag) {
   const index = args.indexOf(flag);
@@ -71,14 +101,20 @@ function writeCredentials(records) {
   if (result.status !== 0) throw new Error(result.stderr || 'Credential workbook failed');
 }
 
+function readExistingPasswords() {
+  if (!credentialsSourcePath || !fs.existsSync(credentialsSourcePath)) return new Map();
+  const script = path.join(__dirname, 'simulationWorkbook.py');
+  const result = spawnSync('python', ['-X', 'utf8', script, 'read-credentials', credentialsSourcePath], {
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) throw new Error(result.stderr || 'Credential workbook read failed');
+  return new Map(Object.entries(JSON.parse(result.stdout).passwords));
+}
+
 function asciiText(value) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-function asciiSlug(value) {
-  return asciiText(value).slice(0, 34);
 }
 
 function hash32(value) {
@@ -157,20 +193,32 @@ function normalizedPhone(value) {
   return digits.length >= 9 ? digits : '';
 }
 
+function staffEmail(name, sourceId) {
+  return `${asciiText(name).replace(/-/g, '.')}.t${String(sourceId).padStart(2, '0')}@schedula.demo`;
+}
+
+function vietnamesePhone(seed) {
+  const random = rngFor(`${seed}:phone`);
+  const prefix = mobilePrefixes[Math.floor(random() * mobilePrefixes.length)];
+  return `${prefix}${String(Math.floor(random() * 10000000)).padStart(7, '0')}`;
+}
+
 function buildPlan(businesses) {
   assert.equal(businesses.length, 11, 'Expected 11 visible tenant rows');
   const seenContacts = new Set();
   const tenants = businesses.map((business) => {
     if (!business.startDate) throw new Error(`Missing start date for ${business.name}`);
-    const tenantId = `sim-2026-${String(business.sourceId).padStart(2, '0')}-${asciiSlug(business.name)}`;
+    const tenantId = tenantIdFor(business.name);
     const startDate = parseSourceDate(business.startDate);
     const endDate = business.endDate ? parseSourceDate(business.endDate) : null;
-    const journeyEnd = endDate || asOf;
+    const trialEndDate = addDays(startDate, 30);
+    const journeyEnd = endDate || (asOf < trialEndDate ? asOf : trialEndDate);
     const count = staffCount(business.staffBand, business.sourceId);
     const sourceContact = business.contact.trim();
-    const ownerEmail = sourceContact.includes('@')
+    const legacyOwnerEmail = sourceContact.includes('@')
       ? sourceContact.toLowerCase()
       : `owner.${String(business.sourceId).padStart(2, '0')}@schedula.demo`;
+    const ownerEmail = tenantAdminEmail(business.name);
     if (seenContacts.has(ownerEmail)) throw new Error(`Duplicate owner email: ${ownerEmail}`);
     seenContacts.add(ownerEmail);
     return {
@@ -178,20 +226,26 @@ function buildPlan(businesses) {
       tenantId,
       startDate,
       endDate,
+      trialEndDate,
       journeyEnd,
       staffCount: count,
+      legacyOwnerEmail,
       ownerEmail,
       ownerPhone: sourceContact.includes('@') ? '' : normalizedPhone(sourceContact),
       taperDay: taperAfterDays(business.note),
     };
   });
-  return tenants.map(buildTenantData);
+  const plans = tenants.map(buildTenantData);
+  const staff = plans.flatMap((plan) => plan.staff);
+  assert.equal(new Set(staff.map((member) => member.email)).size, staff.length, 'Staff emails must be unique');
+  assert.equal(new Set(staff.map((member) => member.phone)).size, staff.length, 'Staff phones must be unique');
+  return plans;
 }
 
 function buildTenantData(tenant) {
   const random = rngFor(tenant.tenantId);
   const owner = {
-    uid: authUid(tenant.ownerEmail),
+    uid: authUid(tenant.legacyOwnerEmail),
     tenantId: tenant.tenantId,
     tenantName: tenant.name,
     role: 'owner',
@@ -208,11 +262,12 @@ function buildTenantData(tenant) {
       : maleNames[(index + tenant.sourceId) % maleNames.length];
     const name = `${familyNames[(index * 3 + tenant.sourceId) % familyNames.length]} ${given}`;
     const role = roleTitles[(index + tenant.sourceId) % roleTitles.length];
-    const email = `staff.${String(tenant.sourceId).padStart(2, '0')}.${String(index + 1).padStart(2, '0')}@schedula.demo`;
+    const legacyEmail = `staff.${String(tenant.sourceId).padStart(2, '0')}.${String(index + 1).padStart(2, '0')}@schedula.demo`;
+    const email = staffEmail(name, tenant.sourceId);
     const age = 20 + (hash32(`${tenant.tenantId}:${index}:age`) % 16);
     staff.push({
-      uid: authUid(email), tenantId: tenant.tenantId, tenantName: tenant.name,
-      role: 'staff', name, email, phone: `09${String(10000000 + (hash32(email) % 90000000))}`,
+      uid: authUid(legacyEmail), tenantId: tenant.tenantId, tenantName: tenant.name,
+      role: 'staff', name, email, phone: vietnamesePhone(legacyEmail),
       sourceContact: '', age, roleTitle: role[0], specialties: role[1],
       color: colors[index % colors.length], appointments: 0,
     });
@@ -227,6 +282,7 @@ function buildTenantData(tenant) {
     },
   }));
   const customerCount = Math.max(16, tenant.staffCount * 4);
+  const vipCount = tenant.staffCount >= 8 ? 2 : 1;
   const customers = Array.from({ length: customerCount }, (_, index) => {
     const female = index % 2 === 0;
     const given = female
@@ -239,6 +295,7 @@ function buildTenantData(tenant) {
       phone: `09${String(10000000 + (hash32(`${tenant.tenantId}:customer:${index}`) % 90000000))}`,
       email: `customer.${tenant.sourceId}.${index + 1}@example.test`,
       visits: 0, spent: 0, lastVisit: tenant.startDate,
+      isVip: index < vipCount, serviceCounts: {},
     };
   });
   const bookings = [];
@@ -259,16 +316,18 @@ function buildTenantData(tenant) {
     for (let index = 0; index < daily; index += 1) {
       bookingSequence += 1;
       const member = staff[index % staff.length];
-      const round = Math.floor(index / staff.length);
       const service = serviceDocs[Math.floor(random() * serviceDocs.length)];
-      const customer = customers[Math.floor(random() * customers.length)];
-      const startMinutes = 9 * 60 + round * 120 + (index % 3) * 15;
+      const randomCustomer = customers[Math.floor(random() * customers.length)];
+      const scheduledVip = index < vipCount && (dates.length <= 6 || (dayIndex + index) % 3 === 0);
+      const customer = scheduledVip ? customers[index] : randomCustomer;
+      const center = 8 * 60 + 30 + ((index + 0.5) * 9 * 60 / daily);
+      const startMinutes = Math.round((center + random() * 30 - 15) / 5) * 5;
       const startHour = String(Math.floor(startMinutes / 60)).padStart(2, '0');
       const startMinute = String(startMinutes % 60).padStart(2, '0');
       const startTime = localTimestamp(date, `${startHour}:${startMinute}`);
       const endTime = Timestamp.fromMillis(startTime.toMillis() + service.data.duration * 60000);
       const roll = random();
-      const status = roll < 0.88 ? 'completed' : roll < 0.95 ? 'cancelled' : 'no_show';
+      const status = scheduledVip ? 'completed' : roll < 0.88 ? 'completed' : roll < 0.95 ? 'cancelled' : 'no_show';
       const bookingId = `${tenant.tenantId}-booking-${String(bookingSequence).padStart(5, '0')}`;
       const amount = status === 'completed' ? service.data.price : 0;
       const paymentId = status === 'completed' ? `${tenant.tenantId}-payment-${String(bookingSequence).padStart(5, '0')}` : null;
@@ -292,6 +351,7 @@ function buildTenantData(tenant) {
       customer.spent += amount;
       if (status === 'completed') customer.lastVisit = date;
       if (status === 'completed') {
+        customer.serviceCounts[service.id] = (customer.serviceCounts[service.id] || 0) + 1;
         payments.push({
           id: paymentId,
           data: {
@@ -315,17 +375,50 @@ function buildTenantData(tenant) {
     }
   });
 
-  const customerDocs = customers.map((customer, index) => ({
+  const customerDocs = customers.map((customer, index) => {
+    const favoriteServiceId = Object.entries(customer.serviceCounts)
+      .sort((left, right) => right[1] - left[1])[0]?.[0] || serviceDocs[0].id;
+    const favoriteService = serviceDocs.find((service) => service.id === favoriteServiceId);
+    const vipProfilePool = favoriteService.data.category === 'Massage'
+      ? [vipPreferences[0], vipPreferences[3]]
+      : [vipPreferences[1], vipPreferences[2]];
+    const vipProfile = vipProfilePool[(tenant.sourceId + index) % vipProfilePool.length];
+    const vipNotes = `⭐ KHÁCH VIP • ${customer.visits} lượt trong kỳ mô phỏng. Dịch vụ dùng nhiều: ${favoriteService.data.name}. Quan tâm: ${vipProfile.care}. Cách phục vụ: ${vipProfile.treatment}.`;
+    return ({
     id: customer.id,
     data: {
       tenantId: tenant.tenantId, name: customer.name, phone: customer.phone,
       email: customer.email, birthday: `199${index % 8}-${String((index % 12) + 1).padStart(2, '0')}-${String((index % 27) + 1).padStart(2, '0')}`,
-      notes: index % 3 === 0 ? 'Khách quay lại định kỳ.' : '', allergies: '',
+      notes: customer.isVip ? vipNotes : (index % 3 === 0 ? 'Khách quay lại định kỳ.' : ''),
+      allergies: '', isVip: customer.isVip, customerTier: customer.isVip ? 'vip' : 'standard',
+      carePreferences: customer.isVip ? vipProfile.care : '',
+      treatmentGuidance: customer.isVip ? vipProfile.treatment : '',
+      favoriteServiceId: customer.isVip ? favoriteService.id : '',
+      favoriteServiceName: customer.isVip ? favoriteService.data.name : '',
       lastVisit: localTimestamp(customer.lastVisit), visitCount: customer.visits,
       totalVisits: customer.visits, spent: customer.spent,
       avatar: initials(customer.name), color: colors[index % colors.length],
       emailMarketingConsent: index % 4 !== 0, emailOptedOut: false,
       createdAt: localTimestamp(tenant.startDate),
+    },
+  });
+  });
+  const vipCustomers = customerDocs.filter((customer) => customer.data.isVip);
+  const regularCustomers = customerDocs.filter((customer) => !customer.data.isVip);
+  const regularAverage = regularCustomers.reduce((sum, customer) => sum + customer.data.visitCount, 0) / regularCustomers.length;
+  assert.equal(vipCustomers.length, vipCount);
+  assert(vipCustomers.every((customer) => customer.data.visitCount > regularAverage));
+  const auditEvents = bookings.map((booking) => ({
+    id: `${booking.id}-audit-created`,
+    data: {
+      tenantId: tenant.tenantId,
+      actorId: owner.uid,
+      actorRole: 'owner',
+      entityType: 'booking',
+      entityId: booking.id,
+      action: 'booking.created',
+      status: 'succeeded',
+      createdAt: booking.data.createdAt,
     },
   }));
 
@@ -333,6 +426,7 @@ function buildTenantData(tenant) {
     tenant, owner, staff,
     docs: {
       services: serviceDocs, customers: customerDocs, bookings, payments,
+      auditEvents,
       slots: [...slots.entries()].map(([id, slot]) => ({
         id: `${tenant.tenantId}_${id}`,
         data: {
@@ -383,6 +477,7 @@ function allAccounts(plans) {
 
 async function inspectAccount(account) {
   let user = null;
+  let matchedByUid = false;
   try {
     user = await auth.getUserByEmail(account.email);
   } catch (error) {
@@ -390,11 +485,13 @@ async function inspectAccount(account) {
   }
   if (!user) {
     try {
-      const uidUser = await auth.getUser(account.uid);
-      throw new Error(`UID collision for ${account.email}: ${uidUser.email}`);
+      user = await auth.getUser(account.uid);
+      matchedByUid = true;
     } catch (error) {
       if (error.code !== 'auth/user-not-found') throw error;
     }
+  }
+  if (!user) {
     return { account, state: 'new' };
   }
   const profile = await db.collection('users').doc(user.uid).get();
@@ -408,6 +505,7 @@ async function inspectAccount(account) {
   return {
     account: { ...account, uid: user.uid },
     state: 'existing',
+    previousEmail: matchedByUid && user.email !== account.email ? user.email : '',
     mustChangePassword:
       user.customClaims?.mustChangePassword === true ||
       profile.data()?.mustChangePassword === true,
@@ -439,8 +537,11 @@ function summary(plans) {
     bookings: plan.docs.bookings.length,
     completed: plan.docs.payments.length,
     start: plan.tenant.startDate,
-    end: plan.tenant.journeyEnd,
+    trialEnd: plan.tenant.trialEndDate,
+    usageEnd: plan.tenant.endDate || 'still using',
+    journeyEnd: plan.tenant.journeyEnd,
     taperAfterDays: plan.tenant.taperDay ?? 'steady',
+    vipCustomers: plan.docs.customers.filter((customer) => customer.data.isVip).length,
   }));
 }
 
@@ -454,7 +555,7 @@ async function ensureAuthAccount(record) {
       displayName: account.name, disabled: false,
     });
   } else {
-    await auth.updateUser(account.uid, { displayName: account.name, disabled: false });
+    await auth.updateUser(account.uid, { email: account.email, displayName: account.name, disabled: false });
   }
   const permissions = account.role === 'owner'
     ? ['booking.manage', 'booking.status.own', 'customer.read', 'customer.write', 'staff.manage', 'report.read', 'campaign.send']
@@ -489,9 +590,11 @@ async function writeAccountProfile(account, plan, record) {
 
 async function writeTenant(plan) {
   const tenant = plan.tenant;
-  const active = !tenant.endDate;
+  const stillUsing = !tenant.endDate;
+  const trialActive = asOf <= tenant.trialEndDate;
   await db.collection('tenants').doc(tenant.tenantId).set({
     tenantId: tenant.tenantId, ownerUid: plan.owner.uid, name: tenant.name,
+    email: plan.owner.email,
     type: tenant.type, address: tenant.area, phone: plan.owner.phone,
     website: '', hoursWeekday: '08:30 - 19:30', hoursWeekend: '09:00 - 18:00',
     description: tenant.note || `${tenant.type} tại ${tenant.area}`,
@@ -499,15 +602,20 @@ async function writeTenant(plan) {
     bookingPolicy: { timezone: 'Asia/Ho_Chi_Minh', weekdayHours: '08:30 - 19:30', weekendHours: '09:00 - 18:00' },
     branchCount: tenant.branches, staffBand: tenant.staffBand,
     sourceStatus: tenant.status, sourceNote: tenant.note, source: tenant.source,
-    trialStatus: active ? 'active' : 'expired', planTier: 'basic',
+    status: 'active',
+    subscriptionStatus: trialActive ? 'trial' : stillUsing ? 'active' : 'cancelled',
+    trialStatus: trialActive ? 'active' : 'expired', plan: 'enterprise', planTier: 'enterprise',
     planStartedAt: localTimestamp(tenant.startDate),
-    planExpiresAt: localTimestamp(tenant.endDate || addDays(tenant.startDate, 29)),
+    planExpiresAt: localTimestamp(tenant.trialEndDate),
+    usageEndedAt: tenant.endDate ? localTimestamp(tenant.endDate, '23:59') : null,
+    sourceEndDate: tenant.endDate || '',
     simulationBatchId: batchId, createdAt: localTimestamp(tenant.startDate),
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
 }
 
 async function writeJourney(plan) {
+  await deleteObsoleteJourneyDocs(plan);
   const writer = db.bulkWriter();
   writer.onWriteError((error) => error.failedAttempts < 3);
   for (const [collection, docs] of Object.entries(plan.docs)) {
@@ -521,13 +629,32 @@ async function writeJourney(plan) {
   await writer.close();
 }
 
+async function deleteObsoleteJourneyDocs(plan) {
+  for (const [collection, docs] of Object.entries(plan.docs)) {
+    const expectedIds = new Set(docs.map((doc) => doc.id));
+    const snapshot = await db.collection(collection).where('tenantId', '==', plan.tenant.tenantId).get();
+    const obsolete = snapshot.docs.filter(
+      (doc) => doc.data().simulationBatchId === batchId && !expectedIds.has(doc.id),
+    );
+    for (let index = 0; index < obsolete.length; index += 400) {
+      const batch = db.batch();
+      obsolete.slice(index, index + 400).forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    }
+  }
+}
+
 async function writeSimulation(plans, accountStates) {
   const stateByEmail = new Map(accountStates.map((item) => [item.account.email, item]));
+  const existingPasswords = readExistingPasswords();
   const credentials = accountStates.map((item) => ({
     tenantName: item.account.tenantName, tenantId: item.account.tenantId,
     role: item.account.role, name: item.account.name, email: item.account.email,
-    temporaryPassword: item.account.temporaryPassword || '',
-    accountStatus: item.state, sourceContact: item.account.sourceContact,
+    temporaryPassword: item.account.temporaryPassword ||
+      existingPasswords.get(`email:${item.previousEmail || item.account.email}`) ||
+      existingPasswords.get(`identity:${item.account.tenantId}|${item.account.role}|${item.account.name}`) || '',
+    accountStatus: item.previousEmail ? 'email updated' : item.state,
+    sourceContact: item.account.sourceContact,
   }));
   writeCredentials(credentials);
 
@@ -561,7 +688,7 @@ async function count(collection, tenantId) {
 }
 
 async function verify(plans) {
-  const collections = ['users', 'services', 'customers', 'bookings', 'payments', 'slots', 'tenantStatsDaily', 'staffStatsDaily', 'serviceStatsDaily'];
+  const collections = ['users', 'services', 'customers', 'bookings', 'payments', 'auditEvents', 'slots', 'tenantStatsDaily', 'staffStatsDaily', 'serviceStatsDaily'];
   for (const plan of plans) {
     const expected = {
       users: plan.staff.length + 1,
@@ -573,17 +700,35 @@ async function verify(plans) {
     assert.deepEqual(actual, expected, `Count mismatch for ${plan.tenant.name}`);
     const tenantSnapshot = await db.collection('tenants').doc(plan.tenant.tenantId).get();
     assert.equal(tenantSnapshot.data()?.simulationBatchId, batchId);
+    assert.equal(tenantSnapshot.data()?.status, 'active');
     for (const account of [plan.owner, ...plan.staff]) {
       const user = await auth.getUser(account.uid);
+      assert.equal(user.email, account.email);
       assert.equal(user.customClaims?.tenantId, plan.tenant.tenantId);
       assert.equal(user.customClaims?.role, account.role);
+      const profile = await db.collection('users').doc(account.uid).get();
+      assert.equal(profile.data()?.email, account.email);
+      assert.equal(profile.data()?.phone, account.phone);
     }
-    console.log(`Verified ${plan.tenant.name}: ${actual.users} users, ${actual.bookings} bookings`);
+    const customerSnapshots = await db.collection('customers')
+      .where('tenantId', '==', plan.tenant.tenantId).get();
+    const vipCustomers = customerSnapshots.docs.filter((doc) => doc.data().isVip === true);
+    assert.equal(vipCustomers.length, plan.docs.customers.filter((customer) => customer.data.isVip).length);
+    assert(vipCustomers.every((doc) => doc.data().visitCount >= 2));
+    assert(vipCustomers.every((doc) => String(doc.data().notes).startsWith('⭐ KHÁCH VIP')));
+    const regularCustomers = customerSnapshots.docs.filter((doc) => doc.data().isVip !== true);
+    const regularAverage = regularCustomers.reduce((sum, doc) => sum + doc.data().visitCount, 0) / regularCustomers.length;
+    assert(vipCustomers.every((doc) => doc.data().visitCount > regularAverage));
+    console.log(`Verified ${plan.tenant.name}: ${actual.users} users, ${actual.bookings} bookings, ${vipCustomers.length} VIPs`);
   }
 }
 
 async function main() {
-  const plans = buildPlan(extractWorkbook());
+  const allPlans = buildPlan(extractWorkbook());
+  const plans = selectedTenants.size
+    ? allPlans.filter((plan) => selectedTenants.has(plan.tenant.name))
+    : allPlans;
+  assert(plans.length, 'No tenants matched --tenants.');
   console.table(summary(plans));
   console.log(`Totals: ${plans.length} tenants, ${plans.reduce((sum, p) => sum + p.staff.length, 0)} staff, ${plans.reduce((sum, p) => sum + p.docs.bookings.length, 0)} bookings`);
   if (mode === 'verify') {

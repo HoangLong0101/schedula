@@ -250,6 +250,10 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /landingPageEvents/{id} {
+      allow read, write: if false;
+    }
+
     match /campaigns/{id} {
       allow read: if isAuth()
         && sameTenant(resource.data.tenantId)

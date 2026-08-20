@@ -698,6 +698,9 @@ function writeAudit(
     after: auditValue(after),
     createdAt: FieldValue.serverTimestamp(),
   });
+  tx.set(db.collection('tenants').doc(auth.tenantId), {
+    lastActiveAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
 }
 
 function incrementBookingAggregates(

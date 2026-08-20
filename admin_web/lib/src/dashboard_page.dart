@@ -6,6 +6,13 @@ import 'admin_theme.dart';
 import 'admin_dialog.dart';
 import 'platform_dashboard.dart';
 
+String _planLabel(String value) => switch (value.trim().toLowerCase()) {
+  'basic' => 'Cơ bản',
+  'pro' || 'professional' => 'Chuyên nghiệp',
+  'premium' || 'enterprise' => 'Doanh nghiệp',
+  _ => value,
+};
+
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
     required this.future,
@@ -427,7 +434,7 @@ class BusinessTable extends StatelessWidget {
                                     : business.ownerEmail,
                               ),
                             ),
-                            DataCell(Text(business.planTier.toUpperCase())),
+                            DataCell(Text(_planLabel(business.planTier))),
                             DataCell(
                               StatusBadge(active: business.status == 'active'),
                             ),
@@ -482,7 +489,7 @@ class _BusinessDialog extends StatelessWidget {
             ),
             DetailRow(
               label: 'Gói dịch vụ',
-              value: business.planTier.toUpperCase(),
+              value: _planLabel(business.planTier),
             ),
             DetailRow(
               label: 'Ngày đăng ký',

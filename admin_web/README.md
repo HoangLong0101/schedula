@@ -37,10 +37,10 @@ Create a second Firebase Hosting site, then map it once:
 firebase target:apply hosting admin YOUR_ADMIN_HOSTING_SITE_ID
 ```
 
-Build and deploy without replacing the tenant website:
+Build with the checked production script, then deploy without replacing the
+tenant website:
 
 ```powershell
-flutter build web --release --dart-define-from-file=../.firebase-config.dev.json
-cd ..
+./tool/build_admin_web.ps1
 firebase deploy --config firebase.admin.json --only hosting:admin
 ```

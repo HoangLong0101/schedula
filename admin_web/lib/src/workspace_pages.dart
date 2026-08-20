@@ -17,6 +17,20 @@ final _money = NumberFormat.currency(
 );
 final _date = DateFormat('dd/MM/yyyy');
 final _dateTime = DateFormat('HH:mm dd/MM/yyyy');
+final _filterTime = DateFormat('HH:mm:ss');
+
+String _filterDateTimeText(DateTime value) =>
+    '${value.day} tháng ${value.month}, ${_filterTime.format(value)}';
+
+String _shortVietnameseDate(DateTime value, {bool includeYear = false}) =>
+    '${value.day} tháng ${value.month}${includeYear ? ', ${value.year}' : ''}';
+
+String _planLabel(String value) => switch (value.trim().toLowerCase()) {
+  'basic' => 'Cơ bản',
+  'pro' || 'professional' => 'Chuyên nghiệp',
+  'premium' || 'enterprise' => 'Doanh nghiệp',
+  _ => value,
+};
 
 class WorkspacePage extends StatelessWidget {
   const WorkspacePage({
@@ -71,7 +85,7 @@ class WorkspacePage extends StatelessWidget {
                 ],
                 Expanded(
                   child: Text(
-                    title.$1,
+                    title,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -88,18 +102,10 @@ class WorkspacePage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        title.$1,
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        title.$2,
-                        style: const TextStyle(color: AdminTheme.mutedInk),
-                      ),
-                      const SizedBox(height: 20),
                       if (_usesFilters(section) && snapshot.data != null) ...[
                         GlobalFilterBar(
+                          key: ValueKey('filters-${section.name}'),
+                          section: section,
                           value: filter,
                           workspace: snapshot.data!,
                           onApply: onFilterChanged,
@@ -144,7 +150,6 @@ class WorkspacePage extends StatelessWidget {
         onChanged: onRefresh,
       ),
       AdminSection.revenue => RevenueWorkspace(data: data),
-      AdminSection.provinces => ProvinceWorkspace(data: data),
       AdminSection.plans => PlansWorkspace(
         data: data,
         api: api,
@@ -166,51 +171,17 @@ class WorkspacePage extends StatelessWidget {
   }
 }
 
-(String, String) _title(AdminSection section) => switch (section) {
-  AdminSection.dashboard => (
-    'Tổng quan hệ thống',
-    'Theo dõi sức khỏe kinh doanh của Schedula.',
-  ),
-  AdminSection.businesses => (
-    'Doanh nghiệp',
-    'Tìm kiếm, kiểm tra và kiểm soát tài khoản doanh nghiệp.',
-  ),
-  AdminSection.transactions => (
-    'Giao dịch',
-    'Đối soát giao dịch PayOS và thanh toán SaaS.',
-  ),
-  AdminSection.subscriptions => (
-    'Gói đăng ký',
-    'Theo dõi vòng đời và xử lý gia hạn thủ công.',
-  ),
-  AdminSection.revenue => (
-    'Phân tích doanh thu',
-    'Doanh thu thật từ các bản ghi thanh toán đã xác nhận.',
-  ),
-  AdminSection.provinces => (
-    'Phân tích tỉnh thành',
-    'So sánh mức độ sử dụng và doanh thu theo địa phương.',
-  ),
-  AdminSection.plans => (
-    'Gói và bảng giá SaaS',
-    'Quản lý giá, thời gian dùng thử và tính năng.',
-  ),
-  AdminSection.monitoring => (
-    'Vận hành hệ thống',
-    'Theo dõi webhook PayOS và nhật ký quản trị.',
-  ),
-  AdminSection.reports => (
-    'Báo cáo',
-    'Xuất dữ liệu đang được lọc để kiểm tra và phân tích.',
-  ),
-  AdminSection.admins => (
-    'Quản trị viên',
-    'Phân quyền và vô hiệu hóa quyền truy cập nội bộ.',
-  ),
-  AdminSection.settings => (
-    'Cài đặt',
-    'Thông tin môi trường và tài khoản quản trị.',
-  ),
+String _title(AdminSection section) => switch (section) {
+  AdminSection.dashboard => 'Tổng quan hệ thống',
+  AdminSection.businesses => 'Doanh nghiệp',
+  AdminSection.transactions => 'Giao dịch',
+  AdminSection.subscriptions => 'Gói đăng ký',
+  AdminSection.revenue => 'Phân tích doanh thu',
+  AdminSection.plans => 'Gói và bảng giá SaaS',
+  AdminSection.monitoring => 'Vận hành hệ thống',
+  AdminSection.reports => 'Báo cáo',
+  AdminSection.admins => 'Quản trị viên',
+  AdminSection.settings => 'Cài đặt',
 };
 
 bool _usesFilters(AdminSection section) => !{
@@ -222,12 +193,14 @@ bool _usesFilters(AdminSection section) => !{
 
 class GlobalFilterBar extends StatefulWidget {
   const GlobalFilterBar({
+    this.section = AdminSection.dashboard,
     required this.value,
     required this.workspace,
     required this.onApply,
     super.key,
   });
 
+  final AdminSection section;
   final WorkspaceFilter value;
   final PlatformWorkspace workspace;
   final ValueChanged<WorkspaceFilter> onApply;
@@ -257,138 +230,593 @@ class _GlobalFilterBarState extends State<GlobalFilterBar> {
 
   @override
   Widget build(BuildContext context) {
-    final provinces = _options(
-      widget.workspace.businesses.map((item) => item.province),
-      draft.province,
-    );
+    final showSearch = {
+      AdminSection.businesses,
+      AdminSection.transactions,
+      AdminSection.subscriptions,
+      AdminSection.reports,
+    }.contains(widget.section);
+    final showDate = {
+      AdminSection.dashboard,
+      AdminSection.transactions,
+      AdminSection.revenue,
+      AdminSection.reports,
+    }.contains(widget.section);
+    final showBusinessType = widget.section == AdminSection.businesses;
+    final showSubscriptionStatus = {
+      AdminSection.dashboard,
+      AdminSection.businesses,
+      AdminSection.subscriptions,
+    }.contains(widget.section);
+    final showTransactionStatus = {
+      AdminSection.transactions,
+      AdminSection.revenue,
+      AdminSection.reports,
+    }.contains(widget.section);
     final plans = _options(
       widget.workspace.plans.map((item) => item.id),
       draft.plan,
     );
+    final businessTypes = _options(
+      widget.workspace.businesses.map((item) => item.businessType),
+      draft.businessType,
+    );
+    final controls = <Widget>[
+      if (showSearch)
+        SizedBox(
+          width: 250,
+          child: TextField(
+            controller: search,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search, size: 20),
+              hintText: widget.section == AdminSection.transactions
+                  ? 'Tìm giao dịch, doanh nghiệp...'
+                  : 'Tìm doanh nghiệp, chủ sở hữu...',
+              isDense: true,
+            ),
+            onSubmitted: (_) => _apply(),
+          ),
+        ),
+      if (showDate)
+        _DateRangeField(
+          value: draft,
+          onChanged: (range) => setState(
+            () => draft = draft.copyWith(start: range.start, end: range.end),
+          ),
+        ),
+      if (showBusinessType)
+        _Select(
+          width: 175,
+          value: draft.businessType,
+          label: 'Loại hình',
+          items: {
+            '': 'Tất cả loại hình',
+            for (final item in businessTypes) item: item,
+          },
+          onChanged: (value) =>
+              setState(() => draft = draft.copyWith(businessType: value)),
+        ),
+      _Select(
+        width: 160,
+        value: draft.plan,
+        label: 'Gói',
+        items: {
+          '': 'Tất cả gói',
+          for (final item in plans) item: _planLabel(item),
+        },
+        onChanged: (value) =>
+            setState(() => draft = draft.copyWith(plan: value)),
+      ),
+      if (showSubscriptionStatus)
+        _Select(
+          width: 175,
+          value: draft.subscriptionStatus,
+          label: 'Đăng ký',
+          items: const {
+            '': 'Mọi trạng thái',
+            'trial': 'Dùng thử',
+            'active': 'Hoạt động',
+            'expired': 'Hết hạn',
+            'cancelled': 'Đã hủy',
+          },
+          onChanged: (value) =>
+              setState(() => draft = draft.copyWith(subscriptionStatus: value)),
+        ),
+      if (showTransactionStatus)
+        _Select(
+          width: 175,
+          value: draft.transactionStatus,
+          label: 'Thanh toán',
+          items: const {
+            '': 'Mọi trạng thái',
+            'paid': 'Đã thanh toán',
+            'pending': 'Đang chờ',
+            'failed': 'Thất bại',
+            'cancelled': 'Đã hủy',
+            'refunded': 'Hoàn tiền',
+            'superseded': 'Đã thay thế',
+          },
+          onChanged: (value) =>
+              setState(() => draft = draft.copyWith(transactionStatus: value)),
+        ),
+      SizedBox(
+        height: 56,
+        child: FilledButton.icon(
+          onPressed: _apply,
+          icon: const Icon(Icons.filter_alt_outlined, size: 18),
+          label: const Text('Áp dụng'),
+        ),
+      ),
+    ];
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 250,
-              child: TextField(
-                controller: search,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search, size: 20),
-                  hintText: 'Tìm doanh nghiệp, chủ sở hữu...',
-                  isDense: true,
+        child: SingleChildScrollView(
+          key: const ValueKey('workspace-filter-strip'),
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final (index, control) in controls.indexed) ...[
+                if (index > 0) const SizedBox(width: 12),
+                control,
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _apply() {
+    final businesses = widget.section == AdminSection.businesses;
+    final subscriptions = widget.section == AdminSection.subscriptions;
+    final transactions = {
+      AdminSection.transactions,
+      AdminSection.revenue,
+      AdminSection.reports,
+    }.contains(widget.section);
+    widget.onApply(
+      draft.copyWith(
+        query:
+            {
+              AdminSection.businesses,
+              AdminSection.transactions,
+              AdminSection.subscriptions,
+              AdminSection.reports,
+            }.contains(widget.section)
+            ? search.text
+            : '',
+        province: '',
+        businessType: businesses ? draft.businessType : '',
+        subscriptionStatus:
+            businesses ||
+                subscriptions ||
+                widget.section == AdminSection.dashboard
+            ? draft.subscriptionStatus
+            : '',
+        transactionStatus: transactions ? draft.transactionStatus : '',
+      ),
+    );
+  }
+}
+
+class _DateRangeField extends StatefulWidget {
+  const _DateRangeField({required this.value, required this.onChanged});
+
+  final WorkspaceFilter value;
+  final ValueChanged<DateTimeRange> onChanged;
+
+  @override
+  State<_DateRangeField> createState() => _DateRangeFieldState();
+}
+
+class _DateRangeFieldState extends State<_DateRangeField> {
+  final _portal = OverlayPortalController();
+  final _link = LayerLink();
+  late DateTime _visibleMonth;
+  late DateTime _start;
+  DateTime? _end;
+  bool _choosingEnd = false;
+
+  DateTime get _lastDate {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    return DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _resetDraft();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DateRangeField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value && !_portal.isShowing) _resetDraft();
+  }
+
+  void _resetDraft() {
+    _start = DateUtils.dateOnly(widget.value.start);
+    _end = DateUtils.dateOnly(widget.value.end);
+    _visibleMonth = DateTime(_start.year, _start.month);
+    _choosingEnd = false;
+  }
+
+  void _open() {
+    _resetDraft();
+    _portal.show();
+  }
+
+  void _close() => _portal.hide();
+
+  void _select(DateTime day) {
+    if (day.isBefore(DateTime(2020)) || day.isAfter(_lastDate)) return;
+    setState(() {
+      if (!_choosingEnd) {
+        _start = day;
+        _end = null;
+        _choosingEnd = true;
+      } else {
+        if (day.isBefore(_start)) {
+          _end = _start;
+          _start = day;
+        } else {
+          _end = day;
+        }
+        _choosingEnd = false;
+      }
+    });
+  }
+
+  void _apply() {
+    final end = _end ?? _start;
+    widget.onChanged(
+      DateTimeRange(
+        start: _start,
+        end: DateTime(end.year, end.month, end.day, 23, 59, 59),
+      ),
+    );
+    _close();
+  }
+
+  @override
+  Widget build(BuildContext context) => CompositedTransformTarget(
+    link: _link,
+    child: OverlayPortal(
+      controller: _portal,
+      overlayLocation: OverlayChildLocation.rootOverlay,
+      overlayChildBuilder: (context) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _close,
+            ),
+          ),
+          CompositedTransformFollower(
+            link: _link,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.bottomLeft,
+            followerAnchor: Alignment.topLeft,
+            offset: const Offset(0, 6),
+            child: _DateRangeDropdown(
+              visibleMonth: _visibleMonth,
+              start: _start,
+              end: _end,
+              firstDate: DateTime(2020),
+              lastDate: _lastDate,
+              onPreviousMonth: () => setState(
+                () => _visibleMonth = DateTime(
+                  _visibleMonth.year,
+                  _visibleMonth.month - 1,
                 ),
-                onSubmitted: (_) => _apply(),
               ),
+              onNextMonth: () => setState(
+                () => _visibleMonth = DateTime(
+                  _visibleMonth.year,
+                  _visibleMonth.month + 1,
+                ),
+              ),
+              onSelect: _select,
+              onCancel: _close,
+              onApply: _apply,
             ),
-            _Select(
-              width: 150,
-              value: _rangeValue(draft),
-              label: 'Thời gian',
-              items: const {
-                '7': '7 ngày',
-                '30': '30 ngày',
-                '90': 'Quý gần nhất',
-                '365': '12 tháng',
-                'all': 'Toàn bộ dữ liệu',
-                'custom': 'Tùy chọn',
-              },
-              onChanged: (value) async {
-                if (value == 'custom') {
-                  final selected = await showDateRangePicker(
-                    context: context,
-                    firstDate: DateTime.now().subtract(
-                      const Duration(days: 366),
-                    ),
-                    lastDate: DateTime.now().add(const Duration(days: 1)),
-                    initialDateRange: DateTimeRange(
-                      start: draft.start,
-                      end: draft.end,
-                    ),
-                  );
-                  if (selected != null) {
-                    setState(
-                      () => draft = draft.copyWith(
-                        start: selected.start,
-                        end: selected.end.add(
-                          const Duration(hours: 23, minutes: 59),
-                        ),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        key: const ValueKey('workspace-date-range'),
+        width: 350,
+        height: 56,
+        child: OutlinedButton(
+          onPressed: _portal.isShowing ? _close : _open,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AdminTheme.ink,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            side: const BorderSide(color: AdminTheme.strongBorder),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.calendar_month_outlined, size: 19),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${_filterDateTimeText(widget.value.start)} – '
+                  '${_filterDateTimeText(widget.value.end)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.expand_more, size: 19),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _DateRangeDropdown extends StatelessWidget {
+  const _DateRangeDropdown({
+    required this.visibleMonth,
+    required this.start,
+    required this.end,
+    required this.firstDate,
+    required this.lastDate,
+    required this.onPreviousMonth,
+    required this.onNextMonth,
+    required this.onSelect,
+    required this.onCancel,
+    required this.onApply,
+  });
+
+  final DateTime visibleMonth;
+  final DateTime start;
+  final DateTime? end;
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final VoidCallback onPreviousMonth;
+  final VoidCallback onNextMonth;
+  final ValueChanged<DateTime> onSelect;
+  final VoidCallback onCancel;
+  final VoidCallback onApply;
+
+  bool get _canGoPrevious =>
+      visibleMonth.isAfter(DateTime(firstDate.year, firstDate.month));
+
+  bool get _canGoNext => DateTime(
+    visibleMonth.year,
+    visibleMonth.month + 1,
+  ).isBefore(DateTime(lastDate.year, lastDate.month + 1));
+
+  @override
+  Widget build(BuildContext context) {
+    final secondMonth = DateTime(visibleMonth.year, visibleMonth.month + 1);
+    final selectedEnd = end ?? start;
+    return Material(
+      key: const ValueKey('workspace-date-dropdown'),
+      color: Colors.white,
+      elevation: 8,
+      shadowColor: AdminTheme.ink.withValues(alpha: 0.16),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        width: 736,
+        decoration: BoxDecoration(
+          border: Border.all(color: AdminTheme.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 10, 12),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Chọn khoảng ngày',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
                       ),
-                    );
-                  }
-                } else if (value == 'all') {
-                  final end = DateTime.now();
-                  setState(
-                    () =>
-                        draft = draft.copyWith(start: DateTime(2020), end: end),
-                  );
-                } else {
-                  final days = int.parse(value);
-                  final end = DateTime.now();
-                  setState(
-                    () => draft = draft.copyWith(
-                      start: end.subtract(Duration(days: days - 1)),
-                      end: end,
                     ),
-                  );
-                }
-              },
-            ),
-            _Select(
-              width: 190,
-              value: draft.province,
-              label: 'Tỉnh thành',
-              items: {
-                '': 'Tất cả tỉnh thành',
-                for (final item in provinces) item: item,
-              },
-              onChanged: (value) =>
-                  setState(() => draft = draft.copyWith(province: value)),
-            ),
-            _Select(
-              width: 160,
-              value: draft.plan,
-              label: 'Gói',
-              items: {
-                '': 'Tất cả gói',
-                for (final item in plans) item: item.toUpperCase(),
-              },
-              onChanged: (value) =>
-                  setState(() => draft = draft.copyWith(plan: value)),
-            ),
-            _Select(
-              width: 175,
-              value: draft.transactionStatus,
-              label: 'Thanh toán',
-              items: const {
-                '': 'Mọi trạng thái',
-                'paid': 'Đã thanh toán',
-                'pending': 'Đang chờ',
-                'failed': 'Thất bại',
-                'cancelled': 'Đã hủy',
-                'refunded': 'Hoàn tiền',
-                'superseded': 'Đã thay thế',
-              },
-              onChanged: (value) => setState(
-                () => draft = draft.copyWith(transactionStatus: value),
+                  ),
+                  IconButton(
+                    tooltip: 'Đóng',
+                    onPressed: onCancel,
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
             ),
-            FilledButton.icon(
-              onPressed: _apply,
-              icon: const Icon(Icons.filter_alt_outlined, size: 18),
-              label: const Text('Áp dụng'),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconButton(
+                    onPressed: _canGoPrevious ? onPreviousMonth : null,
+                    icon: const Icon(Icons.chevron_left, size: 28),
+                  ),
+                  Expanded(
+                    child: _CalendarMonth(
+                      month: visibleMonth,
+                      start: start,
+                      end: end,
+                      firstDate: firstDate,
+                      lastDate: lastDate,
+                      onSelect: onSelect,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _CalendarMonth(
+                      month: secondMonth,
+                      start: start,
+                      end: end,
+                      firstDate: firstDate,
+                      lastDate: lastDate,
+                      onSelect: onSelect,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _canGoNext ? onNextMonth : null,
+                    icon: const Icon(Icons.chevron_right, size: 28),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Đã chọn: ${_shortVietnameseDate(start)} – '
+                      '${_shortVietnameseDate(selectedEnd, includeYear: true)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(color: AdminTheme.mutedInk),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  OutlinedButton(
+                    onPressed: onCancel,
+                    child: const Text('Hủy'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: onApply,
+                    child: const Text('Áp dụng'),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  void _apply() => widget.onApply(draft.copyWith(query: search.text));
+class _CalendarMonth extends StatelessWidget {
+  const _CalendarMonth({
+    required this.month,
+    required this.start,
+    required this.end,
+    required this.firstDate,
+    required this.lastDate,
+    required this.onSelect,
+  });
+
+  final DateTime month;
+  final DateTime start;
+  final DateTime? end;
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final ValueChanged<DateTime> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstOfMonth = DateTime(month.year, month.month);
+    final firstCell = firstOfMonth.subtract(
+      Duration(days: firstOfMonth.weekday - DateTime.monday),
+    );
+    const weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    return Column(
+      children: [
+        SizedBox(
+          height: 44,
+          child: Center(
+            child: Text(
+              'THÁNG ${month.month} ${month.year}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            for (final weekday in weekdays)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    weekday,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AdminTheme.mutedInk,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 230,
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: 1.08,
+            ),
+            itemCount: 42,
+            itemBuilder: (context, index) {
+              final day = firstCell.add(Duration(days: index));
+              final inMonth = day.month == month.month;
+              final enabled =
+                  !day.isBefore(firstDate) && !day.isAfter(lastDate);
+              final isStart = DateUtils.isSameDay(day, start);
+              final isEnd = end != null && DateUtils.isSameDay(day, end);
+              final inRange =
+                  end != null && !day.isBefore(start) && !day.isAfter(end!);
+              return InkWell(
+                onTap: enabled ? () => onSelect(day) : null,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  decoration: BoxDecoration(
+                    color: inRange ? AdminTheme.inputBackground : null,
+                    border: isStart || isEnd
+                        ? Border.all(color: AdminTheme.orange, width: 1.5)
+                        : null,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${day.day}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: enabled && inMonth
+                          ? AdminTheme.ink
+                          : AdminTheme.mutedInk.withValues(alpha: 0.42),
+                      fontWeight: isStart || isEnd
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _Select extends StatelessWidget {
@@ -430,26 +858,16 @@ class DashboardWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cutoff = DateTime.now().subtract(const Duration(days: 30));
-    final recentlyActive = data.businesses
-        .where(
-          (business) =>
-              business.lastActiveAt != null &&
-              business.lastActiveAt!.isAfter(cutoff),
-        )
-        .length;
-    final usageRate = data.businesses.isEmpty
-        ? 0.0
-        : recentlyActive / data.businesses.length * 100;
+    final recentlyActive = data.metrics.activeBusinesses30d;
+    final usageRate = data.metrics.usageRate30d;
     final planUsage = <String, num>{};
     for (final business in data.businesses) {
-      planUsage[business.planTier] = (planUsage[business.planTier] ?? 0) + 1;
+      final label = _planLabel(business.planTier);
+      planUsage[label] = (planUsage[label] ?? 0) + 1;
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (data.transactionsTruncated || data.businessesTruncated)
-          const _LimitNotice(),
         _ExecutiveSummary(
           data: data,
           usageRate: usageRate,
@@ -503,7 +921,7 @@ class _ExecutiveSummary extends StatelessWidget {
       (
         'Doanh nghiệp đang sử dụng',
         '${usageRate.toStringAsFixed(1)}%',
-        '$recentlyActive/${data.businesses.length} doanh nghiệp có hoạt động trong 30 ngày gần nhất.',
+        '$recentlyActive/${data.businesses.length} doanh nghiệp có hoạt động trong kỳ đã chọn.',
         Icons.domain_verification_outlined,
         null,
       ),
@@ -556,38 +974,45 @@ class _RevenueStory extends StatelessWidget {
     final metrics = data.metrics;
     return _StoryPanel(
       title: 'Doanh thu và hiệu quả giao dịch',
-      caption:
-          'Theo dõi doanh thu cùng tỷ lệ thanh toán, giá trị khách hàng và mức sử dụng gói.',
       tooltip:
           'Các chỉ số trong khối này dùng chung kỳ thời gian và bộ lọc ở đầu trang.',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final chart = RevenueTrendChart(values: data.analytics.revenueByDay);
+          final chart = _DailyTrendChart(
+            title: 'Xu hướng doanh thu theo ngày',
+            tooltip:
+                'Di chuột lên từng cột để xem ngày và doanh thu chính xác.',
+            values: data.analytics.revenueByDay,
+            money: true,
+            emptyMessage: 'Chưa có doanh thu trong kỳ',
+          );
           final relationships = _RelationshipGrid(
             items: [
               (
                 'MRR',
                 _money.format(metrics.mrr),
                 'Doanh thu định kỳ hàng tháng từ các gói đang hoạt động.',
-                false,
+                _MetricTone.neutral,
               ),
               (
                 'ARR',
                 _money.format(metrics.arr),
                 'Doanh thu định kỳ năm, được ước tính bằng MRR nhân 12.',
-                false,
+                _MetricTone.neutral,
               ),
               (
                 'ARPU',
                 _money.format(metrics.arpu),
                 'Doanh thu trung bình trên mỗi doanh nghiệp có gói hoạt động.',
-                false,
+                _MetricTone.neutral,
               ),
               (
                 'Thanh toán thất bại',
                 '${metrics.failedPayments} · ${_money.format(metrics.failedPaymentAmount)}',
                 'Số lượng và tổng giá trị giao dịch thất bại trong kỳ.',
-                metrics.failedPayments > 0,
+                metrics.failedPayments > 0
+                    ? _MetricTone.danger
+                    : _MetricTone.neutral,
               ),
             ],
           );
@@ -610,7 +1035,9 @@ class _RevenueStory extends StatelessWidget {
   }
 }
 
-class _BusinessStory extends StatelessWidget {
+enum _BusinessTrend { usage, newTenants, churnedTenants }
+
+class _BusinessStory extends StatefulWidget {
   const _BusinessStory({
     required this.data,
     required this.usageRate,
@@ -622,72 +1049,136 @@ class _BusinessStory extends StatelessWidget {
   final Map<String, num> planUsage;
 
   @override
+  State<_BusinessStory> createState() => _BusinessStoryState();
+}
+
+class _BusinessStoryState extends State<_BusinessStory> {
+  _BusinessTrend selected = _BusinessTrend.usage;
+
+  @override
   Widget build(BuildContext context) {
+    final data = widget.data;
     final metrics = data.metrics;
+    final selectedIndex = switch (selected) {
+      _BusinessTrend.usage => 0,
+      _BusinessTrend.newTenants => 1,
+      _BusinessTrend.churnedTenants => 3,
+    };
+    final chartTitle = switch (selected) {
+      _BusinessTrend.usage => 'Tỷ lệ sử dụng trong kỳ đã chọn',
+      _BusinessTrend.newTenants => 'Doanh nghiệp mới trong kỳ đã chọn',
+      _BusinessTrend.churnedTenants => 'Doanh nghiệp rời bỏ trong kỳ đã chọn',
+    };
+    final chartTooltip = switch (selected) {
+      _BusinessTrend.usage =>
+        'Mỗi cột là tỷ lệ doanh nghiệp có ít nhất một lịch hẹn trong ngày.',
+      _BusinessTrend.newTenants =>
+        'Mỗi cột là số doanh nghiệp được tạo trong ngày.',
+      _BusinessTrend.churnedTenants =>
+        'Mỗi cột là số doanh nghiệp hết hạn hoặc hủy trong ngày.',
+    };
+    Widget chart(bool showTitle) => switch (selected) {
+      _BusinessTrend.usage => _DailyTrendChart(
+        key: const ValueKey(_BusinessTrend.usage),
+        title: chartTitle,
+        tooltip: chartTooltip,
+        showTitle: showTitle,
+        values: data.analytics.usageRateByDay,
+        percent: true,
+        emptyMessage: 'Chưa có hoạt động trong kỳ đã chọn',
+      ),
+      _BusinessTrend.newTenants => _DailyTrendChart(
+        key: const ValueKey(_BusinessTrend.newTenants),
+        title: chartTitle,
+        tooltip: chartTooltip,
+        showTitle: showTitle,
+        values: data.analytics.newBusinessesByDay,
+        color: AdminTheme.success,
+        emptyMessage: 'Không có doanh nghiệp mới trong kỳ đã chọn',
+      ),
+      _BusinessTrend.churnedTenants => _DailyTrendChart(
+        key: const ValueKey(_BusinessTrend.churnedTenants),
+        title: chartTitle,
+        tooltip: chartTooltip,
+        showTitle: showTitle,
+        values: data.analytics.churnedBusinessesByDay,
+        color: AdminTheme.danger,
+        emptyMessage: 'Không có doanh nghiệp rời bỏ trong kỳ đã chọn',
+      ),
+    };
+    final overview = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _RelationshipGrid(
+          selectedIndex: selectedIndex,
+          selectableIndices: const {0, 1, 3},
+          onSelected: (index) => setState(() {
+            selected = switch (index) {
+              1 => _BusinessTrend.newTenants,
+              3 => _BusinessTrend.churnedTenants,
+              _ => _BusinessTrend.usage,
+            };
+          }),
+          items: [
+            (
+              'Mức sử dụng trong kỳ',
+              '${widget.usageRate.toStringAsFixed(1)}%',
+              'Nhấn để xem tỷ lệ doanh nghiệp có hoạt động theo ngày.',
+              widget.usageRate >= 70
+                  ? _MetricTone.success
+                  : widget.usageRate >= 40
+                  ? _MetricTone.warning
+                  : _MetricTone.danger,
+            ),
+            (
+              'Doanh nghiệp mới',
+              '+${metrics.newBusinesses}',
+              'Nhấn để xem số doanh nghiệp mới theo ngày.',
+              _MetricTone.success,
+            ),
+            (
+              'Đang dùng thử',
+              '${metrics.trialBusinesses}',
+              'Doanh nghiệp chưa chuyển sang gói trả phí.',
+              _MetricTone.neutral,
+            ),
+            (
+              'Đã rời bỏ',
+              '-${metrics.churnedBusinesses}',
+              'Nhấn để xem số doanh nghiệp hết hạn hoặc hủy theo ngày.',
+              _MetricTone.danger,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SegmentedBreakdown(
+          title: 'Tỷ lệ gói đang được sử dụng',
+          values: widget.planUsage,
+          tooltip:
+              'Tỷ trọng doanh nghiệp theo gói hiện tại. Di chuột lên từng phần để xem chi tiết.',
+        ),
+      ],
+    );
     return _StoryPanel(
-      title: 'Doanh nghiệp, mức sử dụng và khu vực',
-      caption:
-          'Đặt quy mô khách hàng cạnh mức hoạt động, gói đang dùng và phân bố địa lý.',
+      title: 'Doanh nghiệp và mức sử dụng',
       tooltip:
-          'Mức sử dụng hiện tại tính từ lastActiveAt trong 30 ngày gần nhất. Doanh nghiệp chưa có lastActiveAt không được tính là đang sử dụng.',
+          'Biểu đồ dùng dữ liệu lịch hẹn, ngày tạo doanh nghiệp và ngày kết thúc đăng ký trong kỳ đã chọn.',
+      rightTitle: chartTitle,
+      rightTooltip: chartTooltip,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final geography = MetricBarChart(
-            title: 'Doanh nghiệp theo tỉnh thành',
-            values: data.analytics.businessesByProvince,
-            embedded: true,
-          );
-          final overview = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _RelationshipGrid(
-                items: [
-                  (
-                    'Mức sử dụng 30 ngày',
-                    '${usageRate.toStringAsFixed(1)}%',
-                    'Tỷ lệ doanh nghiệp có hoạt động trong 30 ngày gần nhất.',
-                    usageRate < 50 && data.businesses.isNotEmpty,
-                  ),
-                  (
-                    'Doanh nghiệp mới',
-                    '${metrics.newBusinesses}',
-                    'Doanh nghiệp được tạo trong kỳ thời gian đang lọc.',
-                    false,
-                  ),
-                  (
-                    'Đang dùng thử',
-                    '${metrics.trialBusinesses}',
-                    'Doanh nghiệp chưa chuyển sang gói trả phí.',
-                    false,
-                  ),
-                  (
-                    'Đã rời bỏ',
-                    '${metrics.churnedBusinesses}',
-                    'Doanh nghiệp có đăng ký đã hủy hoặc hết hạn.',
-                    metrics.churnedBusinesses > 0,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              SegmentedBreakdown(
-                title: 'Tỷ lệ gói đang được sử dụng',
-                values: planUsage,
-                tooltip:
-                    'Tỷ trọng doanh nghiệp theo gói hiện tại. Di chuột lên từng phần để xem chi tiết.',
-              ),
-            ],
-          );
+          final trend = chart(constraints.maxWidth < 900);
           if (constraints.maxWidth < 900) {
             return Column(
-              children: [overview, const SizedBox(height: 20), geography],
+              children: [overview, const SizedBox(height: 24), trend],
             );
           }
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(flex: 2, child: overview),
-              const SizedBox(width: 24),
-              Expanded(flex: 3, child: geography),
+              const SizedBox(width: 32),
+              Expanded(flex: 3, child: trend),
             ],
           );
         },
@@ -817,7 +1308,7 @@ class SubscriptionsWorkspace extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  DataCell(Text(business.planTier.toUpperCase())),
+                  DataCell(Text(_planLabel(business.planTier))),
                   DataCell(StatusBadge(status: business.subscriptionStatus)),
                   DataCell(Text(formatDate(business.planExpiresAt))),
                   DataCell(
@@ -905,84 +1396,6 @@ class RevenueWorkspace extends StatelessWidget {
   );
 }
 
-class ProvinceWorkspace extends StatelessWidget {
-  const ProvinceWorkspace({required this.data, super.key});
-  final PlatformWorkspace data;
-
-  @override
-  Widget build(BuildContext context) {
-    final provinces =
-        <String>{
-              ...data.analytics.businessesByProvince.keys,
-              ...data.analytics.revenueByProvince.keys,
-            }
-            .map(
-              (name) => (
-                name,
-                data.analytics.businessesByProvince[name]?.toInt() ?? 0,
-                data.analytics.revenueByProvince[name]?.toInt() ?? 0,
-              ),
-            )
-            .toList()
-          ..sort((a, b) => b.$3.compareTo(a.$3));
-    if (provinces.isEmpty) {
-      return const EmptyState(
-        icon: Icons.map_outlined,
-        title: 'Chưa có dữ liệu tỉnh thành',
-        message:
-            'Cập nhật trường tỉnh thành trong hồ sơ doanh nghiệp để bật phân tích địa lý.',
-      );
-    }
-    return Column(
-      children: [
-        MetricBarChart(
-          title: 'Doanh thu theo tỉnh',
-          values: data.analytics.revenueByProvince,
-          money: true,
-          highlight: true,
-        ),
-        const SizedBox(height: 16),
-        _TableCard(
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('Xếp hạng')),
-              DataColumn(label: Text('Tỉnh thành')),
-              DataColumn(label: Text('Doanh nghiệp')),
-              DataColumn(label: Text('Doanh thu')),
-              DataColumn(label: Text('ARPU')),
-            ],
-            rows: [
-              for (var i = 0; i < provinces.length; i++)
-                DataRow(
-                  cells: [
-                    DataCell(Text('#${i + 1}')),
-                    DataCell(
-                      Text(
-                        provinces[i].$1,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    DataCell(Text('${provinces[i].$2}')),
-                    DataCell(Text(_money.format(provinces[i].$3))),
-                    DataCell(
-                      Text(
-                        _money.format(
-                          provinces[i].$2 == 0
-                              ? 0
-                              : provinces[i].$3 ~/ provinces[i].$2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class PlansWorkspace extends StatelessWidget {
   const PlansWorkspace({
     required this.data,
@@ -1055,58 +1468,32 @@ class MonitoringWorkspace extends StatelessWidget {
   final PlatformWorkspace data;
 
   @override
-  Widget build(BuildContext context) {
-    final failedWebhooks = data.webhookEvents
-        .where((event) => event.status != 'verified')
-        .length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            const _HealthCard(
-              label: 'Xác thực',
-              detail: 'Firebase Authentication',
-              ok: true,
-            ),
-            const _HealthCard(
-              label: 'Cơ sở dữ liệu',
-              detail: 'Callable API hoạt động',
-              ok: true,
-            ),
-            _HealthCard(
-              label: 'Thanh toán',
-              detail: failedWebhooks == 0
-                  ? 'Webhook gần đây hợp lệ'
-                  : '$failedWebhooks sự kiện cần kiểm tra',
-              ok: failedWebhooks == 0,
-            ),
-            const _HealthCard(
-              label: 'Cloud Monitoring',
-              detail: 'Chưa kết nối Google Cloud Logging',
-              ok: null,
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        SectionHeader(
-          title: 'Webhook PayOS',
-          caption: 'Lịch sử xác minh từ backend',
-        ),
-        const SizedBox(height: 10),
-        EventTable(events: data.webhookEvents, webhook: true),
-        const SizedBox(height: 20),
-        SectionHeader(
-          title: 'Nhật ký kiểm toán',
-          caption: 'Các thao tác quản trị nhạy cảm, chỉ đọc',
-        ),
-        const SizedBox(height: 10),
-        EventTable(events: data.auditEvents),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          const _HealthCard(
+            label: 'Xác thực',
+            detail: 'Firebase Authentication',
+          ),
+          const _HealthCard(
+            label: 'Cơ sở dữ liệu',
+            detail: 'Callable API hoạt động',
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      SectionHeader(
+        title: 'Nhật ký kiểm toán',
+        caption: 'Các thao tác quản trị nhạy cảm, chỉ đọc',
+      ),
+      const SizedBox(height: 10),
+      EventTable(events: data.auditEvents),
+    ],
+  );
 }
 
 class ReportsWorkspace extends StatelessWidget {
@@ -1138,12 +1525,6 @@ class ReportsWorkspace extends StatelessWidget {
             count: data.businesses.length,
             icon: Icons.domain_outlined,
             onExport: () => _exportBusinesses(data.businesses),
-          ),
-          _ExportCard(
-            title: 'Báo cáo tỉnh thành',
-            count: data.analytics.revenueByProvince.length,
-            icon: Icons.map_outlined,
-            onExport: () => _exportProvinces(data.analytics),
           ),
           _ExportCard(
             title: 'Nhật ký kiểm toán',
@@ -1363,7 +1744,7 @@ class _BusinessTableState extends State<BusinessTable> {
           child: DataTable(
             columns: const [
               DataColumn(label: Text('Doanh nghiệp')),
-              DataColumn(label: Text('Chủ sở hữu')),
+              DataColumn(label: Text('Số điện thoại')),
               DataColumn(label: Text('Loại / tỉnh')),
               DataColumn(label: Text('Gói')),
               DataColumn(label: Text('Đăng ký')),
@@ -1404,9 +1785,9 @@ class _BusinessTableState extends State<BusinessTable> {
                       ),
                       DataCell(
                         Text(
-                          business.ownerEmail.isEmpty
-                              ? 'Chưa cập nhật'
-                              : business.ownerEmail,
+                          business.ownerPhone
+                              .ifEmpty(business.phone)
+                              .ifEmpty('Chưa cập nhật'),
                         ),
                       ),
                       DataCell(
@@ -1417,7 +1798,7 @@ class _BusinessTableState extends State<BusinessTable> {
                               .ifEmpty('Chưa cập nhật'),
                         ),
                       ),
-                      DataCell(Text(business.planTier.toUpperCase())),
+                      DataCell(Text(_planLabel(business.planTier))),
                       DataCell(
                         StatusBadge(status: business.subscriptionStatus),
                       ),
@@ -1533,7 +1914,7 @@ class _TransactionTableState extends State<TransactionTable> {
                               : transaction.businessName,
                         ),
                       ),
-                      DataCell(Text(transaction.planTier.toUpperCase())),
+                      DataCell(Text(_planLabel(transaction.planTier))),
                       DataCell(Text(_money.format(transaction.amount))),
                       DataCell(Text(transaction.provider.toUpperCase())),
                       DataCell(Text(formatDate(transaction.createdAt))),
@@ -1556,7 +1937,7 @@ class _TransactionTableState extends State<TransactionTable> {
   }
 }
 
-class BusinessDetailDialog extends StatelessWidget {
+class BusinessDetailDialog extends StatefulWidget {
   const BusinessDetailDialog({
     required this.business,
     required this.api,
@@ -1568,12 +1949,39 @@ class BusinessDetailDialog extends StatelessWidget {
   final VoidCallback onChanged;
 
   @override
+  State<BusinessDetailDialog> createState() => _BusinessDetailDialogState();
+}
+
+class _BusinessDetailDialogState extends State<BusinessDetailDialog> {
+  late Future<Map<Object?, Object?>> detail;
+  String? expandedKind;
+
+  @override
+  void initState() {
+    super.initState();
+    detail = widget.api.getBusinessDetail(widget.business.id);
+  }
+
+  void reload() => setState(() {
+    detail = widget.api.getBusinessDetail(widget.business.id);
+  });
+
+  @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(business.name),
+    title: Row(
+      children: [
+        Expanded(child: Text(widget.business.name)),
+        IconButton(
+          tooltip: 'Chỉnh sửa thông tin doanh nghiệp',
+          onPressed: () => _editBusinessInfo(context),
+          icon: const Icon(Icons.edit_outlined),
+        ),
+      ],
+    ),
     content: SizedBox(
-      width: 760,
+      width: 880,
       child: FutureBuilder<Map<Object?, Object?>>(
-        future: api.getBusinessDetail(business.id),
+        future: detail,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const SizedBox(
@@ -1588,8 +1996,14 @@ class BusinessDetailDialog extends StatelessWidget {
             );
           }
           final data = snapshot.data!;
+          final liveBusiness = Map<Object?, Object?>.from(
+            data['business'] as Map? ?? const {},
+          );
           final usage = Map<Object?, Object?>.from(
             data['usage'] as Map? ?? const {},
+          );
+          final recordGroups = Map<Object?, Object?>.from(
+            data['records'] as Map? ?? const {},
           );
           final payments = (data['payments'] as List? ?? const [])
               .whereType<Map>()
@@ -1599,7 +2013,6 @@ class BusinessDetailDialog extends StatelessWidget {
           final activity = (data['activity'] as List? ?? const [])
               .whereType<Map>()
               .map((item) => Map<Object?, Object?>.from(item))
-              .take(5)
               .toList();
           return SingleChildScrollView(
             child: Column(
@@ -1613,18 +2026,22 @@ class BusinessDetailDialog extends StatelessWidget {
                       width: 340,
                       child: Column(
                         children: [
-                          DetailRow(label: 'Tenant ID', value: business.id),
                           DetailRow(
-                            label: 'Chủ sở hữu',
-                            value: business.ownerName.ifEmpty('Chưa cập nhật'),
+                            label: 'Tenant ID',
+                            value: widget.business.id,
                           ),
                           DetailRow(
-                            label: 'Email',
-                            value: business.ownerEmail.ifEmpty('Chưa cập nhật'),
+                            label: 'Chủ sở hữu',
+                            value: liveBusiness['ownerName'].toString().ifEmpty(
+                              'Chưa cập nhật',
+                            ),
                           ),
                           DetailRow(
                             label: 'Điện thoại',
-                            value: business.phone.ifEmpty('Chưa cập nhật'),
+                            value: liveBusiness['ownerPhone']
+                                .toString()
+                                .ifEmpty(liveBusiness['phone'].toString())
+                                .ifEmpty('Chưa cập nhật'),
                           ),
                         ],
                       ),
@@ -1635,19 +2052,27 @@ class BusinessDetailDialog extends StatelessWidget {
                         children: [
                           DetailRow(
                             label: 'Địa chỉ',
-                            value: business.address.ifEmpty('Chưa cập nhật'),
+                            value: liveBusiness['address'].toString().ifEmpty(
+                              'Chưa cập nhật',
+                            ),
                           ),
                           DetailRow(
                             label: 'Tỉnh thành',
-                            value: business.province.ifEmpty('Chưa cập nhật'),
+                            value: liveBusiness['province'].toString().ifEmpty(
+                              'Chưa cập nhật',
+                            ),
                           ),
                           DetailRow(
                             label: 'Gói hiện tại',
-                            value: business.planTier.toUpperCase(),
+                            value: _planLabel(
+                              liveBusiness['planTier']?.toString() ?? 'basic',
+                            ),
                           ),
                           DetailRow(
                             label: 'Hết hạn',
-                            value: formatDate(business.planExpiresAt),
+                            value: formatDate(
+                              _millisDate(liveBusiness['planExpiresAt']),
+                            ),
                           ),
                         ],
                       ),
@@ -1663,16 +2088,39 @@ class BusinessDetailDialog extends StatelessWidget {
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
-                  children: usage.entries
-                      .map(
-                        (item) => Chip(
-                          label: Text(
-                            '${usageLabel(item.key.toString())}: ${item.value}',
-                          ),
-                        ),
-                      )
-                      .toList(),
+                  children: _usageKinds.map((kind) {
+                    final selected = expandedKind == kind;
+                    return FilterChip(
+                      key: ValueKey('tenant-record-card-$kind'),
+                      selected: selected,
+                      showCheckmark: false,
+                      avatar: Icon(
+                        selected
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        size: 18,
+                      ),
+                      label: Text('${usageLabel(kind)}: ${usage[kind] ?? 0}'),
+                      onSelected: (_) => setState(() {
+                        expandedKind = selected ? null : kind;
+                      }),
+                    );
+                  }).toList(),
                 ),
+                if (expandedKind != null) ...[
+                  const SizedBox(height: 12),
+                  _TenantRecordsPanel(
+                    tenantId: widget.business.id,
+                    kind: expandedKind!,
+                    records: _recordList(recordGroups[expandedKind]),
+                    allRecords: recordGroups,
+                    api: widget.api,
+                    onChanged: () {
+                      reload();
+                      widget.onChanged();
+                    },
+                  ),
+                ],
                 const SizedBox(height: 12),
                 DetailRow(
                   label: 'Doanh thu trọn đời',
@@ -1702,35 +2150,12 @@ class BusinessDetailDialog extends StatelessWidget {
                         _money.format(payment['amount'] ?? 0),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      subtitle: Text('PayOS ${payment['orderCode'] ?? ''}'),
                       trailing: StatusBadge(
                         status: payment['status']?.toString() ?? 'pending',
                       ),
                     ),
                 const Divider(height: 28),
-                Text(
-                  'Hoạt động gần đây',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if (activity.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      'Chưa có hoạt động được ghi nhận.',
-                      style: TextStyle(color: AdminTheme.mutedInk),
-                    ),
-                  )
-                else
-                  for (final event in activity)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      leading: const Icon(Icons.history, size: 18),
-                      title: Text(event['action']?.toString() ?? 'Hoạt động'),
-                      subtitle: Text(
-                        event['actorId']?.toString() ?? 'Hệ thống',
-                      ),
-                    ),
+                _BusinessActivity(activity: activity),
               ],
             ),
           );
@@ -1742,15 +2167,15 @@ class BusinessDetailDialog extends StatelessWidget {
         onPressed: () => Navigator.pop(context),
         child: const Text('Đóng'),
       ),
-      if (business.status == 'suspended')
+      if (widget.business.status == 'suspended')
         FilledButton.tonal(
           onPressed: () => _confirmedAction(
             context,
-            api,
+            widget.api,
             'business.reactivate',
-            business.id,
+            widget.business.id,
             'Kích hoạt lại doanh nghiệp?',
-            onChanged,
+            widget.onChanged,
           ),
           child: const Text('Kích hoạt lại'),
         )
@@ -1758,17 +2183,806 @@ class BusinessDetailDialog extends StatelessWidget {
         FilledButton.tonal(
           onPressed: () => _confirmedAction(
             context,
-            api,
+            widget.api,
             'business.suspend',
-            business.id,
+            widget.business.id,
             'Tạm ngưng doanh nghiệp?',
-            onChanged,
+            widget.onChanged,
           ),
           child: const Text('Tạm ngưng'),
         ),
     ],
   );
+
+  Future<void> _editBusinessInfo(BuildContext context) async {
+    final saved = await showAdminDialog<bool>(
+      context: context,
+      builder: (_) =>
+          _BusinessInfoEditor(business: widget.business, api: widget.api),
+    );
+    if (saved == true) {
+      reload();
+      widget.onChanged();
+    }
+  }
 }
+
+const _usageKinds = [
+  'bookings',
+  'customers',
+  'staff',
+  'services',
+  'products',
+  'equipment',
+];
+
+DateTime? _millisDate(Object? value) =>
+    value is num ? DateTime.fromMillisecondsSinceEpoch(value.toInt()) : null;
+
+List<Map<Object?, Object?>> _recordList(Object? value) =>
+    (value as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<Object?, Object?>.from(item))
+        .toList(growable: false);
+
+class _BusinessInfoEditor extends StatefulWidget {
+  const _BusinessInfoEditor({required this.business, required this.api});
+
+  final PlatformBusinessRecord business;
+  final AdminApi api;
+
+  @override
+  State<_BusinessInfoEditor> createState() => _BusinessInfoEditorState();
+}
+
+class _BusinessInfoEditorState extends State<_BusinessInfoEditor> {
+  final form = GlobalKey<FormState>();
+  late final controllers = <String, TextEditingController>{
+    'name': TextEditingController(text: widget.business.name),
+    'ownerName': TextEditingController(text: widget.business.ownerName),
+    'phone': TextEditingController(
+      text: widget.business.ownerPhone.ifEmpty(widget.business.phone),
+    ),
+    'address': TextEditingController(text: widget.business.address),
+    'province': TextEditingController(text: widget.business.province),
+    'businessType': TextEditingController(text: widget.business.businessType),
+  };
+  bool loading = false;
+
+  @override
+  void dispose() {
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Chỉnh sửa thông tin doanh nghiệp'),
+    content: SizedBox(
+      width: 520,
+      child: Form(
+        key: form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final field in const [
+              ('name', 'Tên doanh nghiệp'),
+              ('ownerName', 'Chủ sở hữu'),
+              ('phone', 'Điện thoại'),
+              ('address', 'Địa chỉ'),
+              ('province', 'Tỉnh thành'),
+              ('businessType', 'Loại hình'),
+            ]) ...[
+              TextFormField(
+                controller: controllers[field.$1],
+                decoration: InputDecoration(labelText: field.$2),
+                validator: _requiredField,
+              ),
+              const SizedBox(height: 10),
+            ],
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: loading ? null : () => Navigator.pop(context),
+        child: const Text('Hủy'),
+      ),
+      FilledButton(
+        onPressed: loading ? null : save,
+        child: Text(loading ? 'Đang lưu...' : 'Lưu'),
+      ),
+    ],
+  );
+
+  Future<void> save() async {
+    if (form.currentState?.validate() != true) return;
+    setState(() => loading = true);
+    try {
+      await widget.api.performAction(
+        action: 'business.update_info',
+        resourceId: widget.business.id,
+        payload: {
+          for (final entry in controllers.entries)
+            entry.key: entry.value.text.trim(),
+        },
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+}
+
+class _TenantRecordsPanel extends StatelessWidget {
+  const _TenantRecordsPanel({
+    required this.tenantId,
+    required this.kind,
+    required this.records,
+    required this.allRecords,
+    required this.api,
+    required this.onChanged,
+  });
+
+  final String tenantId;
+  final String kind;
+  final List<Map<Object?, Object?>> records;
+  final Map<Object?, Object?> allRecords;
+  final AdminApi api;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: ValueKey('tenant-record-list-$kind'),
+    decoration: BoxDecoration(
+      color: AdminTheme.loadingBackground,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AdminTheme.border),
+    ),
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Danh sách ${usageLabel(kind).toLowerCase()}',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: () => edit(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Thêm'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (records.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: Text(
+              'Chưa có bản ghi.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AdminTheme.mutedInk),
+            ),
+          )
+        else
+          ...records.map(
+            (record) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(
+                _recordTitle(kind, record),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(_recordSubtitle(kind, record)),
+              trailing: Wrap(
+                spacing: 2,
+                children: [
+                  IconButton(
+                    tooltip: 'Chỉnh sửa',
+                    onPressed: () => edit(context, record),
+                    icon: const Icon(Icons.edit_outlined, size: 19),
+                  ),
+                  IconButton(
+                    tooltip: 'Xóa',
+                    onPressed: () => remove(context, record),
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      size: 19,
+                      color: AdminTheme.danger,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+
+  Future<void> edit(
+    BuildContext context, [
+    Map<Object?, Object?>? record,
+  ]) async {
+    final saved = await showAdminDialog<bool>(
+      context: context,
+      builder: (_) => _TenantRecordEditor(
+        tenantId: tenantId,
+        kind: kind,
+        record: record,
+        allRecords: allRecords,
+        api: api,
+      ),
+    );
+    if (saved == true) onChanged();
+  }
+
+  Future<void> remove(
+    BuildContext context,
+    Map<Object?, Object?> record,
+  ) async {
+    final confirmed = await showAdminDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Xóa bản ghi?'),
+        content: Text(_recordTitle(kind, record)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await api.performAction(
+        action: 'record.delete',
+        resourceId: record['id'].toString(),
+        payload: {'tenantId': tenantId, 'kind': kind},
+      );
+      onChanged();
+    } catch (error) {
+      if (context.mounted) _showError(context, error);
+    }
+  }
+}
+
+class _TenantRecordEditor extends StatefulWidget {
+  const _TenantRecordEditor({
+    required this.tenantId,
+    required this.kind,
+    required this.record,
+    required this.allRecords,
+    required this.api,
+  });
+
+  final String tenantId;
+  final String kind;
+  final Map<Object?, Object?>? record;
+  final Map<Object?, Object?> allRecords;
+  final AdminApi api;
+
+  @override
+  State<_TenantRecordEditor> createState() => _TenantRecordEditorState();
+}
+
+class _TenantRecordEditorState extends State<_TenantRecordEditor> {
+  final form = GlobalKey<FormState>();
+  late final fields = _recordFields(widget.kind);
+  late final controllers = {
+    for (final field in fields)
+      field.key: TextEditingController(
+        text: _recordFieldValue(widget.record, field.key),
+      ),
+  };
+  late bool isVip = widget.record?['isVip'] == true;
+  bool loading = false;
+
+  @override
+  void dispose() {
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(
+      '${widget.record == null ? 'Thêm' : 'Chỉnh sửa'} ${usageLabel(widget.kind).toLowerCase()}',
+    ),
+    content: SizedBox(
+      width: 560,
+      child: SingleChildScrollView(
+        child: Form(
+          key: form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final field in fields) ...[
+                if (field.key == 'isVip')
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(field.label),
+                    value: isVip,
+                    onChanged: (value) => setState(() => isVip = value),
+                  )
+                else if (field.reference != null)
+                  _referenceField(field)
+                else if (field.options != null)
+                  DropdownButtonFormField<String>(
+                    initialValue: _optionValue(field),
+                    decoration: InputDecoration(labelText: field.label),
+                    items: field.options!.entries
+                        .map(
+                          (entry) => DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                        )
+                        .toList(growable: false),
+                    onChanged: (value) =>
+                        controllers[field.key]!.text = value ?? '',
+                    validator: field.required ? _requiredField : null,
+                  )
+                else
+                  TextFormField(
+                    controller: controllers[field.key],
+                    decoration: InputDecoration(
+                      labelText: field.label,
+                      hintText: field.dateTime ? '2026-08-13T14:30' : null,
+                    ),
+                    keyboardType: field.numeric
+                        ? TextInputType.number
+                        : TextInputType.text,
+                    maxLines: field.longText ? 3 : 1,
+                    validator: field.required ? _requiredField : null,
+                  ),
+                const SizedBox(height: 10),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: loading ? null : () => Navigator.pop(context),
+        child: const Text('Hủy'),
+      ),
+      FilledButton(
+        onPressed: loading ? null : save,
+        child: Text(loading ? 'Đang lưu...' : 'Lưu'),
+      ),
+    ],
+  );
+
+  Widget _referenceField(_RecordField field) {
+    final options = _recordList(widget.allRecords[field.reference]);
+    final ids = options.map((item) => item['id'].toString()).toSet();
+    final current = controllers[field.key]!.text;
+    return DropdownButtonFormField<String>(
+      initialValue: ids.contains(current) ? current : null,
+      decoration: InputDecoration(labelText: field.label),
+      items: [
+        if (!field.required)
+          const DropdownMenuItem(value: '', child: Text('Không chọn')),
+        ...options.map(
+          (item) => DropdownMenuItem(
+            value: item['id'].toString(),
+            child: Text(_recordTitle(field.reference!, item)),
+          ),
+        ),
+      ],
+      onChanged: (value) => controllers[field.key]!.text = value ?? '',
+      validator: field.required ? _requiredField : null,
+    );
+  }
+
+  String? _optionValue(_RecordField field) {
+    final value = controllers[field.key]!.text;
+    if (field.options!.containsKey(value)) return value;
+    final fallback = field.options!.keys.first;
+    controllers[field.key]!.text = fallback;
+    return fallback;
+  }
+
+  Future<void> save() async {
+    if (form.currentState?.validate() != true) return;
+    setState(() => loading = true);
+    try {
+      final payload = <String, Object?>{
+        'tenantId': widget.tenantId,
+        'kind': widget.kind,
+      };
+      for (final field in fields) {
+        final value = controllers[field.key]?.text.trim() ?? '';
+        payload[field.key] = field.key == 'isVip'
+            ? isVip
+            : field.numeric
+            ? int.tryParse(value) ?? 0
+            : field.list
+            ? value
+                  .split(',')
+                  .map((item) => item.trim())
+                  .where((item) => item.isNotEmpty)
+                  .toList()
+            : field.key == 'resourceIds'
+            ? (value.isEmpty ? <String>[] : [value])
+            : value;
+      }
+      final result = await widget.api.performAction(
+        action: 'record.save',
+        resourceId: widget.record?['id']?.toString() ?? 'new',
+        payload: payload,
+      );
+      if (!mounted) return;
+      final password = result['temporaryPassword']?.toString();
+      if (password != null && password.isNotEmpty) {
+        await showAdminDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Mật khẩu tạm thời'),
+            content: SelectableText(password),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Đã lưu'),
+              ),
+            ],
+          ),
+        );
+      }
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) _showError(context, error);
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+}
+
+class _RecordField {
+  const _RecordField(
+    this.key,
+    this.label, {
+    this.required = true,
+    this.numeric = false,
+    this.longText = false,
+    this.list = false,
+    this.dateTime = false,
+    this.options,
+    this.reference,
+  });
+
+  final String key;
+  final String label;
+  final bool required;
+  final bool numeric;
+  final bool longText;
+  final bool list;
+  final bool dateTime;
+  final Map<String, String>? options;
+  final String? reference;
+}
+
+List<_RecordField> _recordFields(String kind) => switch (kind) {
+  'bookings' => const [
+    _RecordField('customerId', 'Khách hàng', reference: 'customers'),
+    _RecordField('staffId', 'Nhân viên', reference: 'staff'),
+    _RecordField('serviceId', 'Dịch vụ', reference: 'services'),
+    _RecordField(
+      'resourceIds',
+      'Thiết bị (tùy chọn)',
+      required: false,
+      reference: 'equipment',
+    ),
+    _RecordField('startTime', 'Bắt đầu', dateTime: true),
+    _RecordField('endTime', 'Kết thúc', dateTime: true),
+    _RecordField(
+      'status',
+      'Trạng thái',
+      options: {
+        'pending': 'Chờ xác nhận',
+        'confirmed': 'Đã xác nhận',
+        'in_progress': 'Đang thực hiện',
+        'completed': 'Hoàn thành',
+        'cancelled': 'Đã hủy',
+        'no_show': 'Không đến',
+      },
+    ),
+    _RecordField('notes', 'Ghi chú', required: false, longText: true),
+  ],
+  'customers' => const [
+    _RecordField('name', 'Tên khách hàng'),
+    _RecordField('phone', 'Điện thoại'),
+    _RecordField('email', 'Email', required: false),
+    _RecordField('birthday', 'Ngày sinh', required: false),
+    _RecordField('notes', 'Ghi chú', required: false, longText: true),
+    _RecordField(
+      'allergies',
+      'Dị ứng / lưu ý',
+      required: false,
+      longText: true,
+    ),
+    _RecordField('visitCount', 'Số lần ghé', numeric: true),
+    _RecordField('isVip', 'Khách VIP', required: false),
+  ],
+  'staff' => const [
+    _RecordField('name', 'Tên nhân viên'),
+    _RecordField('phone', 'Điện thoại'),
+    _RecordField('email', 'Email'),
+    _RecordField('roleTitle', 'Chức danh'),
+    _RecordField(
+      'specialties',
+      'Chuyên môn (phân cách bằng dấu phẩy)',
+      required: false,
+      list: true,
+    ),
+    _RecordField(
+      'status',
+      'Trạng thái',
+      options: {
+        'available': 'Sẵn sàng',
+        'in_session': 'Trong phiên',
+        'absent': 'Vắng mặt',
+      },
+    ),
+  ],
+  'services' => const [
+    _RecordField('name', 'Tên dịch vụ'),
+    _RecordField('category', 'Danh mục'),
+    _RecordField('price', 'Giá', numeric: true),
+    _RecordField('duration', 'Thời lượng (phút)', numeric: true),
+  ],
+  'products' => const [
+    _RecordField('name', 'Tên sản phẩm'),
+    _RecordField('category', 'Danh mục'),
+    _RecordField('price', 'Giá', numeric: true),
+    _RecordField('unit', 'Đơn vị'),
+  ],
+  'equipment' => const [
+    _RecordField('name', 'Tên thiết bị'),
+    _RecordField('location', 'Vị trí', required: false),
+    _RecordField('quantity', 'Số lượng', numeric: true),
+    _RecordField('lastMaintenance', 'Bảo trì gần nhất', required: false),
+    _RecordField(
+      'status',
+      'Trạng thái',
+      options: {
+        'available': 'Sẵn sàng',
+        'in_use': 'Đang sử dụng',
+        'maintenance': 'Bảo trì',
+      },
+    ),
+  ],
+  _ => const [],
+};
+
+String _recordFieldValue(Map<Object?, Object?>? record, String key) {
+  final value = record == null
+      ? null
+      : key == 'roleTitle'
+      ? record['role_title']
+      : record[key];
+  if (key == 'resourceIds' && value is List) {
+    return value.isEmpty ? '' : value.first.toString();
+  }
+  if (value is List) return value.join(', ');
+  if ((key == 'startTime' || key == 'endTime') && value is num) {
+    final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
+    String two(int part) => part.toString().padLeft(2, '0');
+    return '${date.year}-${two(date.month)}-${two(date.day)}T${two(date.hour)}:${two(date.minute)}';
+  }
+  return value?.toString() ?? '';
+}
+
+String? _requiredField(String? value) =>
+    value == null || value.trim().isEmpty ? 'Vui lòng nhập trường này' : null;
+
+String _recordTitle(
+  String kind,
+  Map<Object?, Object?> record,
+) => switch (kind) {
+  'bookings' =>
+    '${record['customerName'] ?? 'Lịch hẹn'} · ${record['serviceName'] ?? ''}',
+  _ => record['name']?.toString().ifEmpty('Chưa đặt tên') ?? 'Chưa đặt tên',
+};
+
+String _recordSubtitle(
+  String kind,
+  Map<Object?, Object?> record,
+) => switch (kind) {
+  'bookings' =>
+    '${formatDateTime(_millisDate(record['startTime']))} · ${record['staffName'] ?? ''} · ${_statusLabel(record['status'])}',
+  'customers' =>
+    '${record['phone'] ?? ''}${record['isVip'] == true ? ' · VIP' : ''}',
+  'staff' =>
+    '${record['role_title'] ?? 'Nhân viên'} · ${_statusLabel(record['status'])}',
+  'services' =>
+    '${_money.format(record['price'] ?? 0)} · ${record['duration'] ?? record['durationMin'] ?? 0} phút',
+  'products' =>
+    '${_money.format(record['price'] ?? 0)} · ${record['unit'] ?? ''}',
+  'equipment' =>
+    '${record['location'] ?? ''} · ${_statusLabel(record['status'])} · SL ${record['quantity'] ?? 1}',
+  _ => '',
+};
+
+String _statusLabel(Object? value) => switch (value?.toString()) {
+  'pending' => 'Chờ xác nhận',
+  'confirmed' => 'Đã xác nhận',
+  'in_progress' => 'Đang thực hiện',
+  'completed' => 'Hoàn thành',
+  'cancelled' => 'Đã hủy',
+  'no_show' => 'Không đến',
+  'available' => 'Sẵn sàng',
+  'in_use' => 'Đang sử dụng',
+  'in_session' => 'Trong phiên',
+  'maintenance' => 'Bảo trì',
+  'absent' => 'Vắng mặt',
+  _ => value?.toString() ?? '',
+};
+
+class _BusinessActivity extends StatefulWidget {
+  const _BusinessActivity({required this.activity});
+
+  final List<Map<Object?, Object?>> activity;
+
+  @override
+  State<_BusinessActivity> createState() => _BusinessActivityState();
+}
+
+class _BusinessActivityState extends State<_BusinessActivity> {
+  static const ranges = [1, 3, 7, 15, 30];
+  int days = 30;
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final cutoff = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).subtract(Duration(days: days - 1));
+    final activity = widget.activity.where((event) {
+      final createdAt = _activityDate(event['createdAt']);
+      return createdAt != null && !createdAt.isBefore(cutoff);
+    }).toList();
+    final activityByDay = <String, num>{};
+    for (var offset = 0; offset < days; offset++) {
+      final date = cutoff.add(Duration(days: offset));
+      activityByDay[_activityDateKey(date)] = 0;
+    }
+    for (final event in activity) {
+      final createdAt = _activityDate(event['createdAt']);
+      if (createdAt == null) continue;
+      final key = _activityDateKey(createdAt);
+      activityByDay[key] = (activityByDay[key] ?? 0) + 1;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Hoạt động gần đây',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const Text(
+              'Khoảng ngày',
+              style: TextStyle(color: AdminTheme.mutedInk, fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          children: ranges
+              .map(
+                (value) => ChoiceChip(
+                  label: Text('$value ngày'),
+                  selected: days == value,
+                  onSelected: (_) => setState(() => days = value),
+                ),
+              )
+              .toList(growable: false),
+        ),
+        const SizedBox(height: 16),
+        _DailyTrendChart(
+          key: ValueKey('business-activity-trend-$days'),
+          title: 'Mức độ sử dụng theo ngày',
+          tooltip:
+              'Số thao tác được ghi nhận theo từng ngày trong khoảng đã chọn.',
+          values: activityByDay,
+          emptyMessage: 'Chưa có hoạt động trong khoảng đã chọn.',
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '${activity.length} hoạt động thêm, chỉnh sửa hoặc xóa trong $days ngày gần nhất.',
+          style: const TextStyle(color: AdminTheme.mutedInk),
+        ),
+        const SizedBox(height: 8),
+        if (activity.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Chưa có hoạt động trong khoảng đã chọn.',
+              style: TextStyle(color: AdminTheme.mutedInk),
+            ),
+          )
+        else
+          ...activity.map(
+            (event) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              leading: Icon(
+                _activityIcon(event['action']),
+                size: 18,
+                color: AdminTheme.tealDark,
+              ),
+              title: Text(
+                '${_activityAction(event['action'])} · ${_activityEntity(event['type'])}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(formatDateTime(_activityDate(event['createdAt']))),
+              trailing: StatusBadge(
+                status: event['status']?.toString() ?? 'succeeded',
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+DateTime? _activityDate(Object? value) =>
+    value is num ? DateTime.fromMillisecondsSinceEpoch(value.toInt()) : null;
+
+String _activityDateKey(DateTime value) =>
+    '${value.year.toString().padLeft(4, '0')}-'
+    '${value.month.toString().padLeft(2, '0')}-'
+    '${value.day.toString().padLeft(2, '0')}';
+
+String _activityAction(Object? value) {
+  final action = value?.toString().toLowerCase() ?? '';
+  if (action.contains('delete')) return 'Xóa';
+  if (action.contains('create') || action.contains('add')) return 'Thêm';
+  return 'Chỉnh sửa';
+}
+
+IconData _activityIcon(Object? value) => switch (_activityAction(value)) {
+  'Thêm' => Icons.add_circle_outline,
+  'Xóa' => Icons.delete_outline,
+  _ => Icons.edit_outlined,
+};
+
+String _activityEntity(Object? value) =>
+    const {
+      'booking': 'Lịch hẹn',
+      'customer': 'Khách hàng',
+      'user': 'Nhân viên',
+      'service': 'Dịch vụ',
+      'product': 'Sản phẩm',
+      'equipment': 'Thiết bị',
+      'tenant': 'Doanh nghiệp',
+      'campaign': 'Chiến dịch',
+    }[value?.toString()] ??
+    'Hệ thống';
 
 class TransactionDialog extends StatefulWidget {
   const TransactionDialog({
@@ -1809,7 +3023,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
             ),
             DetailRow(
               label: 'Gói / kỳ hạn',
-              value: '${item.planTier.toUpperCase()} ${item.billingPeriod}',
+              value: '${_planLabel(item.planTier)} ${item.billingPeriod}',
             ),
             DetailRow(label: 'Số tiền', value: _money.format(item.amount)),
             DetailRow(label: 'Trạng thái', value: statusLabel(item.status)),
@@ -2225,32 +3439,50 @@ class _AddAdminDialogState extends State<AddAdminDialog> {
 class _StoryPanel extends StatelessWidget {
   const _StoryPanel({
     required this.title,
-    required this.caption,
     required this.tooltip,
     required this.child,
+    this.rightTitle,
+    this.rightTooltip,
   });
 
   final String title;
-  final String caption;
   final String tooltip;
   final Widget child;
+  final String? rightTitle;
+  final String? rightTooltip;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _InfoTitle(title: title, tooltip: tooltip),
-          const SizedBox(height: 5),
-          Text(
-            caption,
-            style: const TextStyle(color: AdminTheme.mutedInk, fontSize: 12),
-          ),
-          const SizedBox(height: 24),
-          child,
-        ],
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (rightTitle != null && constraints.maxWidth >= 900)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _InfoTitle(title: title, tooltip: tooltip),
+                  ),
+                  const SizedBox(width: 32),
+                  Expanded(
+                    flex: 3,
+                    child: _InfoTitle(
+                      title: rightTitle!,
+                      tooltip: rightTooltip ?? '',
+                    ),
+                  ),
+                ],
+              )
+            else
+              _InfoTitle(title: title, tooltip: tooltip),
+            const SizedBox(height: 24),
+            child,
+          ],
+        ),
       ),
     ),
   );
@@ -2282,10 +3514,20 @@ class _InfoTitle extends StatelessWidget {
   );
 }
 
-class _RelationshipGrid extends StatelessWidget {
-  const _RelationshipGrid({required this.items});
+enum _MetricTone { neutral, success, warning, danger }
 
-  final List<(String, String, String, bool)> items;
+class _RelationshipGrid extends StatelessWidget {
+  const _RelationshipGrid({
+    required this.items,
+    this.selectedIndex,
+    this.selectableIndices = const {},
+    this.onSelected,
+  });
+
+  final List<(String, String, String, _MetricTone)> items;
+  final int? selectedIndex;
+  final Set<int> selectableIndices;
+  final ValueChanged<int>? onSelected;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -2295,15 +3537,19 @@ class _RelationshipGrid extends StatelessWidget {
       return Wrap(
         spacing: 10,
         runSpacing: 10,
-        children: items
+        children: items.indexed
             .map(
-              (item) => SizedBox(
+              (entry) => SizedBox(
                 width: width,
                 child: _RelationshipMetric(
-                  label: item.$1,
-                  value: item.$2,
-                  tooltip: item.$3,
-                  warning: item.$4,
+                  selected: selectedIndex == entry.$1,
+                  onTap: selectableIndices.contains(entry.$1)
+                      ? () => onSelected?.call(entry.$1)
+                      : null,
+                  label: entry.$2.$1,
+                  value: entry.$2.$2,
+                  tooltip: entry.$2.$3,
+                  tone: entry.$2.$4,
                 ),
               ),
             )
@@ -2318,77 +3564,116 @@ class _RelationshipMetric extends StatelessWidget {
     required this.label,
     required this.value,
     required this.tooltip,
-    required this.warning,
+    required this.tone,
+    this.selected = false,
+    this.onTap,
   });
 
   final String label;
   final String value;
   final String tooltip;
-  final bool warning;
+  final _MetricTone tone;
+  final bool selected;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = warning ? AdminTheme.orange : AdminTheme.tealDark;
-    return Tooltip(
-      message: tooltip,
-      waitDuration: const Duration(milliseconds: 250),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.055),
-          border: Border.all(color: color.withValues(alpha: 0.14)),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AdminTheme.mutedInk,
-                        fontSize: 11,
+    final color = switch (tone) {
+      _MetricTone.success => AdminTheme.success,
+      _MetricTone.warning => AdminTheme.orange,
+      _MetricTone.danger => AdminTheme.danger,
+      _MetricTone.neutral => AdminTheme.tealDark,
+    };
+    final card = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        mouseCursor: onTap == null
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
+        child: Container(
+          key: ValueKey('metric-card-$label'),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.055),
+            border: Border.all(
+              color: color.withValues(alpha: selected ? 0.7 : 0.14),
+              width: selected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AdminTheme.mutedInk,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
-                  ),
-                  Icon(Icons.info_outline, size: 13, color: color),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: warning ? AdminTheme.orange : null,
-                  fontWeight: FontWeight.w700,
+                    Icon(Icons.info_outline, size: 13, color: color),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: tone == _MetricTone.neutral ? null : color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 250),
+      child: card,
+    );
   }
 }
 
-class RevenueTrendChart extends StatelessWidget {
-  const RevenueTrendChart({required this.values, super.key});
+class _DailyTrendChart extends StatelessWidget {
+  const _DailyTrendChart({
+    required this.title,
+    required this.tooltip,
+    required this.values,
+    required this.emptyMessage,
+    this.money = false,
+    this.percent = false,
+    this.color = AdminTheme.teal,
+    this.showTitle = true,
+    super.key,
+  });
 
+  final String title;
+  final String tooltip;
   final Map<String, num> values;
+  final String emptyMessage;
+  final bool money;
+  final bool percent;
+  final Color color;
+  final bool showTitle;
 
   @override
   Widget build(BuildContext context) {
     final entries = values.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
-    final visible = entries.length > 30
-        ? entries.sublist(entries.length - 30)
-        : entries;
+    final visible = entries;
     final max = visible.fold<double>(
       0,
       (current, entry) =>
@@ -2397,60 +3682,59 @@ class RevenueTrendChart extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _InfoTitle(
-          title: 'Xu hướng doanh thu theo ngày',
-          tooltip: 'Di chuột lên từng cột để xem ngày và doanh thu chính xác.',
-        ),
-        const SizedBox(height: 18),
+        if (showTitle) ...[
+          _InfoTitle(title: title, tooltip: tooltip),
+          const SizedBox(height: 18),
+        ],
         if (visible.isEmpty || max <= 0)
-          const SizedBox(
+          SizedBox(
             height: 190,
             child: Center(
               child: Text(
-                'Chưa có doanh thu trong kỳ',
-                style: TextStyle(color: AdminTheme.mutedInk),
+                emptyMessage,
+                style: const TextStyle(color: AdminTheme.mutedInk),
               ),
             ),
           )
         else
           Container(
+            key: ValueKey('trend-chart-body-$title'),
             height: 190,
             padding: const EdgeInsets.fromLTRB(10, 14, 10, 8),
             decoration: BoxDecoration(
               color: AdminTheme.teal.withValues(alpha: 0.035),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: visible
-                  .map(
-                    (entry) => Expanded(
-                      child: Tooltip(
-                        message: '${entry.key}\n${_money.format(entry.value)}',
-                        waitDuration: const Duration(milliseconds: 150),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: FractionallySizedBox(
-                              heightFactor: (entry.value / max)
-                                  .clamp(0.02, 1)
-                                  .toDouble(),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: AdminTheme.teal,
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(5),
-                                  ),
-                                ),
-                              ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CustomPaint(
+                  key: const ValueKey('trend-line'),
+                  painter: _TrendLinePainter(
+                    values: visible
+                        .map((entry) => entry.value.toDouble())
+                        .toList(growable: false),
+                    maxValue: percent ? 100 : max,
+                    color: color,
+                  ),
+                ),
+                Row(
+                  children: visible
+                      .map(
+                        (entry) => Expanded(
+                          child: Tooltip(
+                            message:
+                                '${entry.key}\n${money ? _money.format(entry.value) : '${entry.value}${percent ? '%' : ''}'}',
+                            waitDuration: const Duration(milliseconds: 150),
+                            child: SizedBox.expand(
+                              key: ValueKey('trend-point-${entry.key}'),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
+                      )
+                      .toList(growable: false),
+                ),
+              ],
             ),
           ),
         if (visible.isNotEmpty) ...[
@@ -2458,14 +3742,95 @@ class RevenueTrendChart extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(visible.first.key, style: const TextStyle(fontSize: 10)),
-              Text(visible.last.key, style: const TextStyle(fontSize: 10)),
+              Text(
+                _shortDate(visible.first.key),
+                style: const TextStyle(fontSize: 10),
+              ),
+              Text(
+                _shortDate(visible.last.key),
+                style: const TextStyle(fontSize: 10),
+              ),
             ],
           ),
         ],
       ],
     );
   }
+
+  String _shortDate(String value) {
+    final parts = value.split('-');
+    return parts.length == 3 ? '${parts[2]}/${parts[1]}' : value;
+  }
+}
+
+class _TrendLinePainter extends CustomPainter {
+  const _TrendLinePainter({
+    required this.values,
+    required this.maxValue,
+    required this.color,
+  });
+
+  final List<double> values;
+  final double maxValue;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = AdminTheme.mutedInk.withValues(alpha: 0.12)
+      ..strokeWidth = 1;
+    for (var index = 0; index < 4; index++) {
+      final y = size.height * index / 3;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final usableHeight = size.height - 8;
+    final step = values.length == 1 ? 0.0 : size.width / (values.length - 1);
+    final points = values.indexed
+        .map(
+          (entry) => Offset(
+            values.length == 1 ? size.width / 2 : entry.$1 * step,
+            4 + usableHeight * (1 - (entry.$2 / maxValue).clamp(0, 1)),
+          ),
+        )
+        .toList(growable: false);
+    final line = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      line.lineTo(point.dx, point.dy);
+    }
+    final area = Path.from(line)
+      ..lineTo(points.last.dx, size.height)
+      ..lineTo(points.first.dx, size.height)
+      ..close();
+    canvas.drawPath(
+      area,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0.02)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      line,
+      Paint()
+        ..color = color
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke,
+    );
+    for (final point in points) {
+      canvas.drawCircle(point, 4.5, Paint()..color = Colors.white);
+      canvas.drawCircle(point, 3, Paint()..color = color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TrendLinePainter oldDelegate) =>
+      oldDelegate.values != values ||
+      oldDelegate.maxValue != maxValue ||
+      oldDelegate.color != color;
 }
 
 class SegmentedBreakdown extends StatelessWidget {
@@ -2788,17 +4153,12 @@ class _ChartGrid extends StatelessWidget {
             width: width,
             child: MetricBarChart(
               title: 'Doanh thu theo gói',
-              values: data.analytics.revenueByPlan,
+              values: {
+                for (final item in data.analytics.revenueByPlan.entries)
+                  _planLabel(item.key): item.value,
+              },
               money: true,
               highlight: true,
-            ),
-          ),
-          SizedBox(
-            width: width,
-            child: MetricBarChart(
-              title: 'Doanh thu theo tỉnh',
-              values: data.analytics.revenueByProvince,
-              money: true,
             ),
           ),
           SizedBox(
@@ -2821,7 +4181,7 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      'active' || 'paid' || 'verified' => AdminTheme.success,
+      'active' || 'paid' || 'verified' || 'succeeded' => AdminTheme.success,
       'pending' || 'processing' || 'trial' || 'unchecked' => AdminTheme.orange,
       'suspended' ||
       'failed' ||
@@ -2851,15 +4211,14 @@ class StatusBadge extends StatelessWidget {
 }
 
 class EventTable extends StatelessWidget {
-  const EventTable({required this.events, this.webhook = false, super.key});
+  const EventTable({required this.events, super.key});
   final List<PlatformEvent> events;
-  final bool webhook;
   @override
   Widget build(BuildContext context) {
     if (events.isEmpty) {
       return EmptyState(
-        icon: webhook ? Icons.webhook_outlined : Icons.policy_outlined,
-        title: webhook ? 'Chưa có webhook' : 'Chưa có thao tác kiểm toán',
+        icon: Icons.policy_outlined,
+        title: 'Chưa có thao tác kiểm toán',
         message: 'Các sự kiện mới sẽ xuất hiện tại đây.',
       );
     }
@@ -2877,9 +4236,7 @@ class EventTable extends StatelessWidget {
               (event) => DataRow(
                 cells: [
                   DataCell(Text(formatDateTime(event.createdAt))),
-                  DataCell(
-                    Text(event.actor.ifEmpty(webhook ? 'PayOS' : 'Hệ thống')),
-                  ),
+                  DataCell(Text(event.actor.ifEmpty('Hệ thống'))),
                   DataCell(Text(event.action.ifEmpty(event.status))),
                   DataCell(
                     Text('${event.entityType} ${event.entityId}'.trim()),
@@ -3076,7 +4433,7 @@ class _PlanCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  plan.name,
+                  _planLabel(plan.id),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -3087,22 +4444,6 @@ class _PlanCard extends StatelessWidget {
           Text(
             '${_money.format(plan.monthlyPrice)} / tháng',
             style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _PlanBadge(
-                icon: Icons.calendar_today_outlined,
-                label: '${_money.format(plan.annualPrice)} / năm',
-              ),
-              _PlanBadge(
-                icon: Icons.hourglass_bottom_rounded,
-                label: '${plan.trialDays} ngày dùng thử',
-                highlight: plan.trialDays > 0,
-              ),
-            ],
           ),
           const SizedBox(height: 14),
           Text(
@@ -3180,65 +4521,12 @@ class _PlanCard extends StatelessWidget {
   );
 }
 
-class _PlanBadge extends StatelessWidget {
-  const _PlanBadge({
-    required this.icon,
-    required this.label,
-    this.highlight = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool highlight;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-    decoration: BoxDecoration(
-      color: highlight
-          ? AdminTheme.orange.withValues(alpha: 0.1)
-          : AdminTheme.teal.withValues(alpha: 0.09),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(
-        color: highlight
-            ? AdminTheme.orange.withValues(alpha: 0.35)
-            : AdminTheme.teal.withValues(alpha: 0.3),
-      ),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 14,
-          color: highlight ? AdminTheme.orange : AdminTheme.tealDark,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ],
-    ),
-  );
-}
-
 class _HealthCard extends StatelessWidget {
-  const _HealthCard({
-    required this.label,
-    required this.detail,
-    required this.ok,
-  });
+  const _HealthCard({required this.label, required this.detail});
   final String label;
   final String detail;
-  final bool? ok;
   @override
   Widget build(BuildContext context) {
-    final color = ok == true
-        ? AdminTheme.success
-        : ok == false
-        ? AdminTheme.danger
-        : AdminTheme.mutedInk;
     return SizedBox(
       width: 270,
       child: Card(
@@ -3249,7 +4537,10 @@ class _HealthCard extends StatelessWidget {
               Container(
                 width: 10,
                 height: 10,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: AdminTheme.success,
+                  shape: BoxShape.circle,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -3276,30 +4567,6 @@ class _HealthCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LimitNotice extends StatelessWidget {
-  const _LimitNotice();
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: AdminTheme.orange.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: const Row(
-      children: [
-        Icon(Icons.info_outline, color: AdminTheme.orange),
-        SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Dữ liệu vượt giới hạn đọc an toàn. Các số liệu nhóm chỉ phản ánh phần dữ liệu đã tải; hãy thu hẹp bộ lọc thời gian.',
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _ExportCard extends StatelessWidget {
@@ -3370,8 +4637,10 @@ Future<void> _subscriptionAction(
             decoration: const InputDecoration(labelText: 'Gói SaaS'),
             items: activePlans
                 .map(
-                  (item) =>
-                      DropdownMenuItem(value: item.id, child: Text(item.name)),
+                  (item) => DropdownMenuItem(
+                    value: item.id,
+                    child: Text(_planLabel(item.id)),
+                  ),
                 )
                 .toList(),
             onChanged: (value) => plan = value,
@@ -3539,7 +4808,7 @@ Future<void> _exportTransactions(List<PlatformTransaction> rows) => downloadCsv(
         row.businessName,
         row.tenantId,
         row.province,
-        row.planTier,
+        _planLabel(row.planTier),
         row.amount,
         row.provider,
         row.method,
@@ -3556,7 +4825,6 @@ Future<void> _exportBusinesses(List<PlatformBusinessRecord> rows) =>
           'tenantId',
           'name',
           'owner',
-          'email',
           'phone',
           'type',
           'province',
@@ -3570,32 +4838,16 @@ Future<void> _exportBusinesses(List<PlatformBusinessRecord> rows) =>
             row.id,
             row.name,
             row.ownerName,
-            row.ownerEmail,
-            row.phone,
+            row.ownerPhone.ifEmpty(row.phone),
             row.businessType,
             row.province,
-            row.planTier,
+            _planLabel(row.planTier),
             row.subscriptionStatus,
             row.status,
             row.createdAt?.toIso8601String() ?? '',
           ],
       ]),
     );
-Future<void> _exportProvinces(PlatformAnalytics analytics) => downloadCsv(
-  'schedula-provinces.csv',
-  _csv([
-    ['province', 'businesses', 'revenue'],
-    for (final province in {
-      ...analytics.businessesByProvince.keys,
-      ...analytics.revenueByProvince.keys,
-    })
-      [
-        province,
-        analytics.businessesByProvince[province] ?? 0,
-        analytics.revenueByProvince[province] ?? 0,
-      ],
-  ]),
-);
 Future<void> _exportEvents(List<PlatformEvent> rows) => downloadCsv(
   'schedula-audit-log.csv',
   _csv([
@@ -3624,12 +4876,6 @@ List<String> _options(Iterable<String> values, String current) => {
   ...values.where((item) => item.isNotEmpty),
   if (current.isNotEmpty) current,
 }.toList()..sort();
-String _rangeValue(WorkspaceFilter filter) {
-  final days = filter.end.difference(filter.start).inDays + 1;
-  if (days > 365) return 'all';
-  return [7, 30, 90, 365].contains(days) ? '$days' : 'custom';
-}
-
 String formatDate(DateTime? value) =>
     value == null ? 'Chưa cập nhật' : _date.format(value);
 String formatDateTime(DateTime? value) =>
@@ -3649,6 +4895,7 @@ String statusLabel(String status) =>
       'suspended': 'Tạm ngưng',
       'inactive': 'Vô hiệu',
       'verified': 'Đã xác minh',
+      'succeeded': 'Thành công',
       'unchecked': 'Chưa kiểm tra',
       'mismatch': 'Không khớp',
       'archived': 'Lưu trữ',

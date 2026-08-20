@@ -378,7 +378,7 @@ const subscriptionPlans = [
     gradient: 'from-gray-50 to-gray-100',
     borderColor: 'border-gray-200',
     features: [
-      'Tối đa 50 lịch hẹn/tháng',
+      'Tối đa 100 lịch hẹn/tháng',
       '3 nhân viên',
       'Theo dõi 100 khách hàng',
       'Báo cáo cơ bản',
@@ -386,6 +386,7 @@ const subscriptionPlans = [
     ],
     notIncluded: ['Thống kê nâng cao', 'Tích hợp thanh toán', 'API tùy chỉnh'],
     popular: false,
+    status: 'active',
   },
   {
     id: 'pro',
@@ -405,6 +406,7 @@ const subscriptionPlans = [
     ],
     notIncluded: ['API tùy chỉnh'],
     popular: true,
+    status: 'active',
   },
   {
     id: 'enterprise',
@@ -425,6 +427,7 @@ const subscriptionPlans = [
     ],
     notIncluded: [],
     popular: false,
+    status: 'active',
   },
 ];
 

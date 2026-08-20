@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -101,12 +102,90 @@ def verify_credentials(path):
     roles = {row[2] for row in rows}
     if roles != {"owner", "staff"}:
         raise ValueError(f"Unexpected credential roles: {roles}")
+    demo_owners = [row[0] for row in rows if row[2] == "owner" and str(row[4]).endswith("@schedula.demo")]
+    if demo_owners:
+        raise ValueError(f"Tenant owners still use demo emails: {demo_owners}")
+    dotted_owners = [
+        row[0] for row in rows
+        if row[2] == "owner" and "." in str(row[4]).split("@", 1)[0]
+    ]
+    if dotted_owners:
+        raise ValueError(f"Tenant owner emails still contain dots: {dotted_owners}")
+    invalid_tenant_ids = sorted({
+        row[1] for row in rows if not re.fullmatch(r"[A-Za-z0-9]{20}", str(row[1]))
+    })
+    if invalid_tenant_ids:
+        raise ValueError(f"Invalid tenant IDs: {invalid_tenant_ids}")
     print(json.dumps({
         "accounts": len(rows),
         "owners": sum(row[2] == "owner" for row in rows),
         "staff": sum(row[2] == "staff" for row in rows),
         "temporaryPasswords": sum(bool(row[5]) for row in rows),
+        "demoOwnerEmails": len(demo_owners),
+        "dottedOwnerEmails": len(dotted_owners),
+        "invalidTenantIds": len(invalid_tenant_ids),
     }))
+
+
+def read_credentials(path):
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    rows = workbook["Credentials"].iter_rows(min_row=5, values_only=True)
+    passwords = {}
+    for row in rows:
+        if not row[5]:
+            continue
+        if row[4]:
+            passwords[f"email:{row[4]}"] = str(row[5])
+        if row[1] and row[2] and row[3]:
+            passwords[f"identity:{row[1]}|{row[2]}|{row[3]}"] = str(row[5])
+    print(json.dumps({"passwords": passwords}, ensure_ascii=False))
+
+
+def compare_credentials(old_path, new_path):
+    def by_identity(path):
+        workbook = load_workbook(path, read_only=True, data_only=True)
+        rows = workbook["Credentials"].iter_rows(min_row=5, values_only=True)
+        return {(row[0], row[2], row[3]): row[5] for row in rows}
+
+    old = by_identity(old_path)
+    new = by_identity(new_path)
+    if old != new:
+        raise ValueError("Temporary passwords changed during credential migration")
+    print(json.dumps({"preservedPasswords": len(new)}))
+
+
+def update_tenant_identities(source_path, output_path):
+    sys.stdin.reconfigure(encoding="utf-8")
+    identity_by_tenant = json.load(sys.stdin)
+    workbook = load_workbook(source_path)
+    sheet = workbook["Credentials"]
+    updated_tenants = set()
+    updated_owners = set()
+    for row in sheet.iter_rows(min_row=5):
+        tenant = clean(row[0].value)
+        role = clean(row[2].value)
+        if tenant not in identity_by_tenant:
+            continue
+        identity = identity_by_tenant[tenant]
+        row[1].value = identity["tenantId"]
+        updated_tenants.add(tenant)
+        if role == "owner":
+            row[4].value = identity["email"]
+            row[6].value = "identity updated"
+            updated_owners.add(tenant)
+    missing = sorted(set(identity_by_tenant) - updated_tenants)
+    if missing:
+        raise ValueError(f"Tenant rows not found: {missing}")
+    missing_owners = sorted(set(identity_by_tenant) - updated_owners)
+    if missing_owners:
+        raise ValueError(f"Owner rows not found: {missing_owners}")
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    workbook.save(output_path)
+    print(json.dumps({
+        "updatedTenants": len(updated_tenants),
+        "updatedOwners": len(updated_owners),
+        "output": output_path,
+    }, ensure_ascii=False))
 
 
 def clean(value):
@@ -118,7 +197,7 @@ def clean(value):
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise SystemExit(
-            "Usage: simulationWorkbook.py extract|credentials|verify-credentials PATH"
+            "Usage: simulationWorkbook.py extract|credentials|verify-credentials|read-credentials|update-tenant-identities PATH [PATH]"
         )
     if sys.argv[1] == "extract":
         extract(sys.argv[2])
@@ -126,5 +205,11 @@ if __name__ == "__main__":
         write_credentials(sys.argv[2])
     elif sys.argv[1] == "verify-credentials":
         verify_credentials(sys.argv[2])
+    elif sys.argv[1] == "read-credentials":
+        read_credentials(sys.argv[2])
+    elif sys.argv[1] == "compare-credentials":
+        compare_credentials(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == "update-tenant-identities":
+        update_tenant_identities(sys.argv[2], sys.argv[3])
     else:
         raise SystemExit("Unknown mode")

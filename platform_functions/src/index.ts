@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import * as admin from 'firebase-admin';
 import { AggregateField, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -10,6 +12,14 @@ import {
   type PlatformPermission,
 } from './access';
 
+export {
+  auditCustomerCrud,
+  auditServiceCrud,
+  auditProductCrud,
+  auditEquipmentCrud,
+} from './directCrud';
+export { activeSimulationMigration } from './activeSimulationMigration';
+
 if (admin.apps.length === 0) admin.initializeApp();
 
 const db = admin.firestore();
@@ -17,6 +27,14 @@ const payosClientId = defineSecret('PAYOS_CLIENT_ID');
 const payosApiKey = defineSecret('PAYOS_API_KEY');
 const tenantLimit = 250;
 const paymentLimit = 1000;
+const bookingActivityLimit = 10000;
+const simulationTrialTenantNames = new Set([
+  'Kim Dung Beauty',
+  'Pure Spa',
+  'Katie Spa',
+  'Dưỡng sinh Cô Ba',
+  'Mị Spa',
+]);
 
 type WorkspaceInput = {
   startAt?: string;
@@ -30,6 +48,7 @@ type WorkspaceInput = {
 };
 
 type PaymentRecord = FirebaseFirestore.DocumentData & { id: string };
+type BookingActivity = { tenantId: string; startTime: number | null };
 
 export function isPlatformAdmin(
   token: Record<string, unknown> | undefined,
@@ -50,8 +69,12 @@ export const getPlatformWorkspace = onCall(
   const previousStart = new Date(
     range.start.getTime() - (range.end.getTime() - range.start.getTime()),
   );
-
-  const [tenantSnapshot, paymentSnapshot, planSnapshot] = await Promise.all([
+  const [
+    tenantSnapshot,
+    paymentSnapshot,
+    planSnapshot,
+    bookingActivitySnapshot,
+  ] = await Promise.all([
     db.collection('tenants')
       .orderBy('createdAt', 'desc')
       .limit(tenantLimit + 1)
@@ -63,6 +86,13 @@ export const getPlatformWorkspace = onCall(
       .limit(paymentLimit + 1)
       .get(),
     db.collection('subscriptionPlans').limit(100).get(),
+    db.collection('bookings')
+      .where('startTime', '>=', Timestamp.fromDate(range.start))
+      .where('startTime', '<=', Timestamp.fromDate(range.end))
+      .orderBy('startTime', 'desc')
+      .limit(bookingActivityLimit)
+      .select('tenantId', 'startTime')
+      .get(),
   ]);
 
   const tenantDocs = tenantSnapshot.docs.slice(0, tenantLimit);
@@ -73,10 +103,26 @@ export const getPlatformWorkspace = onCall(
   const ownerDocs = ownerRefs.length ? await db.getAll(...ownerRefs) : [];
   const owners = new Map(ownerDocs.map((document) => [document.id, document.data()]));
 
+  const bookingActivity: BookingActivity[] = bookingActivitySnapshot.docs.map((document) => ({
+    tenantId: String(document.data().tenantId ?? ''),
+    startTime: toMillis(document.data().startTime),
+  }));
+  const latestBookingByTenant = new Map<string, number>();
+  for (const booking of bookingActivity) {
+    const { tenantId, startTime: startedAt } = booking;
+    if (tenantId && startedAt != null && !latestBookingByTenant.has(tenantId)) {
+      latestBookingByTenant.set(tenantId, startedAt);
+    }
+  }
   const allBusinesses = tenantDocs.map((document) => {
     const data = document.data();
     const owner = owners.get(String(data.ownerUid ?? '')) ?? {};
-    return serializeBusiness(document.id, data, owner);
+    return serializeBusiness(
+      document.id,
+      data,
+      owner,
+      latestBookingByTenant.get(document.id),
+    );
   });
   const businesses = filterBusinesses(allBusinesses, input);
   const businessById = new Map(allBusinesses.map((business) => [business.id, business]));
@@ -104,19 +150,14 @@ export const getPlatformWorkspace = onCall(
     filterPayments(previousPayments, input, businessById),
     plans,
     range,
+    bookingActivity,
   );
 
   const canMonitor = actor.permissions.includes('monitoring.read');
-  const [auditSnapshot, webhookSnapshot, adminSnapshot] = await Promise.all([
+  const [auditSnapshot, adminSnapshot] = await Promise.all([
     canMonitor
       ? db.collection('auditEvents')
         .where('platform', '==', true)
-        .orderBy('createdAt', 'desc')
-        .limit(100)
-        .get()
-      : Promise.resolve(null),
-    canMonitor
-      ? db.collection('paymentWebhookEvents')
         .orderBy('createdAt', 'desc')
         .limit(100)
         .get()
@@ -135,12 +176,8 @@ export const getPlatformWorkspace = onCall(
     transactions: payments.map((payment) =>
       serializePayment(payment, businessById.get(String(payment.tenantId ?? '')))),
     plans,
-    analytics: buildAnalytics(businesses, payments),
+    analytics: buildAnalytics(businesses, payments, bookingActivity, range),
     auditEvents: auditSnapshot?.docs.map((document) => ({
-      id: document.id,
-      ...serializeRecord(document.data()),
-    })) ?? [],
-    webhookEvents: webhookSnapshot?.docs.map((document) => ({
       id: document.id,
       ...serializeRecord(document.data()),
     })) ?? [],
@@ -151,12 +188,6 @@ export const getPlatformWorkspace = onCall(
         ? document.data().role
         : 'super_admin',
     })) ?? [],
-    limits: {
-      businesses: tenantLimit,
-      transactions: paymentLimit,
-      businessesTruncated: tenantSnapshot.size > tenantLimit,
-      transactionsTruncated: paymentSnapshot.size > paymentLimit,
-    },
   };
   },
 );
@@ -212,20 +243,22 @@ export const getPlatformDashboard = onCall(async (request) => {
 export const getPlatformBusinessDetail = onCall(async (request) => {
   await requirePlatformAdmin(db, request.auth, 'business.read');
   const tenantId = requiredString(request.data?.tenantId, 'tenantId');
+  const activityDays = parseActivityDays(request.data?.activityDays);
+  const activityStart = Timestamp.fromMillis(Date.now() - activityDays * 86400000);
   const tenantRef = db.collection('tenants').doc(tenantId);
   const tenant = await tenantRef.get();
   if (!tenant.exists) throw new HttpsError('not-found', 'Không tìm thấy doanh nghiệp.');
   const data = tenant.data() ?? {};
   const ownerUid = String(data.ownerUid ?? '');
-  const [owner, bookings, customers, staff, services, products, equipment, revenue, payments, audits] =
+  const [owner, bookings, customers, users, services, products, equipment, revenue, payments, audits] =
     await Promise.all([
       ownerUid ? db.collection('users').doc(ownerUid).get() : Promise.resolve(null),
-      db.collection('bookings').where('tenantId', '==', tenantId).count().get(),
-      db.collection('customers').where('tenantId', '==', tenantId).count().get(),
-      db.collection('users').where('tenantId', '==', tenantId).count().get(),
-      db.collection('services').where('tenantId', '==', tenantId).count().get(),
-      db.collection('products').where('tenantId', '==', tenantId).count().get(),
-      db.collection('equipment').where('tenantId', '==', tenantId).count().get(),
+      db.collection('bookings').where('tenantId', '==', tenantId).get(),
+      db.collection('customers').where('tenantId', '==', tenantId).get(),
+      db.collection('users').where('tenantId', '==', tenantId).get(),
+      db.collection('services').where('tenantId', '==', tenantId).get(),
+      db.collection('products').where('tenantId', '==', tenantId).get(),
+      db.collection('equipment').where('tenantId', '==', tenantId).get(),
       db.collection('payments')
         .where('tenantId', '==', tenantId)
         .where('type', '==', 'subscription')
@@ -243,29 +276,50 @@ export const getPlatformBusinessDetail = onCall(async (request) => {
       db.collection('payments').where('tenantId', '==', tenantId)
         .orderBy('createdAt', 'desc').limit(50).get(),
       db.collection('auditEvents').where('tenantId', '==', tenantId)
-        .orderBy('createdAt', 'desc').limit(50).get(),
+        .where('createdAt', '>=', activityStart)
+        .orderBy('createdAt', 'desc').limit(1000).get(),
     ]);
   const paymentRows: PaymentRecord[] = payments.docs.map((document) => ({
     id: document.id,
     ...document.data(),
   }));
+  const staff = users.docs.filter((document) =>
+    ['staff', 'receptionist'].includes(String(document.data().role)) &&
+    document.data().active !== false,
+  );
+  const records = {
+    bookings: bookings.docs.map((document) => serializeTenantRecord('bookings', document)),
+    customers: customers.docs.map((document) => serializeTenantRecord('customers', document)),
+    staff: staff.map((document) => serializeTenantRecord('staff', document)),
+    services: services.docs.map((document) => serializeTenantRecord('services', document)),
+    products: products.docs.map((document) => serializeTenantRecord('products', document)),
+    equipment: equipment.docs.map((document) => serializeTenantRecord('equipment', document)),
+  };
   return {
     business: serializeBusiness(tenant.id, data, owner?.data() ?? {}),
     usage: {
-      bookings: bookings.data().count,
-      customers: customers.data().count,
-      staff: staff.data().count,
-      services: services.data().count,
-      products: products.data().count,
-      equipment: equipment.data().count,
+      bookings: records.bookings.length,
+      customers: records.customers.length,
+      staff: records.staff.length,
+      services: records.services.length,
+      products: records.products.length,
+      equipment: records.equipment.length,
     },
+    records,
     lifetimeRevenue: revenue == null ? null : money(revenue.data().total),
     lifetimeRevenueAvailable: revenue != null,
     payments: paymentRows.map((payment) => serializePayment(payment)),
-    activity: audits.docs.map((document) => ({
-      id: document.id,
-      ...serializeRecord(document.data()),
-    })),
+    activityDays,
+    activity: audits.docs.map((document) => {
+      const audit = document.data();
+      return {
+        id: document.id,
+        type: String(audit.entityType ?? 'system'),
+        action: String(audit.action ?? 'updated'),
+        status: String(audit.status ?? 'succeeded'),
+        createdAt: toMillis(audit.createdAt),
+      };
+    }),
   };
 });
 
@@ -278,6 +332,9 @@ export const platformAdminAction = onCall(async (request) => {
 
   if (action.startsWith('business.') || action.startsWith('subscription.')) {
     return mutateTenant(actor, action, resourceId, payload);
+  }
+  if (action.startsWith('record.')) {
+    return mutateTenantRecord(actor, action, resourceId, payload);
   }
   if (action.startsWith('plan.')) return mutatePlan(actor, action, resourceId, payload);
   if (action.startsWith('transaction.')) {
@@ -435,6 +492,17 @@ async function mutateTenant(
     const before = snapshot.data() ?? {};
     const update: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
     switch (action) {
+      case 'business.update_info':
+        Object.assign(update, {
+          name: requiredString(payload.name, 'name'),
+          ownerName: requiredString(payload.ownerName, 'ownerName'),
+          phone: requiredString(payload.phone, 'phone'),
+          address: requiredString(payload.address, 'address'),
+          province: requiredString(payload.province, 'province'),
+          type: requiredString(payload.businessType, 'businessType'),
+          businessType: requiredString(payload.businessType, 'businessType'),
+        });
+        break;
       case 'business.suspend': update.status = 'suspended'; break;
       case 'business.reactivate': update.status = 'active'; break;
       case 'business.cancel': update.status = 'cancelled'; update.subscriptionStatus = 'cancelled'; break;
@@ -443,11 +511,12 @@ async function mutateTenant(
         const plan = await transaction.get(
           db.collection('subscriptionPlans').doc(planTier),
         );
-        if (!plan.exists || plan.data()?.status !== 'active') {
+        if (!plan.exists || !isSelectablePlan(plan.data())) {
           throw new HttpsError('failed-precondition', 'Gói SaaS không hoạt động.');
         }
         update.planTier = planTier;
-        update.subscriptionStatus = 'active';
+        update.subscriptionStatus = retainedSubscriptionStatus(before);
+        update.trialStatus = update.subscriptionStatus === 'trial' ? 'active' : 'expired';
         break;
       }
       case 'subscription.extend': {
@@ -458,18 +527,387 @@ async function mutateTenant(
         const base = current.getTime() > Date.now() ? current : new Date();
         base.setDate(base.getDate() + days);
         update.planExpiresAt = Timestamp.fromDate(base);
-        update.subscriptionStatus = 'active';
+        update.subscriptionStatus = retainedSubscriptionStatus(before);
+        update.trialStatus = update.subscriptionStatus === 'trial' ? 'active' : 'expired';
         break;
       }
       case 'subscription.cancel': update.subscriptionStatus = 'cancelled'; break;
-      case 'subscription.reactivate': update.subscriptionStatus = 'active'; break;
+      case 'subscription.reactivate':
+        update.subscriptionStatus = retainedSubscriptionStatus(before);
+        update.trialStatus = update.subscriptionStatus === 'trial' ? 'active' : 'expired';
+        break;
       default: throw new HttpsError('invalid-argument', 'Thao tác doanh nghiệp không hợp lệ.');
     }
     transaction.update(ref, update);
+    if (action === 'business.update_info' && before.ownerUid) {
+      transaction.set(db.collection('users').doc(String(before.ownerUid)), {
+        name: update.ownerName,
+        phone: update.phone,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
     writePlatformAudit(transaction, actor, actionTarget('tenant', tenantId),
       action, before, { ...before, ...update });
   });
   return { resourceId: tenantId };
+}
+
+type TenantRecordKind =
+  | 'bookings'
+  | 'customers'
+  | 'staff'
+  | 'services'
+  | 'products'
+  | 'equipment';
+
+const tenantRecordCollections: Record<TenantRecordKind, string> = {
+  bookings: 'bookings',
+  customers: 'customers',
+  staff: 'users',
+  services: 'services',
+  products: 'products',
+  equipment: 'equipment',
+};
+
+async function mutateTenantRecord(
+  actor: PlatformContext,
+  action: string,
+  resourceId: string,
+  payload: Record<string, unknown>,
+) {
+  if (!['record.save', 'record.delete'].includes(action)) {
+    throw new HttpsError('invalid-argument', 'Thao tác dữ liệu không hợp lệ.');
+  }
+  const tenantId = requiredString(payload.tenantId, 'tenantId');
+  const kind = requiredString(payload.kind, 'kind') as TenantRecordKind;
+  if (!(kind in tenantRecordCollections)) {
+    throw new HttpsError('invalid-argument', 'Loại dữ liệu không hợp lệ.');
+  }
+  const tenant = await db.collection('tenants').doc(tenantId).get();
+  if (!tenant.exists) throw new HttpsError('not-found', 'Không tìm thấy doanh nghiệp.');
+  if (kind === 'staff') {
+    return mutateStaffRecord(actor, action, resourceId, tenantId, payload);
+  }
+  if (kind === 'bookings') {
+    return mutateBookingRecord(actor, action, resourceId, tenantId, payload);
+  }
+
+  const collection = tenantRecordCollections[kind];
+  const ref = resourceId === 'new'
+    ? db.collection(collection).doc()
+    : db.collection(collection).doc(resourceId);
+  const snapshot = resourceId === 'new' ? null : await ref.get();
+  if (snapshot && (!snapshot.exists || snapshot.data()?.tenantId !== tenantId)) {
+    throw new HttpsError('not-found', 'Không tìm thấy bản ghi.');
+  }
+  if (action === 'record.delete') {
+    if (!snapshot) throw new HttpsError('not-found', 'Không tìm thấy bản ghi.');
+    if (kind === 'equipment') {
+      const assigned = await db.collection('bookings')
+        .where('resourceIds', 'array-contains', ref.id).get();
+      if (assigned.docs.some((document) =>
+        ['pending', 'confirmed', 'in_progress'].includes(String(document.data().status)),
+      )) {
+        throw new HttpsError('failed-precondition', 'Thiết bị đang được dùng trong lịch hẹn.');
+      }
+    }
+    const batch = db.batch();
+    batch.delete(ref);
+    writePlatformAudit(batch, actor, actionTarget(kind, ref.id),
+      `${kind}.deleted`, snapshot.data(), null);
+    await batch.commit();
+    return { resourceId: ref.id };
+  }
+
+  const update = tenantRecordData(kind, payload, tenantId, snapshot == null);
+  const batch = db.batch();
+  batch.set(ref, update, { merge: true });
+  writePlatformAudit(batch, actor, actionTarget(kind, ref.id),
+    snapshot == null ? `${kind}.created` : `${kind}.updated`,
+    snapshot?.data() ?? null, update);
+  await batch.commit();
+  return { resourceId: ref.id };
+}
+
+function tenantRecordData(
+  kind: Exclude<TenantRecordKind, 'bookings' | 'staff'>,
+  payload: Record<string, unknown>,
+  tenantId: string,
+  creating: boolean,
+): Record<string, unknown> {
+  const common = {
+    tenantId,
+    updatedAt: FieldValue.serverTimestamp(),
+    ...(creating ? { createdAt: FieldValue.serverTimestamp() } : {}),
+  };
+  switch (kind) {
+    case 'customers': {
+      const isVip = payload.isVip === true;
+      return {
+        ...common,
+        name: requiredString(payload.name, 'name'),
+        phone: requiredString(payload.phone, 'phone'),
+        email: optionalString(payload.email) ?? '',
+        birthday: optionalString(payload.birthday) ?? '',
+        notes: optionalString(payload.notes) ?? '',
+        allergies: optionalString(payload.allergies) ?? '',
+        isVip,
+        customerTier: isVip ? 'vip' : 'standard',
+        visitCount: integer(payload.visitCount ?? 0, 'visitCount', 0, 100000),
+        avatar: requiredString(payload.name, 'name').trim().substring(0, 1).toUpperCase(),
+        color: '#22AFC2',
+      };
+    }
+    case 'services':
+      return {
+        ...common,
+        name: requiredString(payload.name, 'name'),
+        price: integer(payload.price, 'price', 0, 1000000000),
+        duration: integer(payload.duration, 'duration', 1, 1440),
+        durationMin: integer(payload.duration, 'duration', 1, 1440),
+        category: requiredString(payload.category, 'category'),
+      };
+    case 'products':
+      return {
+        ...common,
+        name: requiredString(payload.name, 'name'),
+        price: integer(payload.price, 'price', 0, 1000000000),
+        unit: requiredString(payload.unit, 'unit'),
+        category: requiredString(payload.category, 'category'),
+      };
+    case 'equipment': {
+      const status = String(payload.status ?? 'available');
+      if (!['available', 'in_use', 'maintenance'].includes(status)) {
+        throw new HttpsError('invalid-argument', 'Trạng thái thiết bị không hợp lệ.');
+      }
+      return {
+        ...common,
+        name: requiredString(payload.name, 'name'),
+        status,
+        location: optionalString(payload.location) ?? '',
+        quantity: integer(payload.quantity ?? 1, 'quantity', 1, 1000),
+        lastMaintenance: optionalTimestamp(payload.lastMaintenance),
+      };
+    }
+  }
+}
+
+async function mutateStaffRecord(
+  actor: PlatformContext,
+  action: string,
+  resourceId: string,
+  tenantId: string,
+  payload: Record<string, unknown>,
+) {
+  const creating = resourceId === 'new';
+  const ref = creating ? db.collection('users').doc() : db.collection('users').doc(resourceId);
+  const snapshot = creating ? null : await ref.get();
+  if (snapshot && (
+    !snapshot.exists ||
+    snapshot.data()?.tenantId !== tenantId ||
+    !['staff', 'receptionist'].includes(String(snapshot.data()?.role))
+  )) {
+    throw new HttpsError('not-found', 'Không tìm thấy nhân viên.');
+  }
+  if (action === 'record.delete') {
+    if (!snapshot) throw new HttpsError('not-found', 'Không tìm thấy nhân viên.');
+    const future = await db.collection('bookings')
+      .where('tenantId', '==', tenantId)
+      .where('staffId', '==', ref.id)
+      .where('startTime', '>=', Timestamp.now()).limit(1).get();
+    if (!future.empty) {
+      throw new HttpsError('failed-precondition', 'Hãy xử lý lịch hẹn tương lai trước khi xóa nhân viên.');
+    }
+    await admin.auth().updateUser(ref.id, { disabled: true });
+    const batch = db.batch();
+    batch.update(ref, { active: false, updatedAt: FieldValue.serverTimestamp() });
+    writePlatformAudit(batch, actor, actionTarget('staff', ref.id),
+      'staff.deleted', snapshot.data(), { active: false });
+    await batch.commit();
+    return { resourceId: ref.id };
+  }
+
+  const name = requiredString(payload.name, 'name');
+  const email = requiredString(payload.email, 'email').toLowerCase();
+  if (!email.includes('@')) throw new HttpsError('invalid-argument', 'Email không hợp lệ.');
+  const status = String(payload.status ?? 'available');
+  if (!['available', 'in_session', 'absent'].includes(status)) {
+    throw new HttpsError('invalid-argument', 'Trạng thái nhân viên không hợp lệ.');
+  }
+  const update = {
+    tenantId,
+    role: 'staff',
+    permissions: ['booking.status.own', 'customer.read'],
+    name,
+    email,
+    phone: requiredString(payload.phone, 'phone'),
+    role_title: requiredString(payload.roleTitle, 'roleTitle'),
+    status,
+    active: true,
+    color: String(snapshot?.data()?.color ?? '#148a9c'),
+    specialties: stringList(payload.specialties),
+    updatedAt: FieldValue.serverTimestamp(),
+    ...(creating ? {
+      appointments: 0,
+      rating: 5,
+      createdAt: FieldValue.serverTimestamp(),
+      mustChangePassword: true,
+    } : {}),
+  };
+  let temporaryPassword: string | undefined;
+  let uid = ref.id;
+  if (creating) {
+    temporaryPassword = `Sc!${randomBytes(9).toString('base64url')}`;
+    const user = await admin.auth().createUser({ email, password: temporaryPassword, displayName: name });
+    uid = user.uid;
+    await admin.auth().setCustomUserClaims(uid, {
+      role: 'staff', tenantId, permissions: update.permissions, mustChangePassword: true,
+    });
+  } else {
+    await admin.auth().updateUser(uid, { email, displayName: name, disabled: false });
+  }
+  const targetRef = db.collection('users').doc(uid);
+  try {
+    const batch = db.batch();
+    batch.set(targetRef, update, { merge: true });
+    writePlatformAudit(batch, actor, actionTarget('staff', uid),
+      creating ? 'staff.created' : 'staff.updated', snapshot?.data() ?? null, update);
+    await batch.commit();
+  } catch (error) {
+    if (creating) await admin.auth().deleteUser(uid).catch(() => undefined);
+    throw error;
+  }
+  return { resourceId: uid, temporaryPassword };
+}
+
+async function mutateBookingRecord(
+  actor: PlatformContext,
+  action: string,
+  resourceId: string,
+  tenantId: string,
+  payload: Record<string, unknown>,
+) {
+  const creating = resourceId === 'new';
+  const ref = creating ? db.collection('bookings').doc() : db.collection('bookings').doc(resourceId);
+  await db.runTransaction(async (transaction) => {
+    const snapshot = creating ? null : await transaction.get(ref);
+    if (snapshot && (!snapshot.exists || snapshot.data()?.tenantId !== tenantId)) {
+      throw new HttpsError('not-found', 'Không tìm thấy lịch hẹn.');
+    }
+    const before = snapshot?.data() ?? {};
+    const oldResources = stringList(before.resourceIds);
+    if (action === 'record.delete') {
+      if (!snapshot) throw new HttpsError('not-found', 'Không tìm thấy lịch hẹn.');
+      const release = await releasableAdminEquipment(transaction, tenantId, ref.id, oldResources);
+      transaction.delete(ref);
+      for (const equipmentRef of release) transaction.update(equipmentRef, {
+        status: 'available', updatedAt: FieldValue.serverTimestamp(),
+      });
+      writePlatformAudit(transaction, actor, actionTarget('bookings', ref.id),
+        'bookings.deleted', before, null);
+      return;
+    }
+
+    const staffId = requiredString(payload.staffId, 'staffId');
+    const customerId = requiredString(payload.customerId, 'customerId');
+    const serviceId = requiredString(payload.serviceId, 'serviceId');
+    const startTime = requiredTimestamp(payload.startTime, 'startTime');
+    const endTime = requiredTimestamp(payload.endTime, 'endTime');
+    if (endTime.toMillis() <= startTime.toMillis()) {
+      throw new HttpsError('invalid-argument', 'Giờ kết thúc phải sau giờ bắt đầu.');
+    }
+    const status = String(payload.status ?? 'pending');
+    if (!['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'].includes(status)) {
+      throw new HttpsError('invalid-argument', 'Trạng thái lịch hẹn không hợp lệ.');
+    }
+    const [staff, customer, service] = await Promise.all([
+      transaction.get(db.collection('users').doc(staffId)),
+      transaction.get(db.collection('customers').doc(customerId)),
+      transaction.get(db.collection('services').doc(serviceId)),
+    ]);
+    for (const document of [staff, customer, service]) {
+      if (!document.exists || document.data()?.tenantId !== tenantId) {
+        throw new HttpsError('failed-precondition', 'Nhân viên, khách hàng hoặc dịch vụ không hợp lệ.');
+      }
+    }
+    const resourceIds = stringList(payload.resourceIds);
+    const resourceSnapshot: Array<Record<string, unknown>> = [];
+    for (const id of resourceIds) {
+      const equipment = await transaction.get(db.collection('equipment').doc(id));
+      if (!equipment.exists || equipment.data()?.tenantId !== tenantId || equipment.data()?.status === 'maintenance') {
+        throw new HttpsError('failed-precondition', 'Thiết bị không khả dụng.');
+      }
+      resourceSnapshot.push({ id, name: String(equipment.data()?.name ?? id), quantity: equipment.data()?.quantity ?? 1 });
+    }
+    const overlaps = await transaction.get(
+      db.collection('bookings').where('tenantId', '==', tenantId).where('startTime', '<', endTime),
+    );
+    const active = new Set(['pending', 'confirmed', 'in_progress']);
+    const conflicting = overlaps.docs.filter((document) => {
+      if (document.id === ref.id) return false;
+      const row = document.data();
+      return active.has(String(row.status)) &&
+        row.endTime instanceof Timestamp && row.endTime.toMillis() > startTime.toMillis();
+    });
+    if (conflicting.some((document) => document.data().staffId === staffId)) {
+      throw new HttpsError('already-exists', 'Khung giờ của nhân viên đã có lịch.');
+    }
+    for (const id of resourceIds) {
+      const equipment = resourceSnapshot.find((item) => item.id === id)!;
+      const used = conflicting.filter((document) => stringList(document.data().resourceIds).includes(id)).length;
+      if (used >= Number(equipment.quantity ?? 1)) {
+        throw new HttpsError('already-exists', 'Thiết bị đã được đặt trong khung giờ này.');
+      }
+    }
+    const release = await releasableAdminEquipment(
+      transaction, tenantId, ref.id, oldResources.filter((id) => !resourceIds.includes(id)),
+    );
+    const update = {
+      tenantId, staffId, customerId, serviceId, startTime, endTime, status,
+      notes: optionalString(payload.notes) ?? '',
+      staffName: String(staff.data()?.name ?? ''),
+      customerName: String(customer.data()?.name ?? ''),
+      serviceName: String(service.data()?.name ?? ''),
+      resourceIds, resourceSnapshot,
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(creating ? {
+        createdBy: actor.uid, createdAt: FieldValue.serverTimestamp(),
+        reminder24Sent: false, reminder1hSent: false,
+      } : {}),
+    };
+    transaction.set(ref, update, { merge: true });
+    for (const id of resourceIds) transaction.update(db.collection('equipment').doc(id), {
+      status: 'in_use', updatedAt: FieldValue.serverTimestamp(),
+    });
+    for (const equipmentRef of release) transaction.update(equipmentRef, {
+      status: 'available', updatedAt: FieldValue.serverTimestamp(),
+    });
+    writePlatformAudit(transaction, actor, actionTarget('bookings', ref.id),
+      creating ? 'bookings.created' : 'bookings.updated', before, update);
+  });
+  return { resourceId: ref.id };
+}
+
+async function releasableAdminEquipment(
+  transaction: FirebaseFirestore.Transaction,
+  tenantId: string,
+  bookingId: string,
+  resourceIds: string[],
+) {
+  const result: FirebaseFirestore.DocumentReference[] = [];
+  for (const id of resourceIds) {
+    const ref = db.collection('equipment').doc(id);
+    const assigned = await transaction.get(
+      db.collection('bookings').where('resourceIds', 'array-contains', id),
+    );
+    const stillUsed = assigned.docs.some((document) => {
+      const row = document.data();
+      return document.id !== bookingId && row.tenantId === tenantId &&
+        ['pending', 'confirmed', 'in_progress'].includes(String(row.status));
+    });
+    if (!stillUsed) result.push(ref);
+  }
+  return result;
 }
 
 async function mutatePlan(
@@ -597,6 +1035,7 @@ async function mutateAdmin(
 
 function permissionForAction(action: string): PlatformPermission {
   if (action.startsWith('business.')) return 'business.write';
+  if (action.startsWith('record.')) return 'business.write';
   if (action.startsWith('subscription.')) return 'subscription.write';
   if (action.startsWith('plan.')) return 'plan.write';
   if (action.startsWith('transaction.')) return 'transaction.reconcile';
@@ -634,6 +1073,7 @@ function applyPaidSubscription(
   const update: Record<string, unknown> = {
     planTier: String(payment.planTier),
     subscriptionStatus: 'active',
+    trialStatus: 'expired',
     planStartedAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -656,11 +1096,21 @@ function parseDate(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function parseActivityDays(value: unknown): number {
+  const days = Number(value ?? 30);
+  if (![1, 3, 7, 15, 30].includes(days)) {
+    throw new HttpsError('invalid-argument', 'Khoảng hoạt động không hợp lệ.');
+  }
+  return days;
+}
+
 function serializeBusiness(
   id: string,
   data: FirebaseFirestore.DocumentData,
   owner: FirebaseFirestore.DocumentData,
+  latestBookingAt?: number,
 ) {
+  const storedLastActiveAt = toMillis(data.lastActiveAt);
   return {
     id,
     tenantId: String(data.tenantId ?? id),
@@ -677,9 +1127,37 @@ function serializeBusiness(
     subscriptionStatus: String(data.subscriptionStatus ?? inferSubscriptionStatus(data)),
     status: normalizeBusinessStatus(data.status),
     createdAt: toMillis(data.createdAt),
-    lastActiveAt: toMillis(data.lastActiveAt),
+    lastActiveAt: Math.max(storedLastActiveAt ?? 0, latestBookingAt ?? 0) || null,
     planStartedAt: toMillis(data.planStartedAt),
     planExpiresAt: toMillis(data.planExpiresAt),
+    usageEndedAt: toMillis(data.usageEndedAt),
+  };
+}
+
+function serializeTenantRecord(
+  kind: TenantRecordKind,
+  document: FirebaseFirestore.QueryDocumentSnapshot,
+) {
+  const data = document.data();
+  const fields: Record<TenantRecordKind, string[]> = {
+    bookings: [
+      'customerId', 'customerName', 'staffId', 'staffName', 'serviceId',
+      'serviceName', 'startTime', 'endTime', 'status', 'notes', 'resourceIds',
+    ],
+    customers: [
+      'name', 'phone', 'email', 'birthday', 'notes', 'allergies', 'isVip',
+      'customerTier', 'visitCount', 'lastVisit',
+    ],
+    staff: [
+      'name', 'phone', 'email', 'role_title', 'status', 'specialties', 'active',
+    ],
+    services: ['name', 'price', 'duration', 'durationMin', 'category', 'resourceIds'],
+    products: ['name', 'price', 'unit', 'category'],
+    equipment: ['name', 'status', 'location', 'lastMaintenance', 'quantity'],
+  };
+  return {
+    id: document.id,
+    ...Object.fromEntries(fields[kind].map((field) => [field, serializeValue(data[field])])),
   };
 }
 
@@ -768,6 +1246,7 @@ function buildMetrics(
   previousPayments: PaymentRecord[],
   plans: Array<Record<string, unknown>>,
   range: { start: Date; end: Date },
+  bookingActivity: BookingActivity[],
 ) {
   const paid = payments.filter((payment) => payment.status === 'paid');
   const previousPaid = previousPayments.filter((payment) => payment.status === 'paid');
@@ -781,9 +1260,15 @@ function buildMetrics(
     !['pending', 'superseded'].includes(String(payment.status ?? 'pending')),
   );
   const failed = payments.filter((payment) => payment.status === 'failed');
-  const provinceRevenue = groupMoney(paid, (payment) =>
-    businesses.find((business) => business.id === payment.tenantId)?.province || 'Chưa cập nhật');
-  const topProvince = Object.entries(provinceRevenue).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+  const businessIds = new Set(businesses.map((business) => business.id));
+  const activeBusinessIds = new Set(
+    bookingActivity
+      .filter((booking) => businessIds.has(booking.tenantId))
+      .map((booking) => booking.tenantId),
+  );
+  const eligibleBusinesses = businesses.filter((business) =>
+    business.createdAt == null || business.createdAt <= range.end.getTime());
+  const activeBusinesses30d = activeBusinessIds.size;
   return {
     totalRevenue: revenue,
     previousRevenue,
@@ -800,31 +1285,82 @@ function buildMetrics(
     trialBusinesses: businesses.filter((business) => business.subscriptionStatus === 'trial').length,
     failedPayments: failed.length,
     failedPaymentAmount: failed.reduce((sum, payment) => sum + money(payment.amount), 0),
-    churnedBusinesses: businesses.filter((business) =>
-      ['cancelled', 'expired'].includes(business.subscriptionStatus)).length,
+    churnedBusinesses: businesses.filter((business) => {
+      const endedAt = churnedAt(business);
+      return endedAt != null && endedAt >= range.start.getTime() && endedAt <= range.end.getTime();
+    }).length,
+    activeBusinesses30d,
+    usageRate30d: eligibleBusinesses.length
+      ? Math.round(activeBusinesses30d / eligibleBusinesses.length * 1000) / 10
+      : 0,
     transactionSuccessRate: settledAttempts.length
       ? Math.round(settledAttempts.filter((payment) => payment.status === 'paid').length / settledAttempts.length * 1000) / 10
       : 0,
-    topProvince,
   };
 }
 
 function buildAnalytics(
   businesses: ReturnType<typeof serializeBusiness>[],
   payments: PaymentRecord[],
+  bookingActivity: BookingActivity[],
+  range: { start: Date; end: Date },
 ) {
   const paid = payments.filter((payment) => payment.status === 'paid');
   return {
     revenueByDay: groupMoney(paid, (payment) => dateKey(payment.createdAt)),
     revenueByPlan: groupMoney(paid, (payment) => String(payment.planTier ?? 'Không xác định')),
-    revenueByProvince: groupMoney(paid, (payment) =>
-      businesses.find((business) => business.id === payment.tenantId)?.province || 'Chưa cập nhật'),
     revenueByBusinessType: groupMoney(paid, (payment) =>
       businesses.find((business) => business.id === payment.tenantId)?.businessType || 'Chưa cập nhật'),
     transactionStatus: groupCount(payments, (payment) => String(payment.status ?? 'pending')),
     subscriptionStatus: groupCount(businesses, (business) => business.subscriptionStatus),
-    businessesByProvince: groupCount(businesses, (business) => business.province || 'Chưa cập nhật'),
+    ...buildBusinessTrends(businesses, bookingActivity, range),
   };
+}
+
+function buildBusinessTrends(
+  businesses: ReturnType<typeof serializeBusiness>[],
+  bookingActivity: BookingActivity[],
+  range: { start: Date; end: Date },
+) {
+  const start = new Date(`${localDateKey(range.start)}T00:00:00Z`);
+  const end = new Date(`${localDateKey(range.end)}T00:00:00Z`);
+  const dates = [];
+  for (const date = start; date <= end; date.setUTCDate(date.getUTCDate() + 1)) {
+    dates.push(date.toISOString().slice(0, 10));
+  }
+  const dateSet = new Set(dates);
+  const businessIds = new Set(businesses.map((business) => business.id));
+  const activeByDay = new Map(dates.map((date) => [date, new Set<string>()]));
+  for (const booking of bookingActivity) {
+    if (!businessIds.has(booking.tenantId) || booking.startTime == null) continue;
+    activeByDay.get(localDateKey(booking.startTime))?.add(booking.tenantId);
+  }
+
+  const newBusinessesByDay = Object.fromEntries(dates.map((date) => [date, 0]));
+  const churnedBusinessesByDay = Object.fromEntries(dates.map((date) => [date, 0]));
+  for (const business of businesses) {
+    const created = localDateKey(business.createdAt);
+    if (dateSet.has(created)) newBusinessesByDay[created] += 1;
+    const ended = localDateKey(churnedAt(business));
+    if (dateSet.has(ended)) churnedBusinessesByDay[ended] += 1;
+  }
+
+  const usageRateByDay = Object.fromEntries(dates.map((date) => {
+    const dayEnd = new Date(`${date}T23:59:59.999Z`).getTime();
+    const eligible = businesses.filter(
+      (business) => business.createdAt == null || business.createdAt <= dayEnd,
+    ).length;
+    const active = activeByDay.get(date)?.size ?? 0;
+    return [date, eligible ? Math.round(active / eligible * 1000) / 10 : 0];
+  }));
+  return { usageRateByDay, newBusinessesByDay, churnedBusinessesByDay };
+}
+
+function churnedAt(business: ReturnType<typeof serializeBusiness>): number | null {
+  if (business.usageEndedAt != null) return business.usageEndedAt;
+  return ['cancelled', 'expired'].includes(business.subscriptionStatus)
+    ? business.planExpiresAt
+    : null;
 }
 
 function groupMoney<T>(rows: T[], key: (row: T) => string) {
@@ -844,6 +1380,13 @@ function dateKey(value: unknown): string {
   return millis == null ? 'Không xác định' : new Date(millis).toISOString().slice(0, 10);
 }
 
+function localDateKey(value: unknown): string {
+  const millis = toMillis(value);
+  return millis == null
+    ? 'Không xác định'
+    : new Date(millis + 7 * 3600000).toISOString().slice(0, 10);
+}
+
 function normalizePayOSStatus(value: unknown): string {
   switch (String(value ?? '').toUpperCase()) {
     case 'PAID': return 'paid';
@@ -861,9 +1404,18 @@ function normalizeBusinessStatus(value: unknown): string {
 }
 
 function inferSubscriptionStatus(data: FirebaseFirestore.DocumentData): string {
+  if (data.simulationBatchId === 'outreach-trials-2026-08') {
+    return simulationTrialTenantNames.has(String(data.name ?? '')) ? 'trial' : 'expired';
+  }
   if (data.status === 'cancelled') return 'cancelled';
   if (data.planExpiresAt instanceof Timestamp && data.planExpiresAt.toMillis() < Date.now()) return 'expired';
   return data.planTier && data.planTier !== 'basic' ? 'active' : 'trial';
+}
+
+function retainedSubscriptionStatus(data: FirebaseFirestore.DocumentData): string {
+  if (data.simulationBatchId !== 'outreach-trials-2026-08') return 'active';
+  if (data.subscriptionStatus === 'active') return 'active';
+  return simulationTrialTenantNames.has(String(data.name ?? '')) ? 'trial' : 'expired';
 }
 
 function inRange(value: unknown, start: Date, end: Date): boolean {
@@ -875,6 +1427,19 @@ function toMillis(value: unknown): number | null {
   if (value instanceof Timestamp) return value.toMillis();
   if (value instanceof Date) return value.getTime();
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function requiredTimestamp(value: unknown, field: string): Timestamp {
+  const parsed = typeof value === 'number' ? new Date(value) : new Date(String(value ?? ''));
+  if (Number.isNaN(parsed.getTime())) {
+    throw new HttpsError('invalid-argument', `Trường ${field} không hợp lệ.`);
+  }
+  return Timestamp.fromDate(parsed);
+}
+
+function optionalTimestamp(value: unknown): Timestamp | null {
+  if (value == null || value === '') return null;
+  return requiredTimestamp(value, 'date');
 }
 
 function serializeValue(value: unknown): unknown {
@@ -894,6 +1459,13 @@ function serializeRecord(value: FirebaseFirestore.DocumentData): Record<string, 
 function percentChange(current: number, previous: number): number {
   if (previous === 0) return current === 0 ? 0 : 100;
   return Math.round((current - previous) / previous * 1000) / 10;
+}
+
+export function isSelectablePlan(
+  plan: FirebaseFirestore.DocumentData | undefined,
+): boolean {
+  const status = String(plan?.status ?? 'active');
+  return status !== 'inactive' && status !== 'archived';
 }
 
 function requiredString(value: unknown, field: string): string {
@@ -933,7 +1505,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function actionTarget(type: string, id: string) { return { type, id }; }
 
 export const __testing = {
+  buildBusinessTrends,
+  inferSubscriptionStatus,
+  retainedSubscriptionStatus,
   normalizePayOSStatus,
   percentChange,
   parseRange,
+  parseActivityDays,
+  isSelectablePlan,
 };

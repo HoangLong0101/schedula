@@ -12,7 +12,6 @@ enum AdminSection {
   transactions,
   subscriptions,
   revenue,
-  provinces,
   plans,
   monitoring,
   reports,
@@ -61,12 +60,6 @@ const adminDestinations = [
     'analytics.read',
   ),
   AdminDestination(
-    AdminSection.provinces,
-    'Tỉnh thành',
-    Icons.map_outlined,
-    'analytics.read',
-  ),
-  AdminDestination(
     AdminSection.plans,
     'Bảng giá SaaS',
     Icons.sell_outlined,
@@ -111,14 +104,33 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   AdminSection selected = AdminSection.dashboard;
-  WorkspaceFilter filter = WorkspaceFilter.last30Days();
-  late Future<PlatformWorkspace> workspace = widget.api.getWorkspace(filter);
+  final filters = <AdminSection, WorkspaceFilter>{};
+  late WorkspaceFilter filter;
+  late Future<PlatformWorkspace> workspace;
+
+  @override
+  void initState() {
+    super.initState();
+    filter = WorkspaceFilter.last30Days();
+    filters[selected] = filter;
+    workspace = widget.api.getWorkspace(filter);
+  }
 
   void refresh() => setState(() => workspace = widget.api.getWorkspace(filter));
 
   void updateFilter(WorkspaceFilter value) {
     filter = value;
+    filters[selected] = value;
     refresh();
+  }
+
+  void selectSection(AdminSection value) {
+    final nextFilter = filters[value] ?? WorkspaceFilter.last30Days();
+    setState(() {
+      selected = value;
+      filter = nextFilter;
+      workspace = widget.api.getWorkspace(nextFilter);
+    });
   }
 
   @override
@@ -143,7 +155,7 @@ class _AdminShellState extends State<AdminShell> {
             final navigation = _SideNavigation(
               items: visible,
               selected: selected,
-              onSelected: (value) => setState(() => selected = value),
+              onSelected: selectSection,
               user: widget.user,
               role: actor?.role ?? 'platform_admin',
             );
